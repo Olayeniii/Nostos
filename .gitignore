@@ -1,0 +1,50 @@
+# Dependencies and build output
+node_modules/
+.build/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Local environment
+.env
+.env.*
+!.env.example
+*.local
+
+# Databases and runtime state
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+data/
+runtime/
+
+# Wallet and node state
+wallet-data/
+wallets/
+zcash-data/
+node-data/
+regtest-data/
+*.wallet
+*.seed
+*.mnemonic
+
+# Sensitive proof and credentials
+private-evidence/
+evidence/private/
+secrets/
+credentials/
+*.key
+*.pem
+*.p12
+*.keystore
+*.bak
+
+# Editors and system files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
