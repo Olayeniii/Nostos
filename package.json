@@ -18,6 +18,11 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "secret:scan": "node scripts/quality/secret-scan.mjs",
+    "spike:setup": "tsx scripts/shielded-spike/setup-demo-wallets.ts",
+    "spike:send-payment": "tsx scripts/shielded-spike/send-payment.ts",
+    "spike:scan-payment": "tsx scripts/shielded-spike/scan-payment.ts",
+    "spike:send-refund": "tsx scripts/shielded-spike/send-refund.ts",
+    "spike:verify": "tsx scripts/shielded-spike/verify-roundtrip.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
@@ -27,6 +32,7 @@
     "eslint": "9.36.0",
     "globals": "16.4.0",
     "prettier": "3.6.2",
+    "tsx": "4.23.15",
     "typescript": "5.9.2",
     "typescript-eslint": "8.44.1",
     "vitest": "3.2.4"

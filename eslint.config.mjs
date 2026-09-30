@@ -22,7 +22,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["scripts/quality/*.mjs"],
+    files: ["scripts/quality/*.mjs", "scripts/shielded-spike/**/*.ts"],
     rules: {
       "no-console": "off",
     },
