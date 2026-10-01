@@ -42,6 +42,7 @@ describe("partial refund execution", () => {
       txid: "c".repeat(64),
     });
     expect(sendFromAccount).toHaveBeenCalledTimes(1);
+    expect(store.findRefundByPayment(payment.id)?.retryCount).toBe(1);
     store.close();
   });
 
