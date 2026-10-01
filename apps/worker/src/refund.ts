@@ -30,7 +30,10 @@ export async function executePartialRefund(options: {
   if (claimed.status === "broadcast" || claimed.status === "confirmed") {
     if (!claimed.txid)
       throw new Error("Broadcast refund has no transaction ID.");
-    return { broadcast: false, txid: claimed.txid };
+    const retried = options.store.recordRefundRetry(payment.id);
+    if (!retried.txid)
+      throw new Error("Broadcast refund has no transaction ID.");
+    return { broadcast: false, txid: retried.txid };
   }
   if (claimed.status === "broadcast_unknown") {
     throw new Error("Refund broadcast state is unknown; retry is blocked.");
