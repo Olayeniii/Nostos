@@ -1,0 +1,18 @@
+{
+  "classification": "real",
+  "network": "testnet",
+  "verifiedAt": "2026-10-01T17:16:12.360Z",
+  "paymentTxid": "ca8aa10f15abaad706ca3d3354d2b1eba896e47ac74737e97e84275fb48d2707",
+  "orderReference": "demo-order-001",
+  "processRuns": 6,
+  "paymentObservations": 2,
+  "recordsCreated": 1,
+  "storedPayments": 1,
+  "duplicateRecords": 0,
+  "checks": {
+    "realPaymentStored": true,
+    "separateScannerRuns": true,
+    "restartSafe": true,
+    "uniqueTransactionConstraint": true
+  }
+}
