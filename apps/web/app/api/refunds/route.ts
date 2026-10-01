@@ -3,13 +3,15 @@ import { SqlitePaymentStore } from "../../../../../packages/database/src/index.j
 import { ZalletRpcClient } from "../../../../../packages/zcash-adapter/src/index.js";
 import { authorized } from "../../../src/auth.js";
 
+import { trustedOrigin } from "../../../src/origin.js";
+
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   if (!authorized(request, process.env.NOSTOS_WEB_TOKEN))
     return Response.json({ error: "Demo access required" }, { status: 401 });
   const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin)
+  if (!trustedOrigin(origin, process.env.NOSTOS_WEB_TRUSTED_ORIGINS))
     return Response.json({ error: "Request origin rejected" }, { status: 403 });
   const path = process.env.NOSTOS_DATABASE_PATH;
   const url = process.env.NOSTOS_MERCHANT_WALLET_RPC_URL;

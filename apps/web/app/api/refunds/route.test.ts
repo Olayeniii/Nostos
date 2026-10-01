@@ -2,12 +2,31 @@ import { afterEach, describe, expect, it } from "vitest";
 import { POST } from "./route.js";
 
 const previous = process.env.NOSTOS_WEB_TOKEN;
+const previousOrigins = process.env.NOSTOS_WEB_TRUSTED_ORIGINS;
 afterEach(() => {
+  if (previousOrigins === undefined)
+    delete process.env.NOSTOS_WEB_TRUSTED_ORIGINS;
+  else process.env.NOSTOS_WEB_TRUSTED_ORIGINS = previousOrigins;
   if (previous === undefined) delete process.env.NOSTOS_WEB_TOKEN;
   else process.env.NOSTOS_WEB_TOKEN = previous;
 });
 
 describe("refund HTTP boundary", () => {
+  it("accepts tunnel origins even when Next rewrites request.url", async () => {
+    process.env.NOSTOS_WEB_TOKEN = "test-secret";
+    delete process.env.NOSTOS_WEB_TRUSTED_ORIGINS;
+    for (const origin of ["http://127.0.0.1:3000", "http://localhost:3000"]) {
+      const response = await POST(
+        new Request("http://localhost:3000/api/refunds", {
+          method: "POST",
+          headers: { authorization: "Bearer test-secret", origin },
+          body: JSON.stringify({ amountZat: 0 }),
+        }),
+      );
+      // Unconfigured service rejects before any wallet or database access, after origin passes.
+      expect(response.status).toBe(503);
+    }
+  });
   it("rejects an unauthenticated request before any wallet or database access", async () => {
     process.env.NOSTOS_WEB_TOKEN = "test-secret";
     const response = await POST(

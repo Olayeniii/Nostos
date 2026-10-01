@@ -1,0 +1,36 @@
+{
+  "gate": "G5",
+  "status": "incomplete",
+  "baselineCommit": "5bc257b998bc07daab123286c98cb3be7bc0ff33",
+  "phoneProof": {
+    "source": "user-reported wallet, database, and phone receipt agreement",
+    "paymentTxid": "4247ce0007e606da713170c96013d569609627ab6aca343615a393a2a6a77b1a",
+    "paymentAmountZat": 1000000,
+    "refundTxid": "d9a0b9ca9d4123105c03ffe7aeb6956a12bcb040ec377172cc0cd3a568ca0137",
+    "confirmedRefundAmountZat": 310000,
+    "intendedRefundAmountZat": 300000,
+    "retryInputKnown": false,
+    "exactAmountProof": "unresolved",
+    "additionalRefundForbidden": true
+  },
+  "automatedChecks": {
+    "unitAndBoundaryTests": "passed",
+    "testCount": 53,
+    "productionWebBuild": "passed",
+    "exactDecimalConversion": "passed as unit test only",
+    "trustedOriginBoundary": "passed without wallet broadcast"
+  },
+  "controlledBrowserVerification": {
+    "status": "blocked",
+    "reason": "Available browser rejected loopback URL with ERR_BLOCKED_BY_CLIENT",
+    "reviewToSendAmount": "pending",
+    "staleAndOverlappingRefreshes": "pending",
+    "loadingAnimation": "pending"
+  },
+  "limitations": [
+    "No real transaction was sent in this patch validation.",
+    "One refund instruction per payment is supported.",
+    "Tunnel or browser cause of intermittent failures remains unproven.",
+    "G1, G3 and G4 evidence is preserved."
+  ]
+}

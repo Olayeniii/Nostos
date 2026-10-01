@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  requestJson,
+  parseZec,
+  matchesReview,
+  hasRecordedRefund,
+} from "../src/requests.js";
 
 type Status =
   | "ready"
@@ -78,25 +84,51 @@ export default function Home() {
   const [access, setAccess] = useState("");
   const sending = useRef(false);
   const [busy, setBusy] = useState(false);
+  const refreshRequest = useRef<AbortController | undefined>(undefined);
+  const refreshVersion = useRef(0);
+  const recordsPresent = useRef(false);
+  const uncertainPayments = useRef(new Set<string>());
+  const [refreshing, setRefreshing] = useState(false);
+
+  function cancelRefresh() {
+    refreshVersion.current += 1;
+    refreshRequest.current?.abort();
+    refreshRequest.current = undefined;
+    setRefreshing(false);
+  }
 
   async function refresh(quiet = false) {
-    if (sending.current && !quiet) return;
+    if (!access || (sending.current && !quiet) || refreshRequest.current)
+      return;
+    const controller = new AbortController();
+    refreshRequest.current = controller;
+    const version = ++refreshVersion.current;
+    setRefreshing(true);
     if (!quiet && payments.length === 0) {
       setStatus("loading");
       setMessage("Loading payments");
     }
     try {
-      const response = await fetch("/api/payments", {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${access}` },
+      const data = await requestJson<{ payments: Payment[] }>(
+        "/api/payments",
+        {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${access}` },
+        },
+        12_000,
+        controller.signal,
+      );
+      if (version !== refreshVersion.current) return;
+      const records = data.payments.map((record) => {
+        if (!uncertainPayments.current.has(record.id)) return record;
+        if (hasRecordedRefund(record)) {
+          uncertainPayments.current.delete(record.id);
+          return record;
+        }
+        return { ...record, canRefund: false, status: "broadcast_unknown" };
       });
-      if (!response.ok)
-        throw new Error(
-          "Payment service is unavailable. No action was submitted.",
-        );
-      const data = await response.json();
-      const records = data.payments as Payment[];
       setConnectionError("");
+      recordsPresent.current = records.length > 0;
       setPayments(records);
       setSelected((current) =>
         current
@@ -120,13 +152,26 @@ export default function Home() {
             : "Payment records are up to date",
       );
     } catch {
-      if (payments.length === 0 && !sending.current) setStatus("failed");
+      if (version !== refreshVersion.current) return;
+      if (!recordsPresent.current && !sending.current) setStatus("failed");
       setConnectionError(
         "Connection interrupted. Last saved status is shown. Reconnect and refresh before taking action.",
       );
+    } finally {
+      if (version === refreshVersion.current) {
+        refreshRequest.current = undefined;
+        setRefreshing(false);
+      }
     }
   }
   useEffect(() => {
+    cancelRefresh();
+    recordsPresent.current = false;
+    setPayments([]);
+    setSelected(undefined);
+    reviewed.current = undefined;
+    setReview(false);
+    setConnectionError("");
     if (!access) {
       setStatus("ready");
       setMessage("Enter private demo access to load records");
@@ -135,7 +180,10 @@ export default function Home() {
     const timer = setInterval(() => {
       if (!sending.current) void refresh(true);
     }, 8000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      cancelRefresh();
+    };
   }, [access]);
 
   async function sendRefund() {
@@ -145,28 +193,40 @@ export default function Home() {
       !valid ||
       connectionError ||
       !reviewed.current ||
-      reviewed.current.paymentId !== selected.id
+      !matchesReview(reviewed.current, selected.id, amountZat) ||
+      uncertainPayments.current.has(selected.id)
     )
       return;
     const instruction = reviewed.current;
+    cancelRefresh();
+    uncertainPayments.current.add(instruction.paymentId);
     sending.current = true;
     setBusy(true);
     setStatus("loading");
     setMessage("Preparing shielded refund");
     try {
-      const response = await fetch("/api/refunds", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${access}`,
+      await requestJson(
+        "/api/refunds",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${access}`,
+          },
+          body: JSON.stringify({
+            paymentTxid: instruction.paymentId,
+            amountZat: instruction.amountZat,
+          }),
         },
-        body: JSON.stringify({
-          paymentTxid: instruction.paymentId,
-          amountZat: instruction.amountZat,
-        }),
-      });
-      if (!response.ok)
-        throw new Error("Refund requires a status check before retry");
+        130_000,
+      );
+      setStatus("broadcast");
+      setMessage("Refund sent, waiting for confirmation");
+      setSelected((current) =>
+        current
+          ? { ...current, canRefund: false, status: "broadcast" }
+          : current,
+      );
       setReview(false);
       await refresh(true);
     } catch {
@@ -193,10 +253,10 @@ export default function Home() {
     setReview(false);
     setAmount(zec(payment.availableZat));
   }
-  const validAmount = /^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(amount);
-  const amountZat = validAmount ? Math.round(Number(amount) * 100_000_000) : 0;
+  const amountZat = parseZec(amount);
   const valid =
     selected?.canRefund &&
+    !uncertainPayments.current.has(selected.id) &&
     Number.isSafeInteger(amountZat) &&
     amountZat > 0 &&
     amountZat <= selected.availableZat;
@@ -259,12 +319,17 @@ export default function Home() {
           <input
             type="password"
             autoComplete="off"
+            disabled={busy}
             value={access}
             onChange={(event) => setAccess(event.target.value)}
             placeholder="Access token"
           />
         </label>
-        <button className="text-button" type="submit">
+        <button
+          className="text-button"
+          type="submit"
+          disabled={refreshing || busy || !access}
+        >
           Load records
         </button>
       </form>
@@ -275,7 +340,7 @@ export default function Home() {
               <h2>Payments</h2>
               <button
                 className="text-button"
-                disabled={status === "loading"}
+                disabled={refreshing || busy || !access}
                 onClick={() => void refresh()}
               >
                 Refresh
@@ -371,7 +436,10 @@ export default function Home() {
                         <input
                           inputMode="decimal"
                           value={amount}
-                          onChange={(event) => setAmount(event.target.value)}
+                          onChange={(event) => {
+                            reviewed.current = undefined;
+                            setAmount(event.target.value);
+                          }}
                         />
                       </label>
                     )}
@@ -387,7 +455,9 @@ export default function Home() {
                         </p>
                         <button
                           className="primary"
-                          disabled={busy || !valid || !!connectionError}
+                          disabled={
+                            busy || !valid || refreshing || !!connectionError
+                          }
                           onClick={() => void sendRefund()}
                         >
                           {busy ? "Preparing refund" : "Send private refund"}
@@ -403,7 +473,9 @@ export default function Home() {
                     ) : (
                       <button
                         className="primary"
-                        disabled={!valid || busy || !!connectionError}
+                        disabled={
+                          !valid || busy || refreshing || !!connectionError
+                        }
                         onClick={() => {
                           reviewed.current = {
                             paymentId: selected.id,
