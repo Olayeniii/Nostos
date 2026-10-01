@@ -20,7 +20,7 @@ export interface SpikeState {
   detected?: {
     amountZec: number;
     confirmations: number;
-    pool: "orchard" | "sapling";
+    pool: "ironwood" | "orchard" | "sapling";
   };
   refund?: {
     amountZec: number;

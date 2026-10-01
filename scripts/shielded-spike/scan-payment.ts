@@ -24,12 +24,16 @@ const receivers = await merchantRpc.decodeUnifiedAddress(memo.r);
 if (!receivers.orchard || receivers.p2pkh || receivers.tex) {
   throw new Error("Refund destination is not an Orchard-only unified address.");
 }
-if (note.pool !== "orchard" && note.pool !== "sapling") {
+if (
+  note.pool !== "ironwood" &&
+  note.pool !== "orchard" &&
+  note.pool !== "sapling"
+) {
   throw new Error("Payment note pool is not supported by the spike.");
 }
 
 state.detected = {
-  amountZec: note.amount ?? state.payment.amountZec,
+  amountZec: note.value ?? note.amount ?? state.payment.amountZec,
   confirmations: note.confirmations ?? 1,
   pool: note.pool,
 };

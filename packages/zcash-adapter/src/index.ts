@@ -19,6 +19,7 @@ export interface ShieldedRecipient {
 export interface ShieldedNote {
   address?: string;
   amount?: number;
+  value?: number;
   confirmations?: number;
   memo?: string;
   memoStr?: string;

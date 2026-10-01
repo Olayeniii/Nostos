@@ -15,7 +15,7 @@ if (state.refund)
 const merchantRpc = new ZalletRpcClient(config.merchant);
 const txid = await merchantRpc.sendFromAccount(
   state.merchant.accountUuid,
-  state.detected.pool,
+  state.detected.pool === "ironwood" ? "orchard" : state.detected.pool,
   [{ address: state.payment.refundAddress, amount: config.refundZec }],
 );
 

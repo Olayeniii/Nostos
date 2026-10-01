@@ -1,0 +1,24 @@
+{
+  "classification": "real",
+  "network": "testnet",
+  "verifiedAt": "2026-10-01T16:47:21.222Z",
+  "orderReference": "demo-order-001",
+  "payment": {
+    "txid": "ca8aa10f15abaad706ca3d3354d2b1eba896e47ac74737e97e84275fb48d2707",
+    "amountZec": 0.02,
+    "confirmations": 475
+  },
+  "refund": {
+    "txid": "fd4ec8d67a00bc2e928dfe57ffd44e941a9b1322280b3c9b014aeea6eeec53a0",
+    "amountZec": 0.005,
+    "confirmations": 1,
+    "destination": "utest1jx...gg575llg"
+  },
+  "checks": {
+    "freshShieldedRefundAddress": true,
+    "encryptedMemoRecovered": true,
+    "merchantRefundBroadcast": true,
+    "customerRefundConfirmed": true,
+    "fullPrivacyPolicy": true
+  }
+}
