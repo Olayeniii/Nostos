@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { ingestMerchantPayments } from "../../apps/worker/src/index.js";
 import { SqlitePaymentStore } from "../../packages/database/src/index.js";
@@ -24,11 +25,22 @@ const store = new SqlitePaymentStore(
   ),
 );
 
+async function historicalTxids(): Promise<string[]> {
+  const configured = process.env.NOSTOS_HISTORICAL_PAYMENT_TXIDS?.trim();
+  if (configured) return configured.split(",").map((txid) => txid.trim());
+
+  const evidence = JSON.parse(
+    await readFile(resolve("scripts/evidence/gate-g1.json"), "utf8"),
+  ) as { payment?: { txid?: string } };
+  return evidence.payment?.txid ? [evidence.payment.txid] : [];
+}
+
 try {
   const result = await ingestMerchantPayments({
     merchantId: process.env.NOSTOS_MERCHANT_ID?.trim() || "demo-merchant",
     source,
     store,
+    historicalTxids: await historicalTxids(),
   });
   console.log("Nostos payment intake scan completed.");
   console.log(`Observed: ${result.observed}`);
