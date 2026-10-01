@@ -21,6 +21,31 @@ function storeWithPayment(): SqlitePaymentStore {
 }
 
 describe("partial refund execution", () => {
+  it("blocks a concurrent retry without corrupting the active broadcast", async () => {
+    const store = storeWithPayment();
+    let finish!: (txid: string) => void;
+    const sendFromAccount = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const options = {
+      broadcaster: { sendFromAccount },
+      merchantAccountUuid: "merchant-account",
+      paymentTxid: payment.paymentTxId,
+      amountZat: 500_000,
+      idempotencyKey: "payment_001_refund",
+      store,
+    };
+    const first = executePartialRefund(options);
+    await expect(executePartialRefund(options)).rejects.toThrow("in progress");
+    finish("c".repeat(64));
+    await expect(first).resolves.toMatchObject({ broadcast: true });
+    expect(sendFromAccount).toHaveBeenCalledTimes(1);
+    expect(store.findRefundByPayment(payment.id)?.status).toBe("broadcast");
+    store.close();
+  });
   it("broadcasts once and returns the same txid on retry", async () => {
     const store = storeWithPayment();
     const sendFromAccount = vi.fn(async () => "c".repeat(64));
