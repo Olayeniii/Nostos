@@ -160,6 +160,13 @@ export class SqlitePaymentStore {
     return row.count;
   }
 
+  listPayments(): PaymentRecord[] {
+    const rows = this.#database
+      .prepare("SELECT * FROM payments ORDER BY created_at DESC LIMIT 100")
+      .all() as unknown as PaymentRow[];
+    return rows.map(fromRow);
+  }
+
   recordScannerRun(observedPayments: number, createdPayments: number): void {
     this.#database
       .prepare(
