@@ -23,6 +23,7 @@
     "spike:scan-payment": "tsx scripts/shielded-spike/scan-payment.ts",
     "spike:send-refund": "tsx scripts/shielded-spike/send-refund.ts",
     "spike:verify": "tsx scripts/shielded-spike/verify-roundtrip.ts",
+    "intake:scan": "tsx scripts/payment-intake/scan.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
