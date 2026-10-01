@@ -6,6 +6,8 @@ export default tseslint.config(
   {
     ignores: [
       ".build/**",
+      "**/.next/**",
+      "**/next-env.d.ts",
       "coverage/**",
       "node_modules/**",
       "private-evidence/**",
