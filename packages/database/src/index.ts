@@ -131,4 +131,29 @@ export class SqlitePaymentStore {
       .get() as { count: number };
     return row.count;
   }
+
+  scannerRunSummary(): {
+    runs: number;
+    observedPayments: number;
+    createdPayments: number;
+  } {
+    const row = this.#database
+      .prepare(
+        `SELECT
+          COUNT(*) AS runs,
+          COALESCE(SUM(observed_payments), 0) AS observed_payments,
+          COALESCE(SUM(created_payments), 0) AS created_payments
+        FROM scanner_runs`,
+      )
+      .get() as {
+      runs: number;
+      observed_payments: number;
+      created_payments: number;
+    };
+    return {
+      runs: row.runs,
+      observedPayments: row.observed_payments,
+      createdPayments: row.created_payments,
+    };
+  }
 }
