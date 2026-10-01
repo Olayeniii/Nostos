@@ -76,4 +76,33 @@ describe("ZalletRpcClient", () => {
         }),
     ).toThrow("loopback");
   });
+
+  it("omits the address filter when listing every wallet note", async () => {
+    let observed: Record<string, unknown> | undefined;
+    const server = createServer(async (request, response) => {
+      observed = await requestBody(request);
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [] }));
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Test server did not bind.");
+    }
+
+    const client = new ZalletRpcClient({
+      url: `http://127.0.0.1:${address.port}`,
+      user: "user",
+      password: "password",
+    });
+    await client.listUnspent();
+
+    expect(observed).toMatchObject({
+      method: "z_listunspent",
+      params: [1, 9_999_999, false],
+    });
+  });
 });
