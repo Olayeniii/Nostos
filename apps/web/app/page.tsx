@@ -48,7 +48,7 @@ function StateLabel({ state, text }: { state: Status; text: string }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     setVisible(false);
-    if (state !== "loading") return;
+    if (state !== "loading" && state !== "broadcast") return;
     const timer = setTimeout(() => setVisible(true), 250);
     return () => clearTimeout(timer);
   }, [state]);
@@ -71,12 +71,17 @@ export default function Home() {
   const [message, setMessage] = useState("Loading payments");
   const [amount, setAmount] = useState("");
   const [review, setReview] = useState(false);
+  const reviewed = useRef<{ paymentId: string; amountZat: number } | undefined>(
+    undefined,
+  );
+  const [connectionError, setConnectionError] = useState("");
   const [access, setAccess] = useState("");
   const sending = useRef(false);
   const [busy, setBusy] = useState(false);
 
   async function refresh(quiet = false) {
-    if (!quiet) {
+    if (sending.current && !quiet) return;
+    if (!quiet && payments.length === 0) {
       setStatus("loading");
       setMessage("Loading payments");
     }
@@ -91,6 +96,7 @@ export default function Home() {
         );
       const data = await response.json();
       const records = data.payments as Payment[];
+      setConnectionError("");
       setPayments(records);
       setSelected((current) =>
         current
@@ -113,10 +119,10 @@ export default function Home() {
             ? "Refund sent, waiting for confirmation"
             : "Payment records are up to date",
       );
-    } catch (error) {
-      setStatus("failed");
-      setMessage(
-        error instanceof Error ? error.message : "Unable to load payments",
+    } catch {
+      if (payments.length === 0 && !sending.current) setStatus("failed");
+      setConnectionError(
+        "Connection interrupted. Last saved status is shown. Reconnect and refresh before taking action.",
       );
     }
   }
@@ -133,7 +139,16 @@ export default function Home() {
   }, [access]);
 
   async function sendRefund() {
-    if (sending.current || !selected || !valid) return;
+    if (
+      sending.current ||
+      !selected ||
+      !valid ||
+      connectionError ||
+      !reviewed.current ||
+      reviewed.current.paymentId !== selected.id
+    )
+      return;
+    const instruction = reviewed.current;
     sending.current = true;
     setBusy(true);
     setStatus("loading");
@@ -145,7 +160,10 @@ export default function Home() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${access}`,
         },
-        body: JSON.stringify({ paymentTxid: selected.id, amountZat }),
+        body: JSON.stringify({
+          paymentTxid: instruction.paymentId,
+          amountZat: instruction.amountZat,
+        }),
       });
       if (!response.ok)
         throw new Error("Refund requires a status check before retry");
@@ -169,6 +187,8 @@ export default function Home() {
   }
 
   function choose(payment: Payment) {
+    if (sending.current) return;
+    reviewed.current = undefined;
     setSelected(payment);
     setReview(false);
     setAmount(zec(payment.availableZat));
@@ -222,6 +242,11 @@ export default function Home() {
         <span>Isolated demo wallets</span>
       </nav>
       <StateLabel state={status} text={message} />
+      {connectionError && (
+        <p role="alert" className="warning">
+          {connectionError}
+        </p>
+      )}
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -286,7 +311,10 @@ export default function Home() {
                 </p>
                 <h2>{selected.orderReference}</h2>
                 <div className="amount">
-                  {review ? amount : zec(selected.receivedZat)} <span>ZEC</span>
+                  {review && reviewed.current
+                    ? zec(reviewed.current.amountZat)
+                    : zec(selected.receivedZat)}{" "}
+                  <span>ZEC</span>
                 </div>
                 <dl>
                   <div>
@@ -306,6 +334,35 @@ export default function Home() {
                     <dd className="mono">{selected.destination}</dd>
                   </div>
                 </dl>
+                <StateLabel
+                  state={
+                    busy
+                      ? "loading"
+                      : selected.status === "broadcast"
+                        ? "broadcast"
+                        : selected.refundedZat > 0
+                          ? "confirmed"
+                          : selected.status === "broadcast_unknown" ||
+                              selected.status === "broadcasting"
+                            ? "broadcast_unknown"
+                            : "ready"
+                  }
+                  text={
+                    busy
+                      ? "Preparing shielded refund. Do not send again."
+                      : selected.refundedZat > 0
+                        ? `Refund confirmed: ${zec(selected.refundedZat)} ZEC`
+                        : selected.status === "broadcast"
+                          ? "Refund sent, waiting for confirmation"
+                          : selected.status === "broadcast_unknown" ||
+                              selected.status === "broadcasting"
+                            ? "Checking refund state. Sending is blocked."
+                            : "No refund sent for this payment"
+                  }
+                />
+                {connectionError && (
+                  <p className="warning">{connectionError}</p>
+                )}
                 {selected.canRefund ? (
                   <>
                     {!review && (
@@ -330,13 +387,14 @@ export default function Home() {
                         </p>
                         <button
                           className="primary"
-                          disabled={busy || !valid}
+                          disabled={busy || !valid || !!connectionError}
                           onClick={() => void sendRefund()}
                         >
                           {busy ? "Preparing refund" : "Send private refund"}
                         </button>
                         <button
                           className="text-button"
+                          disabled={busy}
                           onClick={() => setReview(false)}
                         >
                           Go back
@@ -345,8 +403,14 @@ export default function Home() {
                     ) : (
                       <button
                         className="primary"
-                        disabled={!valid}
-                        onClick={() => setReview(true)}
+                        disabled={!valid || busy || !!connectionError}
+                        onClick={() => {
+                          reviewed.current = {
+                            paymentId: selected.id,
+                            amountZat,
+                          };
+                          setReview(true);
+                        }}
                       >
                         Review refund
                       </button>
