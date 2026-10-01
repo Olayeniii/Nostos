@@ -27,6 +27,21 @@ export interface RefundIntent {
   amountZat: number;
 }
 
+export const refundStatuses = [
+  "pending",
+  "broadcasting",
+  "broadcast_unknown",
+  "broadcast",
+  "confirmed",
+] as const;
+
+export type RefundStatus = (typeof refundStatuses)[number];
+
+export interface RefundRecord extends RefundIntent {
+  status: RefundStatus;
+  txid?: string;
+}
+
 export class DomainValidationError extends Error {
   constructor(message: string) {
     super(message);
