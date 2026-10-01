@@ -105,4 +105,46 @@ describe("ZalletRpcClient", () => {
       params: [1, 9_999_999, false],
     });
   });
+
+  it("reads wallet-visible outputs from a historical transaction", async () => {
+    let observed: Record<string, unknown> | undefined;
+    const server = createServer(async (request, response) => {
+      observed = await requestBody(request);
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          result: {
+            confirmations: 12,
+            outputs: [{ pool: "ironwood", valueZat: 2_000_000 }],
+          },
+        }),
+      );
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Test server did not bind.");
+    }
+
+    const client = new ZalletRpcClient({
+      url: `http://127.0.0.1:${address.port}`,
+      user: "user",
+      password: "password",
+    });
+    const txid = "f".repeat(64);
+    await expect(client.viewTransaction(txid)).resolves.toMatchObject({
+      txid,
+      confirmations: 12,
+      outputs: [{ pool: "ironwood", valueZat: 2_000_000 }],
+    });
+    expect(observed).toMatchObject({
+      method: "z_viewtransaction",
+      params: [txid],
+    });
+  });
 });
