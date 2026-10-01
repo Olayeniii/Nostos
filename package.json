@@ -26,6 +26,7 @@
     "intake:scan": "tsx scripts/payment-intake/scan.ts",
     "intake:verify": "tsx scripts/payment-intake/verify-restart.ts",
     "refund:send": "tsx scripts/refund-core/send.ts",
+    "refund:verify": "tsx scripts/refund-core/verify.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
