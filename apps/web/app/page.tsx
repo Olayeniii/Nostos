@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Status =
   | "ready"
@@ -72,10 +72,14 @@ export default function Home() {
   const [amount, setAmount] = useState("");
   const [review, setReview] = useState(false);
   const [access, setAccess] = useState("");
+  const sending = useRef(false);
+  const [busy, setBusy] = useState(false);
 
-  async function refresh() {
-    setStatus("loading");
-    setMessage("Loading payments");
+  async function refresh(quiet = false) {
+    if (!quiet) {
+      setStatus("loading");
+      setMessage("Loading payments");
+    }
     try {
       const response = await fetch("/api/payments", {
         cache: "no-store",
@@ -86,9 +90,29 @@ export default function Home() {
           "Payment service is unavailable. No action was submitted.",
         );
       const data = await response.json();
-      setPayments(data.payments);
-      setStatus("ready");
-      setMessage("Payment records are up to date");
+      const records = data.payments as Payment[];
+      setPayments(records);
+      setSelected((current) =>
+        current
+          ? records.find((record) => record.id === current.id)
+          : undefined,
+      );
+      const unresolved = records.find(
+        (record) =>
+          record.status === "broadcast_unknown" ||
+          record.status === "broadcasting",
+      );
+      const waiting = records.some((record) => record.status === "broadcast");
+      setStatus(
+        unresolved ? "broadcast_unknown" : waiting ? "broadcast" : "ready",
+      );
+      setMessage(
+        unresolved
+          ? "Reconciliation required before retry"
+          : waiting
+            ? "Refund sent, waiting for confirmation"
+            : "Payment records are up to date",
+      );
     } catch (error) {
       setStatus("failed");
       setMessage(
@@ -97,8 +121,52 @@ export default function Home() {
     }
   }
   useEffect(() => {
-    void refresh();
-  }, []);
+    if (!access) {
+      setStatus("ready");
+      setMessage("Enter private demo access to load records");
+      return;
+    }
+    const timer = setInterval(() => {
+      if (!sending.current) void refresh(true);
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [access]);
+
+  async function sendRefund() {
+    if (sending.current || !selected || !valid) return;
+    sending.current = true;
+    setBusy(true);
+    setStatus("loading");
+    setMessage("Preparing shielded refund");
+    try {
+      const response = await fetch("/api/refunds", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${access}`,
+        },
+        body: JSON.stringify({ paymentTxid: selected.id, amountZat }),
+      });
+      if (!response.ok)
+        throw new Error("Refund requires a status check before retry");
+      setReview(false);
+      await refresh(true);
+    } catch {
+      setStatus("broadcast_unknown");
+      setMessage("Checking refund state. Do not send again.");
+      // Lock this record in the browser even if the subsequent status read fails.
+      setSelected((current) =>
+        current
+          ? { ...current, canRefund: false, status: "broadcast_unknown" }
+          : current,
+      );
+      setReview(false);
+      await refresh(true);
+    } finally {
+      sending.current = false;
+      setBusy(false);
+    }
+  }
 
   function choose(payment: Payment) {
     setSelected(payment);
@@ -257,12 +325,15 @@ export default function Home() {
                     {review ? (
                       <>
                         <p className="warning">
-                          Sending is not enabled until the authenticated API is
-                          connected. No transaction will be submitted from this
-                          screen.
+                          This sends a real testnet refund. Review the amount
+                          and masked destination before continuing.
                         </p>
-                        <button className="primary" disabled>
-                          Send private refund
+                        <button
+                          className="primary"
+                          disabled={busy || !valid}
+                          onClick={() => void sendRefund()}
+                        >
+                          {busy ? "Preparing refund" : "Send private refund"}
                         </button>
                         <button
                           className="text-button"
@@ -286,7 +357,7 @@ export default function Home() {
                     {selected.status === "broadcast_unknown" ||
                     selected.status === "broadcasting"
                       ? "Reconciliation required before retry. Sending is blocked."
-                      : "A refund instruction already exists. A second refund is blocked."}
+                      : "Refunding is unavailable for this record. Existing refunds and historical demo payments cannot be sent again."}
                   </p>
                 )}
               </>
