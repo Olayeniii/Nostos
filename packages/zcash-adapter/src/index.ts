@@ -20,11 +20,18 @@ export interface ShieldedNote {
   address?: string;
   amount?: number;
   value?: number;
+  valueZat?: number;
   confirmations?: number;
   memo?: string;
   memoStr?: string;
   pool?: ShieldedPool | string;
   txid?: string;
+}
+
+export interface ViewedTransaction {
+  confirmations: number;
+  outputs: ShieldedNote[];
+  txid: string;
 }
 
 interface RpcEnvelope<T> {
@@ -170,6 +177,28 @@ export class ZalletRpcClient {
     if (!Array.isArray(notes))
       throw new Error("Zallet returned an invalid note list.");
     return notes as ShieldedNote[];
+  }
+
+  async viewTransaction(txid: string): Promise<ViewedTransaction> {
+    if (!/^[a-f0-9]{64}$/u.test(txid)) {
+      throw new Error("Transaction ID must be 64 lowercase hex characters.");
+    }
+    const result = await this.call<unknown>("z_viewtransaction", [txid]);
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      throw new Error("Zallet returned an invalid transaction view.");
+    }
+    const transaction = result as Record<string, unknown>;
+    if (!Array.isArray(transaction.outputs)) {
+      throw new Error("Zallet transaction view has no output list.");
+    }
+    return {
+      txid,
+      confirmations:
+        typeof transaction.confirmations === "number"
+          ? transaction.confirmations
+          : 0,
+      outputs: transaction.outputs as ShieldedNote[],
+    };
   }
 
   async sendFromAccount(
