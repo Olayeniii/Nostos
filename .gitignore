@@ -47,4 +47,4 @@ credentials/
 .idea/
 .vscode/
 *.swp
-
+*.tsbuildinfo
