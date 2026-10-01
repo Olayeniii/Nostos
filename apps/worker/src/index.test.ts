@@ -57,4 +57,31 @@ describe("merchant payment intake", () => {
     expect(store.paymentCount()).toBe(0);
     store.close();
   });
+
+  it("recovers a spent payment from transaction history", async () => {
+    const store = new SqlitePaymentStore(":memory:");
+    const result = await ingestMerchantPayments({
+      merchantId: "merchant_001",
+      historicalTxids: [txid],
+      source: {
+        listUnspent: async () => [],
+        viewTransaction: async () => ({
+          txid,
+          confirmations: 20,
+          outputs: [
+            {
+              pool: "ironwood",
+              valueZat: 2_000_000,
+              value: 0.02,
+              memo: encodeMemo("order_001", refundAddress),
+            },
+          ],
+        }),
+      },
+      store,
+    });
+    expect(result).toMatchObject({ created: 1, observed: 1 });
+    expect(store.findByTxid(txid)).toMatchObject({ confirmations: 20 });
+    store.close();
+  });
 });
