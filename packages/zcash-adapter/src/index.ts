@@ -26,6 +26,8 @@ export interface ShieldedNote {
   memoStr?: string;
   pool?: ShieldedPool | string;
   txid?: string;
+  walletInternal?: boolean;
+  outgoing?: boolean;
 }
 
 export interface ViewedTransaction {
