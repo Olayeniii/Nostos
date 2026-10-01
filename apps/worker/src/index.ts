@@ -5,9 +5,11 @@ import {
 import type { SqlitePaymentStore } from "../../../packages/database/src/index.js";
 import { decodeMemo } from "../../../packages/memo/src/index.js";
 import type { ShieldedNote } from "../../../packages/zcash-adapter/src/index.js";
+import type { ViewedTransaction } from "../../../packages/zcash-adapter/src/index.js";
 
 export interface PaymentNoteSource {
   listUnspent(addresses?: string[]): Promise<ShieldedNote[]>;
+  viewTransaction?(txid: string): Promise<ViewedTransaction>;
 }
 
 export interface IntakeResult {
@@ -17,6 +19,13 @@ export interface IntakeResult {
 }
 
 function amountZat(note: ShieldedNote): number {
+  if (
+    typeof note.valueZat === "number" &&
+    Number.isSafeInteger(note.valueZat) &&
+    note.valueZat > 0
+  ) {
+    return note.valueZat;
+  }
   const zec = note.value ?? note.amount;
   if (typeof zec !== "number" || !Number.isFinite(zec) || zec <= 0) {
     throw new Error("Payment note has no valid positive amount.");
@@ -45,8 +54,23 @@ export async function ingestMerchantPayments(options: {
   source: PaymentNoteSource;
   store: SqlitePaymentStore;
   addresses?: string[];
+  historicalTxids?: string[];
 }): Promise<IntakeResult> {
   const notes = await options.source.listUnspent(options.addresses);
+  for (const txid of options.historicalTxids ?? []) {
+    if (notes.some((note) => note.txid === txid)) continue;
+    if (!options.source.viewTransaction) {
+      throw new Error("Payment source cannot read historical transactions.");
+    }
+    const transaction = await options.source.viewTransaction(txid);
+    notes.push(
+      ...transaction.outputs.map((output) => ({
+        ...output,
+        txid: transaction.txid,
+        confirmations: transaction.confirmations,
+      })),
+    );
+  }
   const payments: PaymentRecord[] = [];
   let created = 0;
 
