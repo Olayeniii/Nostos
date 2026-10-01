@@ -28,6 +28,7 @@ interface RefundRow {
   amount_zat: number;
   status: RefundStatus;
   txid: string | null;
+  retry_count: number;
 }
 
 function refundFromRow(row: RefundRow): RefundRecord {
@@ -37,6 +38,7 @@ function refundFromRow(row: RefundRow): RefundRecord {
     idempotencyKey: row.idempotency_key,
     amountZat: row.amount_zat,
     status: row.status,
+    retryCount: row.retry_count,
     ...(row.txid ? { txid: row.txid } : {}),
   };
 }
@@ -87,10 +89,19 @@ export class SqlitePaymentStore {
         amount_zat INTEGER NOT NULL CHECK (amount_zat > 0),
         status TEXT NOT NULL,
         txid TEXT UNIQUE,
+        retry_count INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
     `);
+    const refundColumns = this.#database
+      .prepare("PRAGMA table_info(refunds)")
+      .all() as unknown as Array<{ name: string }>;
+    if (!refundColumns.some((column) => column.name === "retry_count")) {
+      this.#database.exec(
+        "ALTER TABLE refunds ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
+      );
+    }
   }
 
   close(): void {
@@ -278,6 +289,26 @@ export class SqlitePaymentStore {
     if (refund?.status === "broadcasting") {
       this.#setRefundStatus(refund.id, "broadcast_unknown");
     }
+  }
+
+  recordRefundRetry(paymentId: string): RefundRecord {
+    const refund = this.findRefundByPayment(paymentId);
+    if (
+      !refund ||
+      (refund.status !== "broadcast" && refund.status !== "confirmed")
+    ) {
+      throw new Error("Refund retry has no completed broadcast to return.");
+    }
+    this.#database
+      .prepare(
+        `UPDATE refunds
+         SET retry_count = retry_count + 1, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(new Date().toISOString(), refund.id);
+    const updated = this.findRefundByPayment(paymentId);
+    if (!updated) throw new Error("Refund disappeared after retry recording.");
+    return updated;
   }
 
   confirmRefund(paymentId: string): RefundRecord {
