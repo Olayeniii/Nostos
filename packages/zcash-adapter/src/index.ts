@@ -164,12 +164,9 @@ export class ZalletRpcClient {
   }
 
   async listUnspent(addresses: string[] = []): Promise<ShieldedNote[]> {
-    const notes = await this.call<unknown>("z_listunspent", [
-      1,
-      9_999_999,
-      false,
-      addresses,
-    ]);
+    const params: unknown[] = [1, 9_999_999, false];
+    if (addresses.length > 0) params.push(addresses);
+    const notes = await this.call<unknown>("z_listunspent", params);
     if (!Array.isArray(notes))
       throw new Error("Zallet returned an invalid note list.");
     return notes as ShieldedNote[];
