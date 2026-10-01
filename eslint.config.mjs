@@ -26,6 +26,7 @@ export default tseslint.config(
       "scripts/quality/*.mjs",
       "scripts/shielded-spike/**/*.ts",
       "scripts/payment-intake/**/*.ts",
+      "scripts/refund-core/**/*.ts",
     ],
     rules: {
       "no-console": "off",
