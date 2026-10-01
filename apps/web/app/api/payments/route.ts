@@ -1,4 +1,5 @@
-import { timingSafeEqual } from "node:crypto";
+import { authorized } from "../../../src/auth.js";
+import { ZalletRpcClient } from "../../../../../packages/zcash-adapter/src/index.js";
 import { paymentView } from "../../../../api/src/index.js";
 import { SqlitePaymentStore } from "../../../../../packages/database/src/index.js";
 
@@ -13,25 +14,54 @@ export async function GET(request: Request) {
       { error: "Service is not configured" },
       { status: 503 },
     );
-  const provided =
-    request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
-  const expectedBytes = Buffer.from(token);
-  const suppliedBytes = Buffer.from(provided);
-  if (
-    expectedBytes.length !== suppliedBytes.length ||
-    !timingSafeEqual(expectedBytes, suppliedBytes)
-  ) {
+  if (!authorized(request, token)) {
     return Response.json({ error: "Demo access is required" }, { status: 401 });
   }
   const store = new SqlitePaymentStore(path);
   try {
+    const url = process.env.NOSTOS_CUSTOMER_WALLET_RPC_URL;
+    const cookieFile = process.env.NOSTOS_CUSTOMER_WALLET_RPC_COOKIE_FILE;
+    if (url && cookieFile) {
+      const customer = new ZalletRpcClient({
+        url,
+        cookieFile,
+        timeoutMs: 5000,
+      });
+      for (const payment of store.listPayments()) {
+        const refund = store.findRefundByPayment(payment.id);
+        if (refund?.status !== "broadcast" || !refund.txid) continue;
+        try {
+          const transaction = await customer.viewTransaction(refund.txid);
+          if (
+            transaction.confirmations > 0 &&
+            transaction.outputs.some(
+              (output) =>
+                output.address === payment.refundAddress &&
+                output.valueZat === refund.amountZat &&
+                output.outgoing === false,
+            )
+          ) {
+            store.confirmRefund(payment.id);
+          }
+        } catch {
+          /* Keep broadcast state until wallet receipt can be verified. */
+        }
+      }
+    }
     return Response.json(
       {
-        payments: store
-          .listPayments()
-          .map((payment) =>
-            paymentView(payment, store.findRefundByPayment(payment.id)),
-          ),
+        payments: store.listPayments().map((payment) => {
+          const view = paymentView(
+            payment,
+            store.findRefundByPayment(payment.id),
+          );
+          return {
+            ...view,
+            canRefund:
+              view.canRefund &&
+              payment.id === process.env.NOSTOS_WEB_ALLOWED_PAYMENT_TXID,
+          };
+        }),
       },
       { headers: { "Cache-Control": "no-store" } },
     );
