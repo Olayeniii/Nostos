@@ -3,7 +3,11 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
   parsePaymentRecord,
+  parseRefundIntent,
   type PaymentRecord,
+  type RefundIntent,
+  type RefundRecord,
+  type RefundStatus,
 } from "../../core/src/index.js";
 
 interface PaymentRow {
@@ -15,6 +19,26 @@ interface PaymentRow {
   refund_address: string;
   confirmations: number;
   status: string;
+}
+
+interface RefundRow {
+  id: string;
+  payment_id: string;
+  idempotency_key: string;
+  amount_zat: number;
+  status: RefundStatus;
+  txid: string | null;
+}
+
+function refundFromRow(row: RefundRow): RefundRecord {
+  return {
+    id: row.id,
+    paymentId: row.payment_id,
+    idempotencyKey: row.idempotency_key,
+    amountZat: row.amount_zat,
+    status: row.status,
+    ...(row.txid ? { txid: row.txid } : {}),
+  };
 }
 
 function fromRow(row: PaymentRow): PaymentRecord {
@@ -55,6 +79,16 @@ export class SqlitePaymentStore {
         started_at TEXT NOT NULL,
         observed_payments INTEGER NOT NULL CHECK (observed_payments >= 0),
         created_payments INTEGER NOT NULL CHECK (created_payments >= 0)
+      );
+      CREATE TABLE IF NOT EXISTS refunds (
+        id TEXT PRIMARY KEY,
+        payment_id TEXT NOT NULL UNIQUE REFERENCES payments(id),
+        idempotency_key TEXT NOT NULL UNIQUE,
+        amount_zat INTEGER NOT NULL CHECK (amount_zat > 0),
+        status TEXT NOT NULL,
+        txid TEXT UNIQUE,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
       );
     `);
   }
@@ -155,5 +189,109 @@ export class SqlitePaymentStore {
       observedPayments: row.observed_payments,
       createdPayments: row.created_payments,
     };
+  }
+
+  prepareRefund(
+    paymentTxid: string,
+    intent: RefundIntent,
+  ): {
+    created: boolean;
+    refund: RefundRecord;
+  } {
+    const payment = this.findByTxid(paymentTxid);
+    if (!payment) throw new Error("Refund payment was not found.");
+    const valid = parseRefundIntent(intent, payment);
+    const now = new Date().toISOString();
+    const result = this.#database
+      .prepare(
+        `INSERT INTO refunds (
+          id, payment_id, idempotency_key, amount_zat, status,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'pending', ?, ?)
+        ON CONFLICT(payment_id) DO NOTHING`,
+      )
+      .run(
+        valid.id,
+        valid.paymentId,
+        valid.idempotencyKey,
+        valid.amountZat,
+        now,
+        now,
+      );
+    const refund = this.findRefundByPayment(valid.paymentId);
+    if (!refund) throw new Error("Refund insert did not return a record.");
+    if (
+      refund.idempotencyKey !== valid.idempotencyKey ||
+      refund.amountZat !== valid.amountZat
+    ) {
+      throw new Error("A conflicting refund already exists for this payment.");
+    }
+    return { created: result.changes === 1, refund };
+  }
+
+  findRefundByPayment(paymentId: string): RefundRecord | undefined {
+    const row = this.#database
+      .prepare("SELECT * FROM refunds WHERE payment_id = ?")
+      .get(paymentId) as unknown as RefundRow | undefined;
+    return row ? refundFromRow(row) : undefined;
+  }
+
+  claimRefundBroadcast(paymentId: string): RefundRecord {
+    const refund = this.findRefundByPayment(paymentId);
+    if (!refund) throw new Error("Refund instruction was not found.");
+    if (refund.status === "broadcasting") {
+      this.#setRefundStatus(refund.id, "broadcast_unknown");
+      throw new Error(
+        "Refund broadcast state is unknown; reconcile before retrying.",
+      );
+    }
+    if (refund.status !== "pending") return refund;
+    this.#setRefundStatus(refund.id, "broadcasting");
+    return { ...refund, status: "broadcasting" };
+  }
+
+  recordRefundBroadcast(
+    paymentId: string,
+    transactionId: string,
+  ): RefundRecord {
+    if (!/^[a-f0-9]{64}$/u.test(transactionId)) {
+      throw new Error("Refund transaction ID is invalid.");
+    }
+    const refund = this.findRefundByPayment(paymentId);
+    if (!refund || refund.status !== "broadcasting") {
+      throw new Error("Refund is not awaiting a broadcast result.");
+    }
+    this.#database
+      .prepare(
+        `UPDATE refunds
+         SET status = 'broadcast', txid = ?, updated_at = ?
+         WHERE id = ? AND status = 'broadcasting'`,
+      )
+      .run(transactionId, new Date().toISOString(), refund.id);
+    const updated = this.findRefundByPayment(paymentId);
+    if (!updated) throw new Error("Refund disappeared after broadcast.");
+    return updated;
+  }
+
+  markRefundBroadcastUnknown(paymentId: string): void {
+    const refund = this.findRefundByPayment(paymentId);
+    if (refund?.status === "broadcasting") {
+      this.#setRefundStatus(refund.id, "broadcast_unknown");
+    }
+  }
+
+  confirmRefund(paymentId: string): RefundRecord {
+    const refund = this.findRefundByPayment(paymentId);
+    if (!refund || refund.status !== "broadcast" || !refund.txid) {
+      throw new Error("Refund is not ready for confirmation.");
+    }
+    this.#setRefundStatus(refund.id, "confirmed");
+    return { ...refund, status: "confirmed" };
+  }
+
+  #setRefundStatus(id: string, status: RefundStatus): void {
+    this.#database
+      .prepare("UPDATE refunds SET status = ?, updated_at = ? WHERE id = ?")
+      .run(status, new Date().toISOString(), id);
   }
 }
