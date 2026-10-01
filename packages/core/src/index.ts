@@ -40,6 +40,7 @@ export type RefundStatus = (typeof refundStatuses)[number];
 export interface RefundRecord extends RefundIntent {
   status: RefundStatus;
   txid?: string;
+  retryCount: number;
 }
 
 export class DomainValidationError extends Error {
