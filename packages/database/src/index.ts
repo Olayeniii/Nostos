@@ -251,13 +251,22 @@ export class SqlitePaymentStore {
     const refund = this.findRefundByPayment(paymentId);
     if (!refund) throw new Error("Refund instruction was not found.");
     if (refund.status === "broadcasting") {
-      this.#setRefundStatus(refund.id, "broadcast_unknown");
       throw new Error(
-        "Refund broadcast state is unknown; reconcile before retrying.",
+        "Refund broadcast is already in progress; reconcile before retrying.",
       );
     }
     if (refund.status !== "pending") return refund;
-    this.#setRefundStatus(refund.id, "broadcasting");
+    const claim = this.#database
+      .prepare(
+        `UPDATE refunds SET status = 'broadcasting', updated_at = ?
+         WHERE id = ? AND status = 'pending'`,
+      )
+      .run(new Date().toISOString(), refund.id);
+    if (claim.changes !== 1) {
+      throw new Error(
+        "Refund was claimed by another worker; retry is blocked.",
+      );
+    }
     return { ...refund, status: "broadcasting" };
   }
 
