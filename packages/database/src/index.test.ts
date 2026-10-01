@@ -43,6 +43,11 @@ describe("SqlitePaymentStore", () => {
     restarted.recordScannerRun(1, 0);
     expect(restarted.paymentCount()).toBe(1);
     expect(restarted.scannerRunCount()).toBe(2);
+    expect(restarted.scannerRunSummary()).toEqual({
+      runs: 2,
+      observedPayments: 2,
+      createdPayments: 1,
+    });
     restarted.close();
   });
 
