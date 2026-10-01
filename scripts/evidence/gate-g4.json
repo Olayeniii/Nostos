@@ -1,0 +1,18 @@
+{
+  "classification": "real",
+  "network": "testnet",
+  "verifiedAt": "2026-10-01T17:37:01.468Z",
+  "paymentTxid": "f80fd5bd3d8711b362f6a37743ed16ee438f61a12964f175ce4a9604dfdcc9d2",
+  "paymentAmountZat": 1000000,
+  "refundTxid": "a996d5800121771fea6359c92014d94a78468b3b5d6bb987a9474827ce7022fc",
+  "refundAmountZat": 300000,
+  "refundConfirmations": 10,
+  "refundDestination": "utest10q...cvj75fvp",
+  "safeRetries": 1,
+  "checks": {
+    "partialRefund": true,
+    "singleBroadcast": true,
+    "retryReturnedExistingTransaction": true,
+    "customerRefundConfirmed": true
+  }
+}
