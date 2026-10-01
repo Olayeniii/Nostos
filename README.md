@@ -6,7 +6,7 @@ Nostos provides private refunds for shielded ZEC payments. A customer includes a
 
 ## Current status
 
-Gate G0 repository foundation passes locally. Gate G1 passed on Zcash testnet with a confirmed shielded payment, encrypted memo recovery, and confirmed shielded refund. Gate G2 domain and schema tests pass.
+Gate G0 repository foundation passes locally. Gate G1 passed on Zcash testnet with a confirmed shielded payment, encrypted memo recovery, and confirmed shielded refund. Gate G2 domain and schema tests pass. The Gate G3 restart-safe payment intake harness is ready for live proof.
 
 Build started: `2026-09-29T00:01:43Z`
 
