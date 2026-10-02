@@ -81,3 +81,7 @@ Use isolated testnet wallets only. Never use a personal wallet, seed phrase, spe
 ## Open source status
 
 The repository remains private during the build window and will be made public for submission. A license will be selected before public release.
+
+## External protocol review
+
+See [the October 2 protocol review](docs/PROTOCOL_REVIEW.md) for the verified source baseline, information flow, custody and prior-work comparison. The follow-up patch validates Orchard-only return routes before intake and refund signing, tightens the 512-byte memo schema, and removes both product route copies after a confirmed refund. It does not prove route ownership, freshness outside NOSTOS, production deployment, backup erasure or an independent current wallet loop. Expiry awaits a defined refund policy; the privacy release gate remains open.

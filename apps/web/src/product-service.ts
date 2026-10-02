@@ -8,6 +8,7 @@ import {
 import { decodeMemo, encodeMemo } from "../../../packages/memo/src/index.js";
 import { paymentView } from "../../api/src/index.js";
 import { submitRefund } from "../../api/src/refund-request.js";
+import { orchardRefundReceiver } from "../../../packages/zcash-adapter/src/refund-route.js";
 
 export function wallet(timeoutMs = 2500) {
   const url = process.env.NOSTOS_MERCHANT_WALLET_RPC_URL;
@@ -57,7 +58,17 @@ export async function reconcile(
   observed?: ShieldedNote[],
 ) {
   const merchant = store.merchant(checkout.merchantId)!;
+  // Also finish cleanup after interruption between the two database updates.
+  if (
+    checkout.paymentTxid &&
+    core.findRefundByPayment(checkout.paymentTxid)?.status === "confirmed"
+  ) {
+    core.retireConfirmedRefundRoute(checkout.paymentTxid);
+    store.retireRoute(checkout.id);
+    return;
+  }
   if (!checkout.route || !merchant.destination) return;
+  await orchardRefundReceiver(checkout.route, rpc);
   let txid = checkout.paymentTxid;
   if (!txid) {
     const notes = observed ?? (await rpc.listUnspent([merchant.destination]));
@@ -98,8 +109,11 @@ export async function reconcile(
             n.valueZat === refund.amountZat &&
             ["orchard", "sapling"].includes(n.pool ?? ""),
         )
-      )
+      ) {
         core.confirmRefund(txid);
+        core.retireConfirmedRefundRoute(txid);
+        store.retireRoute(checkout.id);
+      }
     }
   }
 }
@@ -145,9 +159,7 @@ export async function preparePayment(
     throw new Error("Payment is already recorded");
   if (checkout.route && checkout.route !== route)
     throw new Error("The return route is already attached");
-  const receivers = await rpc.decodeUnifiedAddress(route);
-  if (!receivers.orchard)
-    throw new Error("An Orchard refund receiver is required");
+  await orchardRefundReceiver(route, rpc);
   const memo = encodeMemo(checkout.order, route);
   store.setRoute(checkout.id, route);
   const saved = store.checkout(checkout.id)!;

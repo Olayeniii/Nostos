@@ -57,8 +57,9 @@ export default function Checkout() {
           <div className="checkout-assurance">
             <strong>A private route back.</strong>
             <p>
-              Your fresh refund address travels in the encrypted payment memo.
-              The merchant can refund you without asking for an address later.
+              The refund route you supply travels inside the shielded payment
+              memo. The merchant can refund to that route without asking for
+              another address.
             </p>
           </div>
           <p className="privacy">
@@ -99,8 +100,8 @@ export default function Checkout() {
             <>
               <h2>Pay with shielded ZEC</h2>
               <p>
-                First, attach a fresh testnet refund address from your own
-                wallet.
+                Supply a fresh Orchard-only testnet address from a wallet that
+                you control.
               </p>
               {!prepared ? (
                 <form
@@ -155,8 +156,10 @@ export default function Checkout() {
                     />
                   </label>
                   <p className="privacy">
-                    Use an address you control. This is saved once for this
-                    payment and never shown on the receipt.
+                    Use an address you control. NOSTOS checks Orchard
+                    capability, not ownership or prior use. The hosted service
+                    and merchant wallet can read this route; the receipt omits
+                    it.
                   </p>
                   <button
                     className="primary"

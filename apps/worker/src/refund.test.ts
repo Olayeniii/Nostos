@@ -31,7 +31,10 @@ describe("partial refund execution", () => {
         }),
     );
     const options = {
-      broadcaster: { sendFromAccount },
+      broadcaster: {
+        sendFromAccount,
+        decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
+      },
       merchantAccountUuid: "merchant-account",
       paymentTxid: payment.paymentTxId,
       amountZat: 500_000,
@@ -40,6 +43,7 @@ describe("partial refund execution", () => {
     };
     const first = executePartialRefund(options);
     await expect(executePartialRefund(options)).rejects.toThrow("in progress");
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
     finish("c".repeat(64));
     await expect(first).resolves.toMatchObject({ broadcast: true });
     expect(sendFromAccount).toHaveBeenCalledTimes(1);
@@ -50,7 +54,10 @@ describe("partial refund execution", () => {
     const store = storeWithPayment();
     const sendFromAccount = vi.fn(async () => "c".repeat(64));
     const options = {
-      broadcaster: { sendFromAccount },
+      broadcaster: {
+        sendFromAccount,
+        decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
+      },
       merchantAccountUuid: "merchant-account",
       paymentTxid: payment.paymentTxId,
       amountZat: 500_000,
@@ -77,7 +84,10 @@ describe("partial refund execution", () => {
       throw new Error("connection closed");
     });
     const options = {
-      broadcaster: { sendFromAccount },
+      broadcaster: {
+        sendFromAccount,
+        decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
+      },
       merchantAccountUuid: "merchant-account",
       paymentTxid: payment.paymentTxId,
       amountZat: 500_000,
@@ -97,7 +107,12 @@ describe("partial refund execution", () => {
     const store = storeWithPayment();
     await expect(
       executePartialRefund({
-        broadcaster: { sendFromAccount: vi.fn() },
+        broadcaster: {
+          sendFromAccount: vi.fn(),
+          decodeUnifiedAddress: async (address: string) => ({
+            orchard: address,
+          }),
+        },
         merchantAccountUuid: "merchant-account",
         paymentTxid: payment.paymentTxId,
         amountZat: payment.amountZat + 1,
@@ -107,4 +122,25 @@ describe("partial refund execution", () => {
     ).rejects.toThrow("cannot exceed");
     store.close();
   });
+});
+
+it("blocks unusable receiver before any instruction or broadcast", async () => {
+  const store = storeWithPayment();
+  const sendFromAccount = vi.fn();
+  await expect(
+    executePartialRefund({
+      store,
+      merchantAccountUuid: "merchant-account",
+      paymentTxid: payment.paymentTxId,
+      amountZat: 500000,
+      idempotencyKey: "test_refund",
+      broadcaster: {
+        sendFromAccount,
+        decodeUnifiedAddress: async () => ({ sapling: "zs1fake" }),
+      },
+    }),
+  ).rejects.toThrow("Orchard-only");
+  expect(store.findRefundByPayment(payment.id)).toBeUndefined();
+  expect(sendFromAccount).not.toHaveBeenCalled();
+  store.close();
 });

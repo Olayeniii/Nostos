@@ -37,7 +37,7 @@ beforeEach(() => {
   rpc = {
     createAccount: vi.fn(async () => "wallet-uuid"),
     deriveOrchardAddress: vi.fn(async () => destination),
-    decodeUnifiedAddress: vi.fn(async () => ({ orchard: "receiver" })),
+    decodeUnifiedAddress: vi.fn(async () => ({ orchard: route })),
     listUnspent: vi.fn(async () => []),
     viewTransaction: vi.fn(async () => ({
       txid,
@@ -266,5 +266,91 @@ describe("verified shielded intake and refund ownership", () => {
     ).rejects.toThrow();
     expect(rpc.sendFromAccount).toHaveBeenCalledTimes(1);
     expect(core.findRefundByPayment(txid)?.status).toBe("broadcast_unknown");
+  });
+});
+
+describe("protocol rejection and route retirement", () => {
+  it("rejects a mixed route before persisting or preparing a payment", async () => {
+    const m = merchant();
+    const created = newRequest(store, m, "Mixed route", 1000000);
+    vi.mocked(rpc.decodeUnifiedAddress).mockResolvedValue({
+      orchard: route,
+      p2pkh: "t1fake",
+    });
+    await expect(
+      preparePayment(store, store.checkout(created.id)!, route, rpc),
+    ).rejects.toThrow();
+    expect(store.checkout(created.id)?.route).toBe("");
+    expect(rpc.sendFromAccount).not.toHaveBeenCalled();
+  });
+  it("retains routes until refund confirmation, then preserves receipt and blocks another send", async () => {
+    const m = merchant();
+    const created = newRequest(store, m, "Retirement", 1000000);
+    await preparePayment(store, store.checkout(created.id)!, route, rpc);
+    const c = store.checkout(created.id)!;
+    const incoming = {
+      txid,
+      outgoing: false,
+      address: destination,
+      pool: "orchard",
+      valueZat: 1000000,
+      memo: encodeMemo(c.order, route),
+    };
+    vi.mocked(rpc.listUnspent).mockResolvedValue([incoming]);
+    vi.mocked(rpc.viewTransaction).mockImplementation(async (id) => ({
+      txid: id,
+      confirmations: id === txid ? 2 : 0,
+      outputs:
+        id === txid
+          ? [incoming]
+          : [
+              {
+                outgoing: true,
+                address: route,
+                pool: "orchard",
+                valueZat: 300000,
+              },
+            ],
+    }));
+    await reconcile(store, core, c, rpc);
+    await refundPayment(store, core, m, c.id, 300000, rpc);
+    await reconcile(store, core, store.checkout(c.id)!, rpc);
+    expect(store.checkout(c.id)?.route).toBe(route);
+    expect(() => core.retireConfirmedRefundRoute(txid)).toThrow();
+    vi.mocked(rpc.viewTransaction).mockImplementation(async (id) => ({
+      txid: id,
+      confirmations: 2,
+      outputs:
+        id === txid
+          ? [incoming]
+          : [
+              {
+                outgoing: true,
+                address: route,
+                pool: "orchard",
+                valueZat: 300000,
+              },
+            ],
+    }));
+    await reconcile(store, core, store.checkout(c.id)!, rpc);
+    expect(store.checkout(c.id)?.route).toBe("");
+    expect(core.findByTxid(txid)).toMatchObject({
+      refundAddress: "",
+      status: "refunded",
+    });
+    expect(checkoutView(store, core, store.checkout(c.id)!)).toMatchObject({
+      status: "confirmed",
+      refundTxid,
+      refundAmountZat: 300000,
+      paymentConfirmations: 2,
+    });
+    await expect(
+      refundPayment(store, core, m, c.id, 300000, rpc),
+    ).rejects.toThrow();
+    expect(rpc.sendFromAccount).toHaveBeenCalledTimes(1);
+    core.close();
+    core = coreStore(store);
+    await reconcile(store, core, store.checkout(c.id)!, rpc);
+    expect(core.findByTxid(txid)?.refundAddress).toBe("");
   });
 });

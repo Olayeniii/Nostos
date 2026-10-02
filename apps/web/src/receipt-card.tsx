@@ -143,13 +143,13 @@ export function ReceiptCard({
                 ? "The shielded refund transaction is confirmed. Your wallet can verify receipt."
                 : refundUnknown
                   ? "Do not request another send while this transaction is being reconciled."
-                  : "Sent to the private return route attached to your original payment."}
+                  : "Sent to the refund route supplied with this payment."}
             </p>
           </>
         ) : (
           <p>
-            The merchant can use the return route encrypted in your payment memo
-            if a refund is due.
+            The merchant can refund to the route supplied in the shielded memo
+            of this payment if a refund is due.
           </p>
         )}
       </section>
@@ -180,6 +180,11 @@ export function ReceiptCard({
               </div>
             ),
         )}
+        <p>
+          This is NOSTOS application status, not a cryptographic payment
+          disclosure. A transaction reference alone does not prove the amount or
+          payer identity.
+        </p>
         <p role="status">{copied}</p>
       </details>
       <div className="receipt-bottom">

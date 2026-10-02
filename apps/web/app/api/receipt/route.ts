@@ -26,8 +26,9 @@ export async function GET(request: Request) {
       { error: "Private receipt access required" },
       { status: 401, headers },
     );
-  const store = new SqlitePaymentStore(path);
+  let store: SqlitePaymentStore | undefined;
   try {
+    store = new SqlitePaymentStore(path);
     const payment = store
       .listPayments()
       .find((p) => receiptAuthorized(request, p.id, secret));
@@ -53,7 +54,12 @@ export async function GET(request: Request) {
       },
       { headers },
     );
+  } catch {
+    return Response.json(
+      { error: "Service temporarily unavailable" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   } finally {
-    store.close();
+    store?.close();
   }
 }

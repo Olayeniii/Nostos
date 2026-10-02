@@ -35,7 +35,8 @@ export default function Home() {
             <span>02</span>
             <h2>Customer pays shielded ZEC</h2>
             <p>
-              The payment memo carries an encrypted, fresh refund destination.
+              The shielded payment memo carries the refund route supplied for
+              that payment.
             </p>
           </article>
           <article>

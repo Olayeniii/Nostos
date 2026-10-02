@@ -1,6 +1,8 @@
 import type { SqlitePaymentStore } from "../../../packages/database/src/index.js";
+import { orchardRefundReceiver } from "../../../packages/zcash-adapter/src/refund-route.js";
 
 export interface RefundBroadcaster {
+  decodeUnifiedAddress?(address: string): Promise<Record<string, string>>;
   sendFromAccount(
     account: string,
     pool: "orchard" | "sapling",
@@ -18,6 +20,13 @@ export async function executePartialRefund(options: {
 }): Promise<{ broadcast: boolean; txid: string }> {
   const payment = options.store.findByTxid(options.paymentTxid);
   if (!payment) throw new Error("Refund payment was not found.");
+  // Fail before creating an instruction when receiver validation is unavailable.
+  if (!options.broadcaster.decodeUnifiedAddress)
+    throw new Error("Refund receiver validation is unavailable.");
+  await orchardRefundReceiver(payment.refundAddress, {
+    decodeUnifiedAddress: (address) =>
+      options.broadcaster.decodeUnifiedAddress!(address),
+  });
 
   options.store.prepareRefund(options.paymentTxid, {
     id: `refund_${payment.id.slice(0, 48)}`,

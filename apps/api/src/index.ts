@@ -33,7 +33,9 @@ export function paymentView(
     reservedZat,
     availableZat: payment.amountZat - refundedZat - reservedZat,
     confirmations: payment.confirmations,
-    destination: `${payment.refundAddress.slice(0, 8)}...${payment.refundAddress.slice(-8)}`,
+    destination: payment.refundAddress
+      ? `${payment.refundAddress.slice(0, 8)}...${payment.refundAddress.slice(-8)}`
+      : "Route removed after confirmed refund",
     status: refund?.status ?? payment.status,
     // The current core supports one refund instruction per payment.
     canRefund:

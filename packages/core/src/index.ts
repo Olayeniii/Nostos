@@ -124,7 +124,10 @@ export function parsePaymentRecord(value: unknown): PaymentRecord {
     orderReference: identifier(input.orderReference, "orderReference"),
     paymentTxId: txid(input.paymentTxId, "paymentTxId"),
     amountZat: zatoshi(input.amountZat, "amountZat"),
-    refundAddress: refundAddress(input.refundAddress),
+    refundAddress:
+      input.status === "refunded" && input.refundAddress === ""
+        ? ""
+        : refundAddress(input.refundAddress),
     confirmations: nonNegativeInteger(input.confirmations, "confirmations"),
     status: paymentStatus(input.status),
   };

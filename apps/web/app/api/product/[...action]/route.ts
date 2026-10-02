@@ -189,8 +189,9 @@ async function handle(request: Request) {
             r.route &&
             (r.status !== "confirmed" ||
               (r.paymentTxid &&
-                core!.findRefundByPayment(r.paymentTxid)?.status ===
-                  "broadcast")),
+                ["broadcast", "confirmed"].includes(
+                  core!.findRefundByPayment(r.paymentTxid)?.status ?? "",
+                ))),
         )
         .slice(0, 10);
       if (pending.length) {

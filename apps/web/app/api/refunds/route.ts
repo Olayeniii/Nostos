@@ -46,8 +46,9 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
-  const store = new SqlitePaymentStore(path);
+  let store: SqlitePaymentStore | undefined;
   try {
+    store = new SqlitePaymentStore(path);
     const result = await submitRefund(body, {
       store,
       broadcaster: new ZalletRpcClient({ url, cookieFile }),
@@ -64,6 +65,6 @@ export async function POST(request: Request) {
       { status: 409 },
     );
   } finally {
-    store.close();
+    store?.close();
   }
 }

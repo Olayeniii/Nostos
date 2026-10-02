@@ -78,7 +78,7 @@ export class ProductStore {
     }
     this.db = new DatabaseSync(path);
     this.db.exec(
-      "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000",
+      "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA secure_delete=ON",
     );
     this.db
       .exec(`CREATE TABLE IF NOT EXISTS merchants(id TEXT PRIMARY KEY,email TEXT NOT NULL,email_hash TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,name TEXT NOT NULL DEFAULT '',wallet TEXT NOT NULL DEFAULT '',destination TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL);
@@ -293,6 +293,14 @@ export class ProductStore {
         "UPDATE checkouts SET payment_txid=?,status='broadcast' WHERE id=? AND payment_txid IS NULL",
       )
       .run(txid, id);
+  }
+  retireRoute(id: string) {
+    // Keep the keyed reuse fingerprint, receipt capability and accounting fields.
+    this.db
+      .prepare(
+        "UPDATE checkouts SET route='' WHERE id=? AND payment_txid IS NOT NULL",
+      )
+      .run(id);
   }
   paid(id: string) {
     this.db

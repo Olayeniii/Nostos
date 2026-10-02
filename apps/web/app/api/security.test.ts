@@ -34,6 +34,10 @@ beforeEach(() => {
   vi.stubEnv("NOSTOS_MERCHANT_ACCOUNT_UUID", "fixture-account");
   vi.stubEnv("NOSTOS_CUSTOMER_WALLET_RPC_URL", "");
   vi.stubEnv("NOSTOS_CUSTOMER_WALLET_RPC_COOKIE_FILE", "");
+  vi.spyOn(
+    ZalletRpcClient.prototype,
+    "decodeUnifiedAddress",
+  ).mockImplementation(async (address) => ({ orchard: address }));
   send = vi
     .spyOn(ZalletRpcClient.prototype, "sendFromAccount")
     .mockRejectedValue(new Error(`fixture failure ${destination}`));
@@ -183,4 +187,20 @@ it("reconciles a lost response to the persisted txid without a second broadcast"
   const retry = await POST(request(body));
   expect(await retry.json()).toEqual({ broadcast: false, txid });
   expect(send).toHaveBeenCalledTimes(1);
+});
+
+it("contains legacy storage read errors without returning sensitive details", async () => {
+  vi.spyOn(SqlitePaymentStore.prototype, "listPayments").mockImplementation(
+    () => {
+      throw new Error(`synthetic SQLite failure ${destination}`);
+    },
+  );
+  const r = await GET(
+    new Request("http://localhost/api/payments", {
+      headers: { authorization: "Bearer fixture-access" },
+    }),
+  );
+  expect(r.status).toBe(503);
+  expect(r.headers.get("Cache-Control")).toBe("no-store");
+  expect(await r.text()).not.toContain(destination);
 });

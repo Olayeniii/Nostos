@@ -74,6 +74,7 @@ export class SqlitePaymentStore {
     this.#database = new DatabaseSync(path);
     this.#database.exec("PRAGMA journal_mode = WAL");
     this.#database.exec("PRAGMA foreign_keys = ON");
+    this.#database.exec("PRAGMA secure_delete = ON");
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS payments (
         id TEXT PRIMARY KEY,
@@ -354,6 +355,19 @@ export class SqlitePaymentStore {
     }
     this.#setRefundStatus(refund.id, "confirmed");
     return { ...refund, status: "confirmed" };
+  }
+
+  retireConfirmedRefundRoute(paymentId: string): void {
+    const refund = this.findRefundByPayment(paymentId);
+    if (refund?.status !== "confirmed")
+      throw new Error(
+        "Return route is still required for refund reconciliation.",
+      );
+    this.#database
+      .prepare(
+        "UPDATE payments SET refund_address='',status='refunded' WHERE id=?",
+      )
+      .run(paymentId);
   }
 
   #setRefundStatus(id: string, status: RefundStatus): void {

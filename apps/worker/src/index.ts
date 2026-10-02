@@ -6,8 +6,10 @@ import type { SqlitePaymentStore } from "../../../packages/database/src/index.js
 import { decodeMemo } from "../../../packages/memo/src/index.js";
 import type { ShieldedNote } from "../../../packages/zcash-adapter/src/index.js";
 import type { ViewedTransaction } from "../../../packages/zcash-adapter/src/index.js";
+import { orchardRefundReceiver } from "../../../packages/zcash-adapter/src/refund-route.js";
 
 export interface PaymentNoteSource {
+  decodeUnifiedAddress?(address: string): Promise<Record<string, string>>;
   listUnspent(addresses?: string[]): Promise<ShieldedNote[]>;
   viewTransaction?(txid: string): Promise<ViewedTransaction>;
 }
@@ -75,8 +77,25 @@ export async function ingestMerchantPayments(options: {
   let created = 0;
 
   for (const note of notes) {
-    if (!note.txid || !candidateMemo(note)) continue;
-    const memo = decodeMemo(note);
+    if (
+      !note.txid ||
+      note.outgoing !== false ||
+      !["orchard", "sapling", "ironwood"].includes(note.pool ?? "") ||
+      !candidateMemo(note)
+    )
+      continue;
+    let memo;
+    try {
+      memo = decodeMemo(note);
+    } catch {
+      continue;
+    }
+    if (!options.source.decodeUnifiedAddress)
+      throw new Error("Payment receiver validation is unavailable.");
+    await orchardRefundReceiver(memo.r, {
+      decodeUnifiedAddress: (address) =>
+        options.source.decodeUnifiedAddress!(address),
+    });
     const payment = parsePaymentRecord({
       id: note.txid,
       merchantId: options.merchantId,

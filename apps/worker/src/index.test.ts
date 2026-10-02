@@ -10,9 +10,12 @@ describe("merchant payment intake", () => {
   it("records a Nostos payment once across repeated scans", async () => {
     const store = new SqlitePaymentStore(":memory:");
     const source = {
+      decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
       listUnspent: async () => [
         {
           txid,
+          outgoing: false,
+          pool: "orchard",
           value: 0.02,
           confirmations: 4,
           memo: encodeMemo("order_001", refundAddress),
@@ -47,6 +50,7 @@ describe("merchant payment intake", () => {
     const result = await ingestMerchantPayments({
       merchantId: "merchant_001",
       source: {
+        decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
         listUnspent: async () => [
           { txid: "e".repeat(64), value: 1, memoStr: "faucet memo" },
         ],
@@ -64,6 +68,7 @@ describe("merchant payment intake", () => {
       merchantId: "merchant_001",
       historicalTxids: [txid],
       source: {
+        decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
         listUnspent: async () => [],
         viewTransaction: async () => ({
           txid,
@@ -71,6 +76,7 @@ describe("merchant payment intake", () => {
           outputs: [
             {
               pool: "ironwood",
+              outgoing: false,
               valueZat: 2_000_000,
               value: 0.02,
               memo: encodeMemo("order_001", refundAddress),
@@ -84,4 +90,59 @@ describe("merchant payment intake", () => {
     expect(store.findByTxid(txid)).toMatchObject({ confirmations: 20 });
     store.close();
   });
+});
+
+it("skips malformed memos without blocking a subsequent valid note", async () => {
+  const store = new SqlitePaymentStore(":memory:");
+  const source = {
+    decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
+    listUnspent: async () => [
+      {
+        txid: "a".repeat(64),
+        outgoing: false,
+        pool: "orchard",
+        memoStr: '{"p":"nostos",broken',
+      },
+      {
+        txid,
+        outgoing: false,
+        pool: "orchard",
+        value: 0.02,
+        confirmations: 2,
+        memo: encodeMemo("order", refundAddress),
+      },
+    ],
+  };
+  const result = await ingestMerchantPayments({
+    store,
+    source,
+    merchantId: "merchant",
+  });
+  expect(result.created).toBe(1);
+  expect(store.paymentCount()).toBe(1);
+  store.close();
+});
+it("fails closed on a syntactically valid route without Orchard capability", async () => {
+  const store = new SqlitePaymentStore(":memory:");
+  await expect(
+    ingestMerchantPayments({
+      store,
+      merchantId: "merchant",
+      source: {
+        decodeUnifiedAddress: async () => ({ sapling: "zs1fake" }),
+        listUnspent: async () => [
+          {
+            txid,
+            outgoing: false,
+            pool: "orchard",
+            value: 0.02,
+            confirmations: 2,
+            memo: encodeMemo("order", refundAddress),
+          },
+        ],
+      },
+    }),
+  ).rejects.toThrow("Orchard-only");
+  expect(store.paymentCount()).toBe(0);
+  store.close();
 });

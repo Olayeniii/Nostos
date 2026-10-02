@@ -55,8 +55,9 @@ export async function POST(request: Request) {
       { error: "Invalid request" },
       { status: 400, headers },
     );
-  const store = new SqlitePaymentStore(path);
+  let store: SqlitePaymentStore | undefined;
   try {
+    store = new SqlitePaymentStore(path);
     if (!store.findByTxid(id))
       return Response.json(
         { error: "Payment unavailable" },
@@ -66,7 +67,12 @@ export async function POST(request: Request) {
       { receiptPath: `/receipt#${receiptToken(id, secret)}` },
       { headers },
     );
+  } catch {
+    return Response.json(
+      { error: "Service temporarily unavailable" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   } finally {
-    store.close();
+    store?.close();
   }
 }

@@ -20,8 +20,10 @@ export async function GET(request: Request) {
       { status: 401 },
     );
   }
-  const store = new SqlitePaymentStore(path);
+  let store: SqlitePaymentStore | undefined;
   try {
+    const active = new SqlitePaymentStore(path);
+    store = active;
     for (const payment of store.listPayments())
       await confirmRecordedRefund(store, payment);
     return Response.json(
@@ -29,7 +31,7 @@ export async function GET(request: Request) {
         payments: store.listPayments().map((payment) => {
           const view = paymentView(
             payment,
-            store.findRefundByPayment(payment.id),
+            active.findRefundByPayment(payment.id),
           );
           return {
             ...view,
@@ -41,7 +43,12 @@ export async function GET(request: Request) {
       },
       { headers: { "Cache-Control": "no-store" } },
     );
+  } catch {
+    return Response.json(
+      { error: "Service temporarily unavailable" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   } finally {
-    store.close();
+    store?.close();
   }
 }
