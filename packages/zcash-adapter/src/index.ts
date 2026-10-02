@@ -44,12 +44,16 @@ interface RpcEnvelope<T> {
   } | null;
 }
 
-const shieldedAddressPattern =
-  /\b(?:utest1|u1|ztestsapling1|zs1)[a-z0-9]{20,}\b/gi;
-
-function safeMessage(value: string): string {
-  return value.replace(shieldedAddressPattern, "[shielded-address]");
-}
+// Only fixed operation names enter diagnostics. Wallet error text may contain
+// memo plaintext, encoded memos, identities, destinations or credentials.
+const diagnosticMethods = new Set([
+  "z_getnewaccount",
+  "z_getaddressforaccount",
+  "z_listunifiedreceivers",
+  "z_listunspent",
+  "z_viewtransaction",
+  "z_sendfromaccount",
+]);
 
 async function authorization(config: ZalletRpcConfig): Promise<string> {
   if (config.cookieFile) {
@@ -99,47 +103,78 @@ export class ZalletRpcClient {
   #nextId = 1;
 
   constructor(config: ZalletRpcConfig) {
+    let url: URL;
+    try {
+      url = new URL(config.url);
+    } catch {
+      throw new Error("Zallet RPC must use a loopback HTTP address.");
+    }
     if (
-      !config.url.startsWith("http://127.0.0.1:") &&
-      !config.url.startsWith("http://localhost:")
+      url.protocol !== "http:" ||
+      !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) ||
+      url.username ||
+      url.password ||
+      url.hash
     ) {
       throw new Error("Zallet RPC must use a loopback HTTP address.");
     }
-    this.#config = config;
+    this.#config = { ...config, url: url.href };
   }
 
   async call<T>(method: string, params: unknown[] = []): Promise<T> {
-    const response = await fetch(this.#config.url, {
-      method: "POST",
-      headers: {
-        authorization: await authorization(this.#config),
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: this.#nextId++,
-        method,
-        params,
-      }),
-      signal: AbortSignal.timeout(this.#config.timeoutMs ?? 120_000),
-    });
+    const operation = diagnosticMethods.has(method) ? method : "request";
+    let access: string;
+    try {
+      access = await authorization(this.#config);
+    } catch {
+      throw new Error(`Zallet RPC ${operation} credentials are unavailable.`);
+    }
+    let response: Response;
+    try {
+      response = await fetch(this.#config.url, {
+        method: "POST",
+        redirect: "error",
+        headers: {
+          authorization: access,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: this.#nextId++,
+          method,
+          params,
+        }),
+        signal: AbortSignal.timeout(this.#config.timeoutMs ?? 120_000),
+      });
+    } catch {
+      // Do not attach the original error as a cause: loggers can serialize it.
+      throw new Error(`Zallet RPC ${operation} transport failed.`);
+    }
 
     if (!response.ok) {
       throw new Error(
-        `Zallet RPC ${method} failed with HTTP ${response.status}.`,
+        `Zallet RPC ${operation} failed with HTTP ${response.status}.`,
       );
     }
 
-    const envelope = (await response.json()) as RpcEnvelope<T>;
+    let value: unknown;
+    try {
+      value = await response.json();
+    } catch {
+      throw new Error(`Zallet RPC ${operation} returned invalid JSON.`);
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`Zallet RPC ${operation} returned an invalid response.`);
+    }
+    const envelope = value as RpcEnvelope<T>;
     if (envelope.error) {
-      const code = envelope.error.code ?? "unknown";
-      const message = safeMessage(
-        envelope.error.message ?? "Unknown wallet error",
-      );
-      throw new Error(`Zallet RPC ${method} failed (${code}): ${message}`);
+      const code = Number.isSafeInteger(envelope.error.code)
+        ? envelope.error.code
+        : "unknown";
+      throw new Error(`Zallet RPC ${operation} failed (${code}).`);
     }
     if (!("result" in envelope)) {
-      throw new Error(`Zallet RPC ${method} returned no result.`);
+      throw new Error(`Zallet RPC ${operation} returned no result.`);
     }
 
     return envelope.result as T;
