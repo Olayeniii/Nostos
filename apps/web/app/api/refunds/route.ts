@@ -9,7 +9,10 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   if (!authorized(request, process.env.NOSTOS_WEB_TOKEN))
-    return Response.json({ error: "Demo access required" }, { status: 401 });
+    return Response.json(
+      { error: "Merchant access required" },
+      { status: 401 },
+    );
   const origin = request.headers.get("origin");
   if (!trustedOrigin(origin, process.env.NOSTOS_WEB_TRUSTED_ORIGINS))
     return Response.json({ error: "Request origin rejected" }, { status: 403 });
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
     (body as Record<string, unknown>).paymentTxid !== allowedPayment
   ) {
     return Response.json(
-      { error: "This payment is not enabled for the controlled demo" },
+      { error: "This payment is not enabled for refunds" },
       { status: 403 },
     );
   }

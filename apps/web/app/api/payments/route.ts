@@ -1,5 +1,5 @@
 import { authorized } from "../../../src/auth.js";
-import { ZalletRpcClient } from "../../../../../packages/zcash-adapter/src/index.js";
+import { confirmRecordedRefund } from "../../../src/refund-confirmation.js";
 import { paymentView } from "../../../../api/src/index.js";
 import { SqlitePaymentStore } from "../../../../../packages/database/src/index.js";
 
@@ -15,39 +15,15 @@ export async function GET(request: Request) {
       { status: 503 },
     );
   if (!authorized(request, token)) {
-    return Response.json({ error: "Demo access is required" }, { status: 401 });
+    return Response.json(
+      { error: "Merchant access is required" },
+      { status: 401 },
+    );
   }
   const store = new SqlitePaymentStore(path);
   try {
-    const url = process.env.NOSTOS_CUSTOMER_WALLET_RPC_URL;
-    const cookieFile = process.env.NOSTOS_CUSTOMER_WALLET_RPC_COOKIE_FILE;
-    if (url && cookieFile) {
-      const customer = new ZalletRpcClient({
-        url,
-        cookieFile,
-        timeoutMs: 5000,
-      });
-      for (const payment of store.listPayments()) {
-        const refund = store.findRefundByPayment(payment.id);
-        if (refund?.status !== "broadcast" || !refund.txid) continue;
-        try {
-          const transaction = await customer.viewTransaction(refund.txid);
-          if (
-            transaction.confirmations > 0 &&
-            transaction.outputs.some(
-              (output) =>
-                output.address === payment.refundAddress &&
-                output.valueZat === refund.amountZat &&
-                output.outgoing === false,
-            )
-          ) {
-            store.confirmRefund(payment.id);
-          }
-        } catch {
-          /* Keep broadcast state until wallet receipt can be verified. */
-        }
-      }
-    }
+    for (const payment of store.listPayments())
+      await confirmRecordedRefund(store, payment);
     return Response.json(
       {
         payments: store.listPayments().map((payment) => {

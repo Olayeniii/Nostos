@@ -1,0 +1,35 @@
+{
+  "status": "implemented; deployment phone verification pending",
+  "sourceCommit": "8c9a50023ea7c5d7756dc9d8781e2dddb71fe765",
+  "routes": {
+    "entry": "/",
+    "merchant": "/merchant",
+    "customerReceipt": "/receipt"
+  },
+  "access": "merchant token preserved; separate opaque per-payment read-only receipt token",
+  "temporaryDemoRoleSwitch": "removed",
+  "testnetLabel": "preserved",
+  "testsPassed": 67,
+  "receiptAccessTests": 7,
+  "productionBuild": "passed locally",
+  "productionHttpChecks": "passed with isolated fixture database and no wallet calls",
+  "vpsHelperChecks": "mocked Docker config preservation, key permissions and stable reuse passed; real execution pending",
+  "phoneVerification": "pending after VPS rebuild and receipt key configuration",
+  "newTransactionsSent": 0,
+  "preserved": [
+    "G1 evidence",
+    "G3 evidence",
+    "G4 evidence",
+    "G5 evidence",
+    "scoped G6 evidence",
+    "wallet authentication",
+    "trusted HTTPS origins",
+    "allowed payment txid",
+    "one refund instruction per payment"
+  ],
+  "limitations": [
+    "No browser customer payment composer or independent customer wallet integration yet.",
+    "Receipt links are bearer access and do not expire; key rotation revokes all.",
+    "No production custody claim."
+  ]
+}

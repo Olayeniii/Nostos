@@ -48,3 +48,7 @@ credentials/
 .vscode/
 *.swp
 *.tsbuildinfo
+
+# Python helper output
+__pycache__/
+*.pyc
