@@ -8,7 +8,7 @@
 | G3 Payment intake | Passed         | One real payment appears once after scanner restart.                     |
 | G4 Refund core    | Passed         | One partial refund broadcasts once and confirms.                         |
 | G5 Interface      | Passed controlled phone flow | HTTPS review, 300000 zatoshi refund, confirmed wallet note, and both phone views agree. |
-| G6 Hardening      | Not started    | Privacy and failure tests pass.                                          |
+| G6 Hardening      | In progress    | 59 tests pass, including six isolated HTTP privacy/failure checks. Browser and VPS checks pending. |
 | G7 Submission     | Not started    | Deployed product, evidence, repository, and video.                       |
 
 No simulated result may be labeled as real.
