@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { authorized } from "./auth.js";
+import { bearerAuthorized } from "./auth.js";
 
 export function receiptAccessConfigured(
   secret: string | undefined,
@@ -18,5 +18,5 @@ export function receiptAuthorized(
   paymentId: string,
   secret: string,
 ): boolean {
-  return authorized(request, receiptToken(paymentId, secret));
+  return bearerAuthorized(request, receiptToken(paymentId, secret));
 }

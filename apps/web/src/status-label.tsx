@@ -14,7 +14,7 @@ export function StateLabel({ state, text }: { state: Status; text: string }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     setVisible(false);
-    if (state !== "loading" && state !== "broadcast") return;
+    if (state !== "loading") return;
     const timer = setTimeout(() => setVisible(true), 250);
     return () => clearTimeout(timer);
   }, [state]);

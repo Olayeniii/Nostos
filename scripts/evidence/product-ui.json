@@ -1,20 +1,22 @@
 {
   "status": "implemented; deployment phone verification pending",
-  "sourceCommit": "8c9a50023ea7c5d7756dc9d8781e2dddb71fe765",
+  "sourceCommit": "e2747515cc741c638a3d08ad452f7d14863a3270",
   "routes": {
     "entry": "/",
     "merchant": "/merchant",
-    "customerReceipt": "/receipt"
+    "customerReceipt": "/receipt",
+    "merchantSignIn": "/sign-in",
+    "settings": "/merchant/settings"
   },
-  "access": "merchant token preserved; separate opaque per-payment read-only receipt token",
+  "access": "Separate merchant password and secure HTTP-only session; backend token kept server-side; independent payment-scoped customer receipt access",
   "temporaryDemoRoleSwitch": "removed",
   "testnetLabel": "preserved",
-  "testsPassed": 67,
+  "testsPassed": 74,
   "receiptAccessTests": 7,
   "productionBuild": "passed locally",
   "productionHttpChecks": "passed with isolated fixture database and no wallet calls",
-  "vpsHelperChecks": "mocked Docker config preservation, key permissions and stable reuse passed; real execution pending",
-  "phoneVerification": "pending after VPS rebuild and receipt key configuration",
+  "vpsHelperChecks": "Mocked preservation of original configuration, private key permissions, separate password hash and subsequent stable restart passed; real VPS execution pending",
+  "phoneVerification": "Pending after VPS rebuild and merchant password setup",
   "newTransactionsSent": 0,
   "preserved": [
     "G1 evidence",
@@ -31,5 +33,13 @@
     "No browser customer payment composer or independent customer wallet integration yet.",
     "Receipt links are bearer access and do not expire; key rotation revokes all.",
     "No production custody claim."
-  ]
+  ],
+  "sessionTests": 7,
+  "uiDesignSources": [
+    "https://github.com/anthropics/skills/tree/main/skills/frontend-design",
+    "https://github.com/vercel-labs/agent-skills/tree/main/skills/web-design-guidelines",
+    "https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices"
+  ],
+  "sessionHttpChecks": "Production sign in cookie, protected settings redirect, Origin rejection, allowed-payment guard and receipt isolation passed; no database or wallet operations",
+  "visualBrowserVerification": "Not run: local browser executable unavailable"
 }

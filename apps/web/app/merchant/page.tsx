@@ -7,6 +7,7 @@ import { AppHeader, AppFooter } from "../../src/shell.js";
 import { useEffect, useRef, useState } from "react";
 import {
   requestJson,
+  RequestError,
   parseZec,
   matchesReview,
   hasRecordedRefund,
@@ -38,8 +39,8 @@ export default function Merchant() {
     undefined,
   );
   const [connectionError, setConnectionError] = useState("");
-  const [access, setAccess] = useState("");
-  const [accessDraft, setAccessDraft] = useState("");
+  const [access, setAccess] = useState(false);
+  const detailRef = useRef<HTMLElement | null>(null);
   const [receiptMessage, setReceiptMessage] = useState("");
   const [sharing, setSharing] = useState(false);
   const sending = useRef(false);
@@ -73,7 +74,6 @@ export default function Merchant() {
         "/api/payments",
         {
           cache: "no-store",
-          headers: { Authorization: `Bearer ${access}` },
         },
         12_000,
         controller.signal,
@@ -111,8 +111,12 @@ export default function Merchant() {
             ? "Refund sent, waiting for confirmation"
             : "Payment records are up to date",
       );
-    } catch {
+    } catch (error) {
       if (version !== refreshVersion.current) return;
+      if (error instanceof RequestError && error.status === 401) {
+        window.location.replace("/sign-in");
+        return;
+      }
       if (!recordsPresent.current && !sending.current) setStatus("failed");
       setConnectionError(
         "Connection interrupted. Last saved status is shown. Reconnect and refresh before taking action.",
@@ -125,6 +129,29 @@ export default function Merchant() {
     }
   }
   useEffect(() => {
+    const controller = new AbortController();
+    void requestJson<{ authenticated: boolean }>(
+      "/api/session",
+      { cache: "no-store" },
+      12000,
+      controller.signal,
+    )
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          if (data.authenticated) setAccess(true);
+          else window.location.replace("/sign-in");
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setConnectionError(
+            "Could not check your session. Refresh when your connection returns.",
+          );
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
     cancelRefresh();
     recordsPresent.current = false;
     setPayments([]);
@@ -134,7 +161,8 @@ export default function Merchant() {
     setConnectionError("");
     if (!access) {
       setStatus("ready");
-      setMessage("Enter your merchant access code");
+      setStatus("loading");
+      setMessage("Opening merchant workspace");
       return;
     }
     void refresh();
@@ -172,7 +200,6 @@ export default function Merchant() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${access}`,
           },
           body: JSON.stringify({
             paymentTxid: instruction.paymentId,
@@ -217,7 +244,6 @@ export default function Merchant() {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${access}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ paymentTxid: selected.id }),
@@ -236,6 +262,12 @@ export default function Merchant() {
       setSharing(false);
     }
   }
+
+  useEffect(() => {
+    if (!selected || !window.matchMedia("(max-width: 700px)").matches) return;
+    detailRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+    detailRef.current?.focus({ preventScroll: true });
+  }, [selected?.id]);
 
   function choose(payment: Payment) {
     if (sending.current || sharing) return;
@@ -261,49 +293,66 @@ export default function Merchant() {
   return (
     <main>
       <AppHeader role="Merchant" />
+      <nav className="workspace-nav" aria-label="Merchant pages">
+        <a href="/merchant" aria-current="page">
+          Payments
+        </a>
+        <a href="/merchant/settings">Settings</a>
+        <button
+          className="text-button"
+          disabled={busy || sharing}
+          onClick={async () => {
+            if (sending.current) return;
+            try {
+              await requestJson("/api/session", { method: "DELETE" }, 12000);
+              window.location.replace("/sign-in");
+            } catch {
+              setConnectionError(
+                "Could not sign out. Check your connection and try again.",
+              );
+            }
+          }}
+        >
+          Sign out
+        </button>
+      </nav>
       <section className="workspace-intro">
-        <p className="eyebrow">MERCHANT WORKSPACE</p>
         <h1>Payments</h1>
         <p className="lede">
           Review a payment and return funds through its private refund route.
         </p>
       </section>
-      <StateLabel state={status} text={message} />
+      {status !== "ready" && <StateLabel state={status} text={message} />}
+      {access && payments.length > 0 && (
+        <div className="payment-summary" aria-label="Payment summary">
+          <span>
+            <strong>
+              {payments.filter((payment) => payment.canRefund).length}
+            </strong>{" "}
+            refundable
+          </span>
+          <span>
+            <strong>
+              {
+                payments.filter((payment) => payment.status === "broadcast")
+                  .length
+              }
+            </strong>{" "}
+            awaiting confirmation
+          </span>
+          <span>
+            <strong>
+              {payments.filter((payment) => payment.refundedZat > 0).length}
+            </strong>{" "}
+            refunded
+          </span>
+        </div>
+      )}
       {connectionError && (
         <p role="alert" className="warning">
           {connectionError}
         </p>
       )}
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (accessDraft !== access) setAccess(accessDraft);
-          else void refresh();
-        }}
-        className="access"
-      >
-        <label>
-          Merchant access code
-          <input
-            type="password"
-            autoComplete="off"
-            disabled={busy || sharing}
-            value={accessDraft}
-            onChange={(event) => setAccessDraft(event.target.value)}
-            placeholder="Enter your access code"
-          />
-        </label>
-        <button
-          className="text-button"
-          type="submit"
-          disabled={refreshing || busy || sharing || !accessDraft}
-        >
-          Open payments
-        </button>
-        {refreshing && (
-          <StateLabel state="loading" text="Checking shielded payments" />
-        )}
-      </form>
       {access && (
         <section className="workspace">
           <div className="list">
@@ -323,6 +372,8 @@ export default function Merchant() {
             {payments.map((payment) => (
               <button
                 key={payment.id}
+                aria-pressed={selected?.id === payment.id}
+                disabled={busy || sharing}
                 className={`payment-row ${selected?.id === payment.id ? "selected" : ""}`}
                 onClick={() => choose(payment)}
               >
@@ -337,11 +388,16 @@ export default function Merchant() {
               </button>
             ))}
           </div>
-          <article className="detail">
+          <article
+            className="detail"
+            ref={detailRef}
+            tabIndex={-1}
+            aria-label="Selected payment"
+          >
             {selected ? (
               <>
                 <p className="eyebrow">
-                  {review ? "REVIEW REFUND" : "PAYMENT DETAILS"}
+                  {review ? "Review refund" : "Payment details"}
                 </p>
                 <h2>{selected.orderReference}</h2>
                 <div className="amount">
@@ -440,6 +496,8 @@ export default function Merchant() {
                       <label>
                         Refund amount in ZEC
                         <input
+                          name="refundAmount"
+                          autoComplete="off"
                           inputMode="decimal"
                           value={amount}
                           onChange={(event) => {

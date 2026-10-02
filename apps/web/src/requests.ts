@@ -1,3 +1,9 @@
+export class RequestError extends Error {
+  constructor(public readonly status: number) {
+    super("Request failed");
+  }
+}
+
 // The deadline covers headers and body. Aborting a POST does not cancel its server action.
 export async function requestJson<T>(
   url: string,
@@ -12,7 +18,7 @@ export async function requestJson<T>(
   const timer = setTimeout(abort, timeoutMs);
   try {
     const response = await fetch(url, { ...init, signal: controller.signal });
-    if (!response.ok) throw new Error("Request failed");
+    if (!response.ok) throw new RequestError(response.status);
     return (await response.json()) as T;
   } finally {
     clearTimeout(timer);

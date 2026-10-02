@@ -6,7 +6,7 @@ export default function Home() {
     <main>
       <AppHeader />
       <section className="intro product-entry">
-        <p className="eyebrow">PRIVATE REFUNDS FOR SHIELDED ZEC PAYMENTS</p>
+        <p className="eyebrow">Private refunds for shielded ZEC payments</p>
         <h1>A private way back.</h1>
         <p className="lede">
           A private refund route travels with the payment. When a refund is due,

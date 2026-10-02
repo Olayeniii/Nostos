@@ -12,7 +12,8 @@ export function Mark({ loading = false }: { loading?: boolean }) {
       </g>
       <path
         className="return-line"
-        d="M0 48 H32 M67 57 H100"
+        pathLength="1"
+        d="M 15 34 C 22 29 27 31 35 37 L 68 63"
         fill="none"
         stroke="#53E3A6"
         strokeWidth="3"

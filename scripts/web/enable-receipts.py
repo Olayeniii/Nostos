@@ -1,4 +1,6 @@
-"""Set separate receipt access while preserving the current web container config."""
+"""Set merchant sign in and receipt access, preserving the current web config."""
+import getpass
+import hashlib
 import http.client
 import json
 import os
@@ -31,6 +33,18 @@ def docker(method, path, payload=None):
         connection.close()
 
 
+def healthy():
+    for _ in range(40):
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:3000/sign-in", timeout=1) as response:
+                if response.status == 200:
+                    return True
+        except (OSError, TimeoutError):
+            pass
+        time.sleep(0.5)
+    return False
+
+
 def run():
     current = docker("GET", "/containers/nostos-web/json")
     config = current["Config"]
@@ -50,9 +64,24 @@ def run():
         with os.fdopen(descriptor, "w") as file:
             file.write(key + "\n")
     os.chmod(key_path, 0o600)
-    if existing:
+    login_hash = env.get("NOSTOS_MERCHANT_PASSWORD_HASH", "")
+    if login_hash and not re.fullmatch(r"[a-f0-9]{32}:[a-f0-9]{64}", login_hash):
+        raise RuntimeError("Merchant password configuration is invalid.")
+    if not login_hash:
+        password = getpass.getpass("Choose a merchant password (12 to 128 characters): ")
+        if not 12 <= len(password.encode("utf-16-le")) // 2 <= 128:
+            raise RuntimeError("Password length is invalid.")
+        if password != getpass.getpass("Confirm merchant password: "):
+            raise RuntimeError("Passwords do not match.")
+        salt = secrets.token_hex(16)
+        digest = hashlib.scrypt(password.encode(), salt=salt.encode(), n=16384, r=8, p=1, dklen=32).hex()
+        login_hash = salt + ":" + digest
+        config["Env"] = [entry for entry in config["Env"] if not entry.startswith("NOSTOS_MERCHANT_PASSWORD_HASH=")] + ["NOSTOS_MERCHANT_PASSWORD_HASH=" + login_hash]
+    if existing and env.get("NOSTOS_MERCHANT_PASSWORD_HASH"):
         docker("POST", "/containers/nostos-web/restart?t=30")
-        print("Receipt access preserved. Web container restarted for the new build.")
+        if not healthy():
+            raise RuntimeError("Web container restarted but did not become healthy. Check docker logs --tail 30 nostos-web.")
+        print("Merchant sign in and receipt access preserved. Web page is healthy.")
         return
     config["Env"] = [entry for entry in config["Env"] if not entry.startswith("NOSTOS_RECEIPT_SECRET=")] + ["NOSTOS_RECEIPT_SECRET=" + key]
     config["HostConfig"] = current["HostConfig"]
@@ -71,16 +100,10 @@ def run():
         docker("POST", "/containers/" + candidate + "/rename?name=nostos-web")
         swapped = True
         docker("POST", "/containers/nostos-web/start")
-        for _ in range(40):
-            try:
-                with urllib.request.urlopen("http://127.0.0.1:3000/merchant", timeout=1) as response:
-                    if response.status == 200:
-                        print("Receipt access configured. Merchant page is healthy.")
-                        print("Private receipt key stays on the VPS. Do not share it.")
-                        return
-            except (OSError, TimeoutError):
-                pass
-            time.sleep(0.5)
+        if healthy():
+            print("Merchant sign in and receipt access configured. Web page is healthy.")
+            print("Private receipt key stays on the VPS. Do not share it.")
+            return
         raise RuntimeError("Replacement web container did not become healthy.")
     except Exception:
         if swapped:
@@ -98,5 +121,7 @@ def run():
 if __name__ == "__main__":
     try:
         run()
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from None
     except Exception:
-        raise SystemExit("Receipt configuration failed. No wallet operations were performed. Check nostos-web status before retrying.") from None
+        raise SystemExit("Merchant configuration failed. No wallet operations were performed. Check nostos-web status before retrying.") from None

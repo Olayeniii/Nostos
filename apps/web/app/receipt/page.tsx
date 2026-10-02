@@ -114,7 +114,6 @@ export default function CustomerReceipt() {
     <main>
       <AppHeader role="Customer" />
       <section className="workspace-intro">
-        <p className="eyebrow">YOUR PAYMENT</p>
         <h1>Your private receipt.</h1>
         <p className="lede">
           Check the refund status for your payment. No wallet connection is
@@ -140,6 +139,8 @@ export default function CustomerReceipt() {
           <label>
             Private receipt link
             <input
+              name="receiptLink"
+              spellCheck={false}
               type="password"
               autoComplete="off"
               value={draft}
@@ -149,8 +150,7 @@ export default function CustomerReceipt() {
             />
           </label>
           <p className="privacy">
-            Use the link for your payment. Merchant access codes cannot open
-            customer receipts.
+            Use the private link supplied by the merchant for this payment.
           </p>
           <button className="primary" disabled={loading || !draft.trim()}>
             Open receipt
