@@ -3,6 +3,7 @@
 **/next-env.d.ts
 coverage
 node_modules
+.pnpm-store
 pnpm-lock.yaml
 private-evidence
 wallet-data
