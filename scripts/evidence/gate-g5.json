@@ -1,6 +1,6 @@
 {
   "gate": "G5",
-  "status": "incomplete",
+  "status": "passed-controlled-phone-flow",
   "baselineCommit": "5bc257b998bc07daab123286c98cb3be7bc0ff33",
   "phoneProof": {
     "source": "user-reported wallet, database, and phone receipt agreement",
@@ -21,16 +21,46 @@
     "trustedOriginBoundary": "passed without wallet broadcast"
   },
   "controlledBrowserVerification": {
-    "status": "blocked",
-    "reason": "Available browser rejected loopback URL with ERR_BLOCKED_BY_CLIENT",
-    "reviewToSendAmount": "pending",
-    "staleAndOverlappingRefreshes": "pending",
-    "loadingAnimation": "pending"
+    "status": "passed controlled user-operated phone flow",
+    "reviewToSendAmount": "review, persisted instruction, customer wallet and both UI views agree",
+    "loadingAnimation": "logo visible beside broadcast status; formation animation timing not verified by still screenshot",
+    "staleAndOverlappingRefreshes": "automated checks only; controlled browser stress test pending",
+    "httpsOrigin": "authenticated invalid JSON probe returned 400 before wallet/database action"
   },
   "limitations": [
-    "No real transaction was sent in this patch validation.",
     "One refund instruction per payment is supported.",
-    "Tunnel or browser cause of intermittent failures remains unproven.",
+    "ui-order-001 discrepancy remains unresolved; no further refund permitted.",
+    "Tunnel failure cause remains unproven; controlled test used HTTPS without SSH forwarding.",
+    "Interrupted-send reconciliation and stale-refresh browser stress tests remain G6 work.",
+    "Loading formation animation timing has not been verified.",
     "G1, G3 and G4 evidence is preserved."
-  ]
+  ],
+  "deployedCommit": "da15c77a7080a5e4a37827570ea5cc93a5080bdd",
+  "verifiedAt": "2026-10-02T00:25:00Z",
+  "controlledPhoneProof": {
+    "source": "User-operated Android Chrome screenshots and pasted VPS read-only database and wallet outputs; no agent-operated browser claim",
+    "origin": "https://nostos.iyforge.xyz",
+    "orderReference": "ui-order-002",
+    "paymentTxid": "261760840eb1922452667f77fdde518b96addfb8d41b84e23dae78bf028415cd",
+    "paymentAmountZat": 1000000,
+    "reviewedRefundZec": "0.003",
+    "refundTxid": "6b954c9f9732a834bba95715172054baa8f6beb86d6f101fd01b6c51efde0741",
+    "databaseAmountZat": 300000,
+    "databaseStatus": "confirmed",
+    "databaseRetryCount": 0,
+    "customerWalletValueZec": 0.003,
+    "customerWalletValueZat": 300000,
+    "customerWalletConfirmations": 5,
+    "remainingAmountZat": 700000,
+    "destinationMasked": "utest14h...ju9nvv40",
+    "exactAmountProof": "passed",
+    "anotherSendUnavailable": true,
+    "screenshots": {
+      "review": "1002586124.jpg",
+      "broadcast": "1002586125.jpg",
+      "merchantConfirmed": "1002586126.jpg",
+      "customerReceipt": "1002586127.jpg"
+    },
+    "screenshotStorage": "Supplied in ChatGPT conversation; binaries not bundled in repository"
+  }
 }
