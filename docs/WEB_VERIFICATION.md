@@ -6,7 +6,7 @@ Continue from main 5bc257b998bc07daab123286c98cb3be7bc0ff33. No wallet, node, sc
 
 Refund POST accepts the exact origins `http://127.0.0.1:3000` and `http://localhost:3000` by default. Optional `NOSTOS_WEB_TRUSTED_ORIGINS` replaces this list with comma-separated exact origins. An empty value denies every origin. HTTP entries are accepted only for loopback hosts; other entries require HTTPS. Request URL, Host, and forwarded headers do not grant trust.
 
-Authentication and `NOSTOS_WEB_ALLOWED_PAYMENT_TXID` remain required. This policy does not make the application public. Keep Next bound to loopback, and use the existing SSH tunnel.
+Authentication and `NOSTOS_WEB_ALLOWED_PAYMENT_TXID` remain required. Keep Next bound to loopback. The deployed phone path now uses Nginx HTTPS at `https://nostos.iyforge.xyz`, with `NOSTOS_WEB_TRUSTED_ORIGINS=https://nostos.iyforge.xyz`. Port 80 serves ACME validation and HTTPS redirects only. Existing bearer authentication and payment authorization remain required.
 
 ## Request behavior
 
@@ -28,7 +28,7 @@ Do not recreate the wallet services, Zebra, koko-memory, or disk guard. No new t
 
 ## Controlled phone checks before another payment
 
-1. Open `http://127.0.0.1:3000` through the existing Termius tunnel. Enter access privately.
+1. Open `https://nostos.iyforge.xyz`. Enter access privately. SSH forwarding is no longer required.
 2. Load records and select `ui-order-001`. Check that the saved refund is 0.0031 ZEC and sending is unavailable. Do not send another refund for this order.
 3. Refresh repeatedly. Check that saved status stays visible and only one request is pending. Interrupt the tunnel and confirm that the connection warning blocks actions without erasing saved data. Restore the tunnel and refresh.
 4. Review an eligible new payment only after the failure checks pass. Record entered ZEC, displayed reviewed ZEC, submitted integer zatoshi, refund database amount, and customer received amount. These must agree before marking exact-amount proof passed.
@@ -36,6 +36,16 @@ Do not recreate the wallet services, Zebra, koko-memory, or disk guard. No new t
 
 ## G5 status
 
-Incomplete. Automated helper and HTTP boundary tests pass. Production build passes. Controlled browser rendering, amount submission, overlapping/stale refresh handling, and loading animation still require browser verification. This environment's browser blocked loopback access; no browser test pass is claimed.
+Controlled user-operated Android Chrome flow passed on deployed commit da15c77a7080a5e4a37827570ea5cc93a5080bdd. ui-order-002 review showed 0.003 ZEC; database stored 300000 zatoshi, confirmed, retry_count 0; customer wallet reported value 0.003, valueZat 300000, five confirmations. Merchant details and customer receipt agreed, with 0.007 ZEC remaining and another send unavailable. Refund txid: 6b954c9f9732a834bba95715172054baa8f6beb86d6f101fd01b6c51efde0741.
+
+Screenshots supplied in the conversation: 1002586124.jpg (review), 1002586125.jpg (broadcast), 1002586126.jpg (merchant confirmed), 1002586127.jpg (customer receipt). Screenshot binaries are not bundled in the repository. This is user-operated proof, not an agent-operated browser test. Logo appeared beside broadcast status; animation timing is not proven by a still image. Stale/overlapping refresh stress tests and interrupted-send reconciliation remain G6 work.
 
 The phone already showed a real confirmed refund for ui-order-001. Its intended amount was 0.003 ZEC, but database and customer receipt showed 310000 zatoshi (0.0031 ZEC). The retry input is uncertain. The discrepancy is unresolved and is not an exact-amount pass. G1, G3, and G4 evidence remains unchanged.
+
+The user noticed and removed an extra keyboard digit during ui-order-002 input before review. This makes accidental input plausible for ui-order-001 but does not establish its prior submitted amount.
+
+## HTTPS operations
+
+Nginx configuration: `/etc/nginx/conf.d/nostos.conf`. Certificate: `/etc/letsencrypt/live/nostos.iyforge.xyz/`. Certbot reported scheduled renewal. Keep the ACME webroot `/var/www/nostos-acme` reachable on port 80. VPS INPUT contained an earlier REJECT before UFW; only TCP 80 and 443 were allowed before it. A dedicated `nostos-web-firewall.service` was provided for reboot persistence; enabled state and reboot behavior still require verification. Do not flush or replace firewall tables.
+
+Private Docker replacement configuration files under `~/nostos/` contain credentials. Do not commit or share them. Previous stopped web containers are rollback copies. No wallet, Zebra, koko-memory, or disk guard restart was required for this migration.
