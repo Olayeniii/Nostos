@@ -1,11 +1,11 @@
 {
   "gate": "G6",
-  "status": "in-progress",
+  "status": "passed-scoped-privacy-and-failure-checks",
   "classification": "automated isolated checks; no real wallet broadcast",
   "checks": {
     "repositoryChecks": "passed",
-    "testCount": 59,
-    "newHttpBoundaryTests": 6,
+    "testCount": 60,
+    "newHttpBoundaryTests": 7,
     "productionWebBuild": "passed",
     "secretScan": "passed",
     "custom404": {
@@ -26,14 +26,20 @@
       "unauthorized payment rejected before wallet access",
       "zero amount creates no instruction",
       "mocked ambiguous broadcast persists broadcast_unknown and second request cannot broadcast again"
-    ]
+    ],
+    "lostResponse": {
+      "classification": "isolated integration test using browser request helper, real temporary SQLite database and mocked broadcaster",
+      "result": "passed",
+      "sequence": [
+        "server persists mocked broadcast txid",
+        "browser helper loses response and aborts",
+        "authenticated status read returns same txid and blocks sending",
+        "explicit same-instruction retry returns same txid with broadcast false"
+      ],
+      "broadcastCalls": 1,
+      "realTransactionsSent": 0
+    }
   },
-  "pending": [
-    "Controlled stale/overlapping browser refresh checks",
-    "Interrupted-send browser reconciliation test using isolated mock environment",
-    "Logo formation animation timing and reduced-motion visual checks",
-    "VPS firewall service enabled state and renewal verification"
-  ],
   "preserved": [
     "G1",
     "G3",
@@ -42,5 +48,41 @@
     "one refund instruction per payment",
     "wallet authentication and allowed payment boundary"
   ],
-  "transactionsSent": 0
+  "transactionsSent": 0,
+  "phoneAndVpsChecks": {
+    "source": "user reported completion in conversation; not agent-operated verification",
+    "custom404": {
+      "status": "passed",
+      "screenshot": "1002586142.jpg"
+    },
+    "connectionRecovery": {
+      "status": "passed",
+      "savedConfirmedAmountZat": 300000,
+      "recoveredWithoutReload": true
+    },
+    "repeatedRefreshAndSelection": {
+      "status": "passed",
+      "finalOrder": "ui-order-002",
+      "refundedZat": 300000,
+      "remainingZat": 700000,
+      "canRefund": false
+    },
+    "firewallService": {
+      "enabled": "user confirmed",
+      "active": "user confirmed",
+      "rebootTest": "not performed"
+    },
+    "certificateRenewal": {
+      "dryRun": "user pasted all simulated renewals succeeded",
+      "nginxDeployHook": "user reported successful configuration test and reload"
+    }
+  },
+  "limitations": [
+    "Interrupted-send reconciliation was tested with the request helper and mock wallet, not a full rendered browser send.",
+    "Repeated refresh is user-observed UI correctness; browser network concurrency was not instrumented.",
+    "Logo animation timing and reduced-motion visual checks remain unverified.",
+    "Firewall service reboot behavior has not been tested.",
+    "No production custody or independent public customer receipt link claim.",
+    "No real transaction was sent for G6."
+  ]
 }
