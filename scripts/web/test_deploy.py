@@ -67,6 +67,9 @@ class DeployTests(unittest.TestCase):
             build = payloads[0]
             self.assertFalse(any('NOSTOS_WEB_TOKEN=' in v for v in build['Env']))
             self.assertFalse(any('wallet' in v for v in build['HostConfig']['Binds']))
+            releases = list((Path(root)/'releases').iterdir())
+            self.assertEqual(len(releases), 1)
+            self.assertTrue((releases[0]/'runtime').is_dir())
             self.assertEqual(calls[-1], ('POST', '/containers/nostos-web/start'))
             self.assertTrue(any('/rename?name=nostos-web' in path and 'nostos-web-before-' in path for _, path in calls))
 

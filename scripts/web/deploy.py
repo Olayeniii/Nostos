@@ -31,7 +31,13 @@ def docker(method, path, payload=None):
         response = connection.getresponse()
         data = response.read()
         if response.status >= 400:
-            raise RuntimeError('Docker operation failed (HTTP %d).' % response.status)
+            try:
+                detail = json.loads(data).get('message', '')
+            except (json.JSONDecodeError, AttributeError):
+                detail = ''
+            detail = re.sub(r'\b(?:utest1|u1)[a-z0-9]{20,}\b', '[shielded-address]', detail)
+            suffix = ': '+detail[:500] if detail else ''
+            raise RuntimeError('Docker operation failed (HTTP %d)%s.' % (response.status, suffix))
         return json.loads(data) if data else None
     finally:
         connection.close()
@@ -99,6 +105,9 @@ def run():
             archive.seek(0)
             with tarfile.open(fileobj=archive) as files:
                 files.extractall(release, filter='data')
+        # Docker cannot create a nested bind mountpoint below a read-only /app
+        # mount. Include the empty directory before mounting the release.
+        (release / 'runtime').mkdir(exist_ok=True)
         builder = 'nostos-build-'+suffix
         # No wallet cookies, application tokens, or databases enter the build container.
         build_config = {'Image': base['Config']['Image'], 'WorkingDir': '/app',
