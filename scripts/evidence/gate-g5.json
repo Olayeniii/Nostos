@@ -11,7 +11,8 @@
     "intendedRefundAmountZat": 300000,
     "retryInputKnown": false,
     "exactAmountProof": "unresolved",
-    "additionalRefundForbidden": true
+    "additionalRefundForbidden": true,
+    "keyboardObservation": "During ui-order-002 entry, user noticed keyboard append 4 after 0.003 and deleted it before review. Accidental input is a plausible explanation for ui-order-001, not proven."
   },
   "automatedChecks": {
     "unitAndBoundaryTests": "passed",
