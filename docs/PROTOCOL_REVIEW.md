@@ -95,3 +95,11 @@ Execution: current live revision and rollback proof, existing isolated release t
 Originality: preserve original build commits and real transaction evidence; accurately acknowledge protocol and merchant-tool overlap.
 
 No mainnet migration, browser wallet connection, draft authenticity proof or NFT-specific automation is included. No event eligibility rules are inferred from older hackathons.
+
+## Noir checkout follow-up
+
+The user tested the official Noir testnet extension on Mises, generated another receive address and obtained faucet funds. Checkout preparation failed. A read-only production RPC check reported Orchard=true, Sapling=true, p2pkh=false, p2sh=false, unknown receiver count=0 and a 250-byte original memo. This proves rejection at the original mixed-receiver validation check; it does not prove the complete wallet payment/refund loop.
+
+Checkout now accepts an Orchard+Sapling shielded UA as input, extracts the wallet-reported single-receiver Orchard UA, independently decodes it and requires Orchard-only capability on the same network. Only the extracted Orchard UA is persisted and encoded inside the paying memo. Intake, reconciliation and refund signing continue to require Orchard-only routes. Transparent-containing, unknown-type and missing-Orchard inputs remain rejected. Repeated preparation compares the normalized route; equivalent checkout inputs producing the same Orchard UA share the reuse fingerprint. This does not prove freshness outside NOSTOS or retroactively normalize historical records. No side-channel refund route or weaker refund fallback is added.
+
+Validation: 144 tests and full repository checks passed. Production deployment and actual Noir payment/refund remain pending.

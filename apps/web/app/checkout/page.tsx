@@ -100,8 +100,8 @@ export default function Checkout() {
             <>
               <h2>Pay with shielded ZEC</h2>
               <p>
-                Supply a fresh Orchard-only testnet address from a wallet that
-                you control.
+                Supply a fresh shielded testnet address from a wallet that you
+                control. NOSTOS uses its Orchard receiver for the refund route.
               </p>
               {!prepared ? (
                 <form

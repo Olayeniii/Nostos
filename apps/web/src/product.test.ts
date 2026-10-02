@@ -37,7 +37,9 @@ beforeEach(() => {
   rpc = {
     createAccount: vi.fn(async () => "wallet-uuid"),
     deriveOrchardAddress: vi.fn(async () => destination),
-    decodeUnifiedAddress: vi.fn(async () => ({ orchard: route })),
+    decodeUnifiedAddress: vi.fn(async (address: string) => ({
+      orchard: address,
+    })),
     listUnspent: vi.fn(async () => []),
     viewTransaction: vi.fn(async () => ({
       txid,
@@ -353,4 +355,37 @@ describe("protocol rejection and route retirement", () => {
     await reconcile(store, core, store.checkout(c.id)!, rpc);
     expect(core.findByTxid(txid)?.refundAddress).toBe("");
   });
+});
+
+it("puts only the Orchard receiver from a combined shielded UA in the paying memo", async () => {
+  const m = merchant();
+  const created = newRequest(store, m, "Noir route", 1000000);
+  const mixed = "utest1" + "f".repeat(80);
+  vi.mocked(rpc.decodeUnifiedAddress).mockImplementation(
+    async (address): Promise<Record<string, string>> =>
+      address === mixed
+        ? { orchard: route, sapling: "zs1fixture" }
+        : { orchard: address },
+  );
+  const first = await preparePayment(
+    store,
+    store.checkout(created.id)!,
+    mixed,
+    rpc,
+  );
+  expect(JSON.parse(first.memo).r).toBe(route);
+  expect(first.memo).not.toContain(mixed);
+  expect(first.uri).not.toContain("message=");
+  expect(store.checkout(created.id)?.route).toBe(route);
+  const repeated = await preparePayment(
+    store,
+    store.checkout(created.id)!,
+    mixed,
+    rpc,
+  );
+  expect(repeated.memo).toBe(first.memo);
+  const second = newRequest(store, m, "Same receiver", 1000000);
+  await expect(
+    preparePayment(store, store.checkout(second.id)!, route, rpc),
+  ).rejects.toThrow();
 });

@@ -8,7 +8,10 @@ import {
 import { decodeMemo, encodeMemo } from "../../../packages/memo/src/index.js";
 import { paymentView } from "../../api/src/index.js";
 import { submitRefund } from "../../api/src/refund-request.js";
-import { orchardRefundReceiver } from "../../../packages/zcash-adapter/src/refund-route.js";
+import {
+  orchardRefundReceiver,
+  prepareOrchardRefundRoute,
+} from "../../../packages/zcash-adapter/src/refund-route.js";
 
 export function wallet(timeoutMs = 2500) {
   const url = process.env.NOSTOS_MERCHANT_WALLET_RPC_URL;
@@ -157,9 +160,9 @@ export async function preparePayment(
     throw new Error("Use a fresh testnet unified address");
   if (checkout.status !== "unpaid")
     throw new Error("Payment is already recorded");
+  route = await prepareOrchardRefundRoute(route, rpc);
   if (checkout.route && checkout.route !== route)
     throw new Error("The return route is already attached");
-  await orchardRefundReceiver(route, rpc);
   const memo = encodeMemo(checkout.order, route);
   store.setRoute(checkout.id, route);
   const saved = store.checkout(checkout.id)!;
