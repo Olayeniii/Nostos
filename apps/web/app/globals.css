@@ -361,3 +361,25 @@ input:focus-visible {
     opacity: 0;
   }
 }
+
+.not-found {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+.not-found .brand {
+  justify-content: flex-start;
+  align-self: flex-start;
+}
+.not-found .intro {
+  max-width: 660px;
+}
+.not-found-link {
+  display: inline-block;
+  width: auto;
+  text-align: center;
+  padding-inline: 24px;
+}
