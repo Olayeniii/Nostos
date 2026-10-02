@@ -1,604 +1,529 @@
 "use client";
-
-import { Mark } from "../../src/mark.js";
-import { StateLabel, type Status } from "../../src/status-label.js";
+import { useState, useRef } from "react";
+import Link from "next/link";
+import QRCode from "qrcode";
 import { AppHeader, AppFooter } from "../../src/shell.js";
-
-import { useEffect, useRef, useState } from "react";
-import {
-  requestJson,
-  RequestError,
-  parseZec,
-  matchesReview,
-  hasRecordedRefund,
-} from "../../src/requests.js";
-
-type Payment = {
+import { StateLabel } from "../../src/status-label.js";
+import { useRecord } from "../../src/use-record.js";
+import { requestJson, parseZec } from "../../src/requests.js";
+import { zec, date, type ReceiptData } from "../../src/receipt-card.js";
+import type { PaymentView } from "../../../api/src/index.js";
+type RecordData = ReceiptData & {
   id: string;
-  orderReference: string;
-  receivedZat: number;
-  refundedZat: number;
-  availableZat: number;
-  destination: string;
-  status: string;
-  canRefund: boolean;
-  refundTxid?: string;
+  paymentStatus: string;
+  payment?: PaymentView;
 };
-
-const zec = (amount: number) =>
-  (amount / 100_000_000).toLocaleString("en", { maximumFractionDigits: 8 });
-
+type Dashboard = {
+  merchant: { name: string; ready: boolean };
+  records: RecordData[];
+  syncWarning: boolean;
+};
+function status(r: RecordData) {
+  return r.refundAmountZat > 0
+    ? r.status === "confirmed"
+      ? "Refund confirmed"
+      : "Refund pending"
+    : r.paymentStatus === "confirmed"
+      ? "Paid"
+      : r.paymentStatus === "broadcast"
+        ? "Confirming"
+        : "Awaiting payment";
+}
 export default function Merchant() {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [selected, setSelected] = useState<Payment>();
-  const [status, setStatus] = useState<Status>("loading");
-  const [message, setMessage] = useState("Loading payments");
-  const [amount, setAmount] = useState("");
-  const [review, setReview] = useState(false);
-  const reviewed = useRef<{ paymentId: string; amountZat: number } | undefined>(
-    undefined,
+  const { data, loading, warning, refresh } = useRecord<Dashboard>(
+    "/api/product/dashboard",
   );
-  const [connectionError, setConnectionError] = useState("");
-  const [access, setAccess] = useState(false);
-  const detailRef = useRef<HTMLElement | null>(null);
-  const [receiptMessage, setReceiptMessage] = useState("");
-  const [sharing, setSharing] = useState(false);
-  const sending = useRef(false);
+  const [selected, setSelected] = useState("");
+  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
-  const refreshRequest = useRef<AbortController | undefined>(undefined);
-  const refreshVersion = useRef(0);
-  const recordsPresent = useRef(false);
-  const uncertainPayments = useRef(new Set<string>());
-  const [refreshing, setRefreshing] = useState(false);
-
-  function cancelRefresh() {
-    refreshVersion.current += 1;
-    refreshRequest.current?.abort();
-    refreshRequest.current = undefined;
-    setRefreshing(false);
+  const [error, setError] = useState("");
+  const [share, setShare] = useState("");
+  const [qr, setQr] = useState("");
+  const [draft, setDraft] = useState("");
+  const [review, setReview] = useState<{ id: string; amountZat: number }>();
+  const [uncertain, setUncertain] = useState(false);
+  const submitting = useRef(false);
+  const records = data?.records ?? [];
+  const current = records.find((r) => r.id === selected);
+  const paid = records.filter((r) => r.payment);
+  const received = paid.reduce((a, r) => a + r.paymentAmountZat, 0);
+  const refunded = paid.reduce(
+    (a, r) => a + (r.status === "confirmed" ? r.refundAmountZat : 0),
+    0,
+  );
+  const refundable = paid
+    .filter((r) => r.payment?.canRefund)
+    .reduce((a, r) => a + (r.payment?.availableZat ?? 0), 0);
+  const safe =
+    !warning && !data?.syncWarning && !loading && !busy && !uncertain;
+  async function post<T>(action: string, body: unknown) {
+    return requestJson<T>(
+      `/api/product/${action}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      30000,
+    );
   }
-
-  async function refresh(quiet = false) {
-    if (!access || (sending.current && !quiet) || refreshRequest.current)
-      return;
-    const controller = new AbortController();
-    refreshRequest.current = controller;
-    const version = ++refreshVersion.current;
-    setRefreshing(true);
-    if (!quiet && payments.length === 0) {
-      setStatus("loading");
-      setMessage("Loading payments");
-    }
-    try {
-      const data = await requestJson<{ payments: Payment[] }>(
-        "/api/payments",
-        {
-          cache: "no-store",
-        },
-        12_000,
-        controller.signal,
-      );
-      if (version !== refreshVersion.current) return;
-      const records = data.payments.map((record) => {
-        if (!uncertainPayments.current.has(record.id)) return record;
-        if (hasRecordedRefund(record)) {
-          uncertainPayments.current.delete(record.id);
-          return record;
-        }
-        return { ...record, canRefund: false, status: "broadcast_unknown" };
-      });
-      setConnectionError("");
-      recordsPresent.current = records.length > 0;
-      setPayments(records);
-      setSelected((current) =>
-        current
-          ? records.find((record) => record.id === current.id)
-          : undefined,
-      );
-      const unresolved = records.find(
-        (record) =>
-          record.status === "broadcast_unknown" ||
-          record.status === "broadcasting",
-      );
-      const waiting = records.some((record) => record.status === "broadcast");
-      setStatus(
-        unresolved ? "broadcast_unknown" : waiting ? "broadcast" : "ready",
-      );
-      setMessage(
-        unresolved
-          ? "Reconciliation required before retry"
-          : waiting
-            ? "Refund sent, waiting for confirmation"
-            : "Payment records are up to date",
-      );
-    } catch (error) {
-      if (version !== refreshVersion.current) return;
-      if (error instanceof RequestError && error.status === 401) {
-        window.location.replace("/sign-in");
-        return;
-      }
-      if (!recordsPresent.current && !sending.current) setStatus("failed");
-      setConnectionError(
-        "Connection interrupted. Last saved status is shown. Reconnect and refresh before taking action.",
-      );
-    } finally {
-      if (version === refreshVersion.current) {
-        refreshRequest.current = undefined;
-        setRefreshing(false);
-      }
-    }
-  }
-  useEffect(() => {
-    const controller = new AbortController();
-    void requestJson<{ authenticated: boolean }>(
-      "/api/session",
-      { cache: "no-store" },
-      12000,
-      controller.signal,
-    )
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          if (data.authenticated) setAccess(true);
-          else window.location.replace("/sign-in");
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setConnectionError(
-            "Could not check your session. Refresh when your connection returns.",
-          );
-      });
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    cancelRefresh();
-    recordsPresent.current = false;
-    setPayments([]);
-    setSelected(undefined);
-    reviewed.current = undefined;
-    setReview(false);
-    setConnectionError("");
-    if (!access) {
-      setStatus("ready");
-      setStatus("loading");
-      setMessage("Opening merchant workspace");
-      return;
-    }
-    void refresh();
-    const timer = setInterval(() => {
-      if (!sending.current) void refresh(true);
-    }, 8000);
-    return () => {
-      clearInterval(timer);
-      cancelRefresh();
-    };
-  }, [access]);
-
-  async function sendRefund() {
-    if (
-      sending.current ||
-      !selected ||
-      !valid ||
-      connectionError ||
-      !reviewed.current ||
-      !matchesReview(reviewed.current, selected.id, amountZat) ||
-      uncertainPayments.current.has(selected.id)
-    )
-      return;
-    const instruction = reviewed.current;
-    cancelRefresh();
-    uncertainPayments.current.add(instruction.paymentId);
-    sending.current = true;
-    setBusy(true);
-    setStatus("loading");
-    setMessage("Preparing shielded refund");
-    try {
-      await requestJson(
-        "/api/refunds",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            paymentTxid: instruction.paymentId,
-            amountZat: instruction.amountZat,
-          }),
-        },
-        130_000,
-      );
-      setStatus("broadcast");
-      setMessage("Refund sent, waiting for confirmation");
-      setSelected((current) =>
-        current
-          ? { ...current, canRefund: false, status: "broadcast" }
-          : current,
-      );
-      setReview(false);
-      await refresh(true);
-    } catch {
-      setStatus("broadcast_unknown");
-      setMessage("Checking refund state. Do not send again.");
-      // Lock this record in the browser even if the subsequent status read fails.
-      setSelected((current) =>
-        current
-          ? { ...current, canRefund: false, status: "broadcast_unknown" }
-          : current,
-      );
-      setReview(false);
-      await refresh(true);
-    } finally {
-      sending.current = false;
-      setBusy(false);
-    }
-  }
-
-  async function shareReceipt() {
-    if (!selected || !access || sharing || busy || connectionError) return;
-    setSharing(true);
-    setReceiptMessage("");
-    try {
-      const result = await requestJson<{ receiptPath: string }>(
-        "/api/receipts",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ paymentTxid: selected.id }),
-        },
-        12000,
-      );
-      await navigator.clipboard.writeText(
-        new URL(result.receiptPath, window.location.origin).href,
-      );
-      setReceiptMessage("Customer receipt link copied.");
-    } catch {
-      setReceiptMessage(
-        "Could not copy the receipt link. Check the connection and receipt access configuration.",
-      );
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!selected || !window.matchMedia("(max-width: 700px)").matches) return;
-    detailRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
-    detailRef.current?.focus({ preventScroll: true });
-  }, [selected?.id]);
-
-  function choose(payment: Payment) {
-    if (sending.current || sharing) return;
-    reviewed.current = undefined;
-    setReceiptMessage("");
-    setSelected(payment);
-    setReview(false);
-    setAmount(
-      (payment.availableZat / 100000000).toLocaleString("en", {
-        maximumFractionDigits: 8,
-        useGrouping: false,
+  async function showLink(token: string) {
+    const link = `${window.location.origin}/checkout#${token}`;
+    setShare(link);
+    setQr(
+      await QRCode.toDataURL(link, {
+        width: 220,
+        margin: 2,
+        color: { dark: "#0b1514", light: "#f3efe6" },
       }),
     );
   }
-  const amountZat = parseZec(amount);
-  const valid =
-    selected?.canRefund &&
-    !uncertainPayments.current.has(selected.id) &&
-    Number.isSafeInteger(amountZat) &&
-    amountZat > 0 &&
-    amountZat <= selected.availableZat;
-
   return (
-    <main>
+    <main className="product-app dashboard-app">
       <AppHeader role="Merchant" />
-      <nav className="workspace-nav" aria-label="Merchant pages">
-        <a href="/merchant" aria-current="page">
+      <nav className="workspace-nav">
+        <Link aria-current="page" href="/merchant">
           Payments
-        </a>
-        <a href="/merchant/settings">Settings</a>
+        </Link>
+        <Link href="/merchant/settings">Store settings</Link>
         <button
           className="text-button"
-          disabled={busy || sharing}
           onClick={async () => {
-            if (sending.current) return;
             try {
-              await requestJson("/api/session", { method: "DELETE" }, 12000);
-              window.location.replace("/sign-in");
+              await post("logout", {});
+              window.location.assign("/sign-in");
             } catch {
-              setConnectionError(
-                "Could not sign out. Check your connection and try again.",
-              );
+              setError("Could not sign out. Try again.");
             }
           }}
         >
           Sign out
         </button>
       </nav>
-      <section className="workspace-intro">
-        <h1>Payments</h1>
-        <p className="lede">
-          Review a payment and return funds through its private refund route.
-        </p>
-      </section>
-      {status !== "ready" && <StateLabel state={status} text={message} />}
-      {access && payments.length > 0 && (
-        <div className="payment-summary" aria-label="Payment summary">
-          <span>
-            <strong>
-              {payments.filter((payment) => payment.canRefund).length}
-            </strong>{" "}
-            refundable
-          </span>
-          <span>
-            <strong>
-              {
-                payments.filter((payment) => payment.status === "broadcast")
-                  .length
-              }
-            </strong>{" "}
-            awaiting confirmation
-          </span>
-          <span>
-            <strong>
-              {payments.filter((payment) => payment.refundedZat > 0).length}
-            </strong>{" "}
-            refunded
-          </span>
+      <div className="dashboard-title">
+        <div>
+          <p className="eyebrow">MERCHANT WORKSPACE</p>
+          <h1>{data?.merchant.name || "Your payments"}</h1>
+          <p>Track incoming payments and send private refunds.</p>
         </div>
+        <button
+          className="primary"
+          onClick={() => {
+            setCreating(true);
+            setShare("");
+            setError("");
+          }}
+          disabled={!data?.merchant.ready}
+        >
+          + Create payment
+        </button>
+      </div>
+      {data && !data.merchant.ready && (
+        <aside className="info-panel">
+          Finish setting up your store before accepting payments.{" "}
+          <Link href="/setup">Set up store</Link>
+        </aside>
       )}
-      {connectionError && (
+      <section className="summary-grid" aria-label="Payment totals">
+        <article>
+          <span>Received</span>
+          <strong>
+            {zec(received)} <small>ZEC</small>
+          </strong>
+          <p>{paid.length} confirmed payments</p>
+        </article>
+        <article>
+          <span>Available to refund</span>
+          <strong>
+            {zec(refundable)} <small>ZEC</small>
+          </strong>
+          <p>Payments with no refund instruction</p>
+        </article>
+        <article>
+          <span>Refunded</span>
+          <strong>
+            {zec(refunded)} <small>ZEC</small>
+          </strong>
+          <p>
+            {records.filter((r) => r.status === "confirmed").length} confirmed
+            refunds
+          </p>
+        </article>
+      </section>
+      {(warning || data?.syncWarning) && (
         <p role="alert" className="warning">
-          {connectionError}
+          {warning ||
+            "Wallet sync is unavailable. Saved records are shown. Refresh before refunding."}
         </p>
       )}
-      {access && (
-        <section className="workspace">
-          <div className="list">
-            <div className="section-head">
-              <h2>Payments</h2>
-              <button
-                className="text-button"
-                disabled={refreshing || busy || !access}
-                onClick={() => void refresh()}
-              >
-                Refresh
-              </button>
-            </div>
-            {payments.length === 0 && status !== "loading" && (
-              <p className="empty">No NOSTOS payments yet.</p>
-            )}
-            {payments.map((payment) => (
-              <button
-                key={payment.id}
-                aria-pressed={selected?.id === payment.id}
-                disabled={busy || sharing}
-                className={`payment-row ${selected?.id === payment.id ? "selected" : ""}`}
-                onClick={() => choose(payment)}
-              >
-                <span>
-                  <strong>{payment.orderReference}</strong>
-                  <small>{payment.status.replaceAll("_", " ")}</small>
-                </span>
-                <span className="row-amount">
-                  {zec(payment.receivedZat)}
-                  <small>ZEC</small>
-                </span>
-              </button>
-            ))}
+      {error && (
+        <p className="warning" role="alert">
+          {error}
+        </p>
+      )}
+      {creating && (
+        <section className="new-payment panel">
+          <div className="section-head">
+            <h2>Create payment request</h2>
+            <button
+              className="text-button"
+              onClick={() => setCreating(false)}
+              disabled={busy}
+            >
+              Close
+            </button>
           </div>
-          <article
-            className="detail"
-            ref={detailRef}
-            tabIndex={-1}
-            aria-label="Selected payment"
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (busy) return;
+              const form = new FormData(e.currentTarget);
+              const amountZat = parseZec(String(form.get("amount")));
+              if (!amountZat || amountZat > 1e8) {
+                setError("Enter an amount from 0.00000001 to 1 testnet ZEC.");
+                return;
+              }
+              setBusy(true);
+              setError("");
+              try {
+                const result = await post<{ id: string; token: string }>(
+                  "requests",
+                  { description: form.get("description"), amountZat },
+                );
+                await showLink(result.token);
+                setCreating(false);
+                setSelected("");
+                void refresh();
+              } catch {
+                setError(
+                  "Could not confirm creation. Check the payment list before creating another request.",
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
           >
-            {selected ? (
-              <>
-                <p className="eyebrow">
-                  {review ? "Review refund" : "Payment details"}
-                </p>
-                <h2>{selected.orderReference}</h2>
-                <div className="amount">
-                  {review && reviewed.current
-                    ? zec(reviewed.current.amountZat)
-                    : zec(selected.receivedZat)}{" "}
-                  <span>ZEC</span>
-                </div>
-                <dl>
-                  <div>
-                    <dt>Received</dt>
-                    <dd>{zec(selected.receivedZat)} ZEC</dd>
-                  </div>
-                  <div>
-                    <dt>Refunded</dt>
-                    <dd>{zec(selected.refundedZat)} ZEC</dd>
-                  </div>
-                  <div>
-                    <dt>
-                      {review ? "Remaining after refund" : "Remaining value"}
-                    </dt>
-                    <dd>
-                      {zec(
-                        review && reviewed.current
-                          ? selected.availableZat - reviewed.current.amountZat
-                          : selected.availableZat,
-                      )}{" "}
-                      ZEC
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Private return route</dt>
-                    <dd className="mono">{selected.destination}</dd>
-                  </div>
-                </dl>
-                <StateLabel
-                  state={
-                    busy
-                      ? "loading"
-                      : selected.status === "broadcast"
-                        ? "broadcast"
-                        : selected.refundedZat > 0
-                          ? "confirmed"
-                          : selected.status === "broadcast_unknown" ||
-                              selected.status === "broadcasting"
-                            ? "broadcast_unknown"
-                            : "ready"
-                  }
-                  text={
-                    busy
-                      ? "Preparing shielded refund. Do not send again."
-                      : selected.refundedZat > 0
-                        ? `Refund confirmed: ${zec(selected.refundedZat)} ZEC`
-                        : selected.status === "broadcast"
-                          ? "Refund sent, waiting for confirmation"
-                          : selected.status === "broadcast_unknown" ||
-                              selected.status === "broadcasting"
-                            ? "Checking refund state. Sending is blocked."
-                            : "No refund sent for this payment"
-                  }
+            <div className="form-grid">
+              <label>
+                What is this payment for?
+                <input
+                  name="description"
+                  placeholder="Order, item, or service"
+                  minLength={2}
+                  maxLength={160}
+                  required
+                  disabled={busy}
                 />
-                <div className="receipt-access">
-                  <button
-                    className="text-button"
-                    disabled={
-                      busy || sharing || refreshing || !!connectionError
-                    }
-                    onClick={() => void shareReceipt()}
-                  >
-                    {sharing
-                      ? "Preparing receipt link"
-                      : "Copy customer receipt link"}
-                  </button>
-                  <p className="privacy">
-                    Anyone with this link can view this payment's receipt. Share
-                    it privately with the customer.
-                  </p>
-                  {sharing && (
-                    <StateLabel
-                      state="loading"
-                      text="Preparing private receipt access"
-                    />
-                  )}
-                  {receiptMessage && (
-                    <p role="status" className="privacy">
-                      {receiptMessage}
-                    </p>
-                  )}
-                </div>
-                {connectionError && (
-                  <p className="warning">{connectionError}</p>
-                )}
-                {selected.canRefund ? (
-                  <>
-                    {!review && (
-                      <label>
-                        Refund amount in ZEC
-                        <input
-                          name="refundAmount"
-                          autoComplete="off"
-                          inputMode="decimal"
-                          value={amount}
-                          onChange={(event) => {
-                            reviewed.current = undefined;
-                            setAmount(event.target.value);
-                          }}
-                        />
-                      </label>
-                    )}
-                    {!review && (
-                      <>
-                        <button
-                          className="text-button"
-                          disabled={busy}
-                          onClick={() => {
-                            reviewed.current = undefined;
-                            setAmount(
-                              (
-                                selected.availableZat / 100000000
-                              ).toLocaleString("en", {
-                                maximumFractionDigits: 8,
-                                useGrouping: false,
-                              }),
-                            );
-                          }}
-                        >
-                          Use full remaining amount
-                        </button>
-                        {!valid && (
-                          <p role="alert" className="warning">
-                            {amountZat > selected.availableZat
-                              ? "Refund cannot exceed the remaining amount."
-                              : "Enter a valid amount greater than zero, with at most eight decimal places."}
-                          </p>
-                        )}
-                      </>
-                    )}
-                    <p className="privacy">
-                      The refund returns to the shielded destination included
-                      with this payment.
-                    </p>
-                    {review ? (
-                      <>
-                        <p className="warning">
-                          Review the amount and private return route. Sending a
-                          refund cannot be undone.
-                        </p>
-                        <button
-                          className="primary"
-                          disabled={
-                            busy || !valid || refreshing || !!connectionError
-                          }
-                          onClick={() => void sendRefund()}
-                        >
-                          {busy ? "Preparing refund" : "Send private refund"}
-                        </button>
-                        <button
-                          className="text-button"
-                          disabled={busy}
-                          onClick={() => setReview(false)}
-                        >
-                          Go back
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        className="primary"
-                        disabled={
-                          !valid || busy || refreshing || !!connectionError
-                        }
-                        onClick={() => {
-                          reviewed.current = {
-                            paymentId: selected.id,
-                            amountZat,
-                          };
-                          setReview(true);
-                        }}
-                      >
-                        Review refund
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <p className="privacy">
-                    {selected.status === "broadcast_unknown" ||
-                    selected.status === "broadcasting"
-                      ? "Reconciliation required before retry. Sending is blocked."
-                      : "This payment cannot be refunded through NOSTOS."}
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className="empty-detail">
-                <Mark />
-                <h2>Choose a payment</h2>
-                <p>Review its private return route and refund status.</p>
-              </div>
+              </label>
+              <label>
+                Amount in ZEC
+                <input
+                  name="amount"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.01"
+                  required
+                  disabled={busy}
+                />
+              </label>
+            </div>
+            <button className="primary" disabled={busy}>
+              Create payment link
+            </button>
+            {busy && (
+              <StateLabel state="loading" text="Creating payment request" />
             )}
-          </article>
+          </form>
         </section>
       )}
+      {share && (
+        <section className="share-panel panel">
+          <div>
+            <h2>Payment link ready</h2>
+            <p>
+              Send this private link to your customer. It opens the amount,
+              payment instructions, and their receipt.
+            </p>
+            <input aria-label="Private payment link" readOnly value={share} />
+            <button
+              className="secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(share);
+                  setError("Payment link copied.");
+                } catch {
+                  setError("Select and copy the link above.");
+                }
+              }}
+            >
+              Copy payment link
+            </button>
+            <a
+              className="text-button"
+              href={share}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open checkout
+            </a>
+          </div>
+          {qr && (
+            <img
+              width={220}
+              height={220}
+              src={qr}
+              alt="QR code for this private payment link"
+            />
+          )}
+        </section>
+      )}
+      <div className={`ledger-layout ${current ? "has-selection" : ""}`}>
+        <section className="ledger panel">
+          <div className="section-head">
+            <div>
+              <h2>Payments</h2>
+              <p>{records.length} payment requests</p>
+            </div>
+            <button
+              className="text-button"
+              disabled={loading}
+              onClick={() => void refresh()}
+            >
+              Refresh
+            </button>
+          </div>
+          {loading && <StateLabel state="loading" text="Checking payments" />}
+          <div className="ledger-columns" aria-hidden="true">
+            <span>Payment</span>
+            <span>Amount</span>
+            <span>Status</span>
+          </div>
+          {records.length === 0 && !loading ? (
+            <div className="empty-state">
+              <h3>Your first payment starts here.</h3>
+              <p>
+                Create a payment request and share the link with your customer.
+                Confirmed payments appear here automatically.
+              </p>
+              <button
+                className="secondary"
+                onClick={() => setCreating(true)}
+                disabled={!data?.merchant.ready}
+              >
+                Create payment
+              </button>
+            </div>
+          ) : (
+            records.map((r) => (
+              <button
+                key={r.id}
+                className={`ledger-row ${selected === r.id ? "selected" : ""}`}
+                onClick={() => {
+                  setSelected(r.id);
+                  setReview(undefined);
+                  setDraft("");
+                  setError("");
+                  setUncertain(false);
+                }}
+              >
+                <span>
+                  <strong>{r.description || r.orderReference}</strong>
+                  <small>{date(r.createdAt)}</small>
+                </span>
+                <span className="ledger-amount">
+                  {zec(r.paymentAmountZat)} <small>ZEC</small>
+                </span>
+                <span
+                  className={`status-chip ${r.paymentStatus === "confirmed" ? "success" : ""}`}
+                >
+                  {status(r)}
+                </span>
+              </button>
+            ))
+          )}
+        </section>
+        {current && (
+          <aside className="payment-detail panel">
+            <div className="section-head">
+              <p className="eyebrow">PAYMENT DETAILS</p>
+              <button className="text-button" onClick={() => setSelected("")}>
+                Close
+              </button>
+            </div>
+            <button
+              className="text-button"
+              disabled={loading}
+              onClick={() => void refresh()}
+            >
+              Refresh payment
+            </button>
+            {loading && <StateLabel state="loading" text="Checking payment" />}
+            <h2>{current.description}</h2>
+            <div className="detail-amount">
+              {zec(current.paymentAmountZat)} <span>ZEC</span>
+            </div>
+            <span className="status-chip">{status(current)}</span>
+            <dl>
+              <div>
+                <dt>Received</dt>
+                <dd>{zec(current.payment?.receivedZat ?? 0)} ZEC</dd>
+              </div>
+              <div>
+                <dt>Refunded</dt>
+                <dd>{zec(current.payment?.refundedZat ?? 0)} ZEC</dd>
+              </div>
+              {!!current.payment?.reservedZat && (
+                <div>
+                  <dt>Refund pending</dt>
+                  <dd>{zec(current.payment.reservedZat)} ZEC</dd>
+                </div>
+              )}
+              <div>
+                <dt>Remaining value</dt>
+                <dd>{zec(current.payment?.availableZat ?? 0)} ZEC</dd>
+              </div>
+              <div>
+                <dt>Return route</dt>
+                <dd className="mono">
+                  {current.payment?.destination || "Waiting for payment"}
+                </dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{date(current.createdAt)}</dd>
+              </div>
+            </dl>
+            {current.payment?.canRefund ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const value = parseZec(draft);
+                  if (
+                    !safe ||
+                    !value ||
+                    value > current.payment!.availableZat
+                  ) {
+                    setError(
+                      "Enter a valid amount within the remaining value. Refresh if the connection is interrupted.",
+                    );
+                    return;
+                  }
+                  setReview({ id: current.id, amountZat: value });
+                }}
+              >
+                <label>
+                  Refund amount in ZEC
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={draft}
+                    onChange={(e) => {
+                      setDraft(e.target.value);
+                      setReview(undefined);
+                    }}
+                    disabled={busy || !!review || uncertain}
+                    placeholder="0.003"
+                  />
+                </label>
+                {!review && (
+                  <button
+                    className="primary"
+                    disabled={!safe || !parseZec(draft)}
+                  >
+                    Review refund
+                  </button>
+                )}
+                {review && (
+                  <div className="refund-review">
+                    <h3>Review private refund</h3>
+                    <strong>{zec(review.amountZat)} ZEC</strong>
+                    <p>
+                      To {current.payment.destination}. The complete destination
+                      stays inside the trusted service.
+                    </p>
+                    <button
+                      type="button"
+                      className="primary"
+                      disabled={!safe || submitting.current}
+                      onClick={async () => {
+                        if (
+                          submitting.current ||
+                          !safe ||
+                          review.id !== current.id ||
+                          review.amountZat !== parseZec(draft)
+                        )
+                          return;
+                        submitting.current = true;
+                        setBusy(true);
+                        setError("");
+                        try {
+                          await post("refund", review);
+                          setReview(undefined);
+                          void refresh();
+                        } catch {
+                          setUncertain(true);
+                          setError(
+                            "The send outcome is not confirmed. Refresh the saved payment state. Do not send again.",
+                          );
+                          setReview(undefined);
+                          void refresh();
+                        } finally {
+                          setBusy(false);
+                          submitting.current = false;
+                        }
+                      }}
+                    >
+                      Send {zec(review.amountZat)} ZEC privately
+                    </button>
+                    <button
+                      type="button"
+                      className="text-button"
+                      disabled={busy}
+                      onClick={() => setReview(undefined)}
+                    >
+                      Change amount
+                    </button>
+                    {busy && (
+                      <StateLabel state="loading" text="Submitting refund" />
+                    )}
+                  </div>
+                )}
+              </form>
+            ) : (
+              <p className="privacy">
+                {current.payment?.refundTxid
+                  ? "A refund is already recorded. This payment cannot be sent again."
+                  : "Refunding becomes available after a valid shielded payment is confirmed."}
+              </p>
+            )}
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const r = await post<{ token: string }>("link", {
+                    id: current.id,
+                  });
+                  await showLink(r.token);
+                } catch {
+                  setError("Could not load the private payment link.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              View payment link
+            </button>
+            <details>
+              <summary>Payment reference</summary>
+              <code className="break-reference">
+                {current.paymentTxid || current.orderReference}
+              </code>
+            </details>
+          </aside>
+        )}
+      </div>
       <AppFooter />
     </main>
   );

@@ -1,56 +1,94 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { validSession } from "../../../src/session.js";
+"use client";
+import Link from "next/link";
+import { useRecord } from "../../../src/use-record.js";
 import { AppHeader, AppFooter } from "../../../src/shell.js";
-export const dynamic = "force-dynamic";
-export default async function Settings() {
-  const jar = await cookies();
-  if (
-    !validSession(
-      new Request("https://nostos.invalid", {
-        headers: { cookie: jar.toString() },
-      }),
-    )
-  )
-    redirect("/sign-in");
+import { StateLabel } from "../../../src/status-label.js";
+export default function Settings() {
+  const { data, warning, loading } = useRecord<{
+    merchant: {
+      name: string;
+      email: string;
+      ready: boolean;
+      setupPending: boolean;
+    };
+  }>("/api/product/me");
   return (
-    <main>
+    <main className="product-app">
       <AppHeader role="Merchant" />
-      <nav className="workspace-nav" aria-label="Merchant pages">
-        <a href="/merchant">Payments</a>
-        <a href="/merchant/settings" aria-current="page">
-          Settings
-        </a>
+      <nav className="workspace-nav">
+        <Link href="/merchant">Payments</Link>
+        <Link href="/merchant/settings" aria-current="page">
+          Store settings
+        </Link>
       </nav>
-      <section className="workspace-intro">
-        <h1>Settings</h1>
-        <p className="lede">Your payment service and access settings.</p>
-      </section>
-      <section className="settings-panel">
-        <h2>Payment service</h2>
-        <dl>
-          <div>
-            <dt>Network</dt>
-            <dd>Zcash testnet</dd>
-          </div>
-          <div>
-            <dt>Wallet connection</dt>
-            <dd>Managed by the service</dd>
-          </div>
-          <div>
-            <dt>Refund route</dt>
-            <dd>Recovered from the payment memo</dd>
-          </div>
-          <div>
-            <dt>Customer receipts</dt>
-            <dd>Private links for individual payments</dd>
-          </div>
-        </dl>
-        <p className="privacy">
-          Wallet credentials stay on the server. Connection changes are managed
-          by the operator.
+      <div className="dashboard-title">
+        <div>
+          <p className="eyebrow">STORE SETTINGS</p>
+          <h1>Your store</h1>
+          <p>Account and wallet integration details.</p>
+        </div>
+      </div>
+      {warning && (
+        <p role="alert" className="warning">
+          {warning}
         </p>
-      </section>
+      )}
+      {loading && <StateLabel state="loading" text="Checking your store" />}
+      {data && (
+        <section className="settings-grid">
+          <article className="panel">
+            <h2>Merchant profile</h2>
+            <dl>
+              <div>
+                <dt>Store name</dt>
+                <dd>{data.merchant.name || "Not set up"}</dd>
+              </div>
+              <div>
+                <dt>Account email</dt>
+                <dd>{data.merchant.email}</dd>
+              </div>
+            </dl>
+            {!data.merchant.ready && (
+              <Link className="primary" href="/setup">
+                Complete store setup
+              </Link>
+            )}
+          </article>
+          <article className="panel">
+            <h2>Wallet integration</h2>
+            <dl>
+              <div>
+                <dt>Network</dt>
+                <dd>Zcash testnet</dd>
+              </div>
+              <div>
+                <dt>Custody</dt>
+                <dd>Hosted by NOSTOS</dd>
+              </div>
+              <div>
+                <dt>Store wallet</dt>
+                <dd>
+                  {data.merchant.ready
+                    ? "Provisioned"
+                    : data.merchant.setupPending
+                      ? "Reconciliation needed"
+                      : "Not provisioned"}
+                </dd>
+              </div>
+              <div>
+                <dt>Refund policy</dt>
+                <dd>One instruction per payment</dd>
+              </div>
+            </dl>
+            <p className="privacy">
+              Each store has a separate wallet account. The service operator
+              controls the wallet keys and can view your payment and refund
+              details. A private return route is kept encrypted in product
+              storage.
+            </p>
+          </article>
+        </section>
+      )}
       <AppFooter />
     </main>
   );

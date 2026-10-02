@@ -1,0 +1,35 @@
+{
+  "scope": "merchant product and receipt redesign",
+  "verified_at": "2026-10-02T08:23:02.574659+00:00",
+  "status": "local_verified_with_mock_wallet",
+  "checks": {
+    "unit_and_integration_tests": 82,
+    "deployment_configuration_and_failed_switch_tests": 2,
+    "production_web_build": "passed",
+    "browser": "Chromium, 390x844 mobile and 1366x900 desktop",
+    "browser_flows": [
+      "create account",
+      "store setup",
+      "create payment request and QR",
+      "prepare ZIP 321 payment memo",
+      "mock incoming shielded payment verification",
+      "private receipt opens directly",
+      "refund review for 300000 zatoshi",
+      "single mock refund broadcast",
+      "confirmed refund receipt"
+    ],
+    "browser_horizontal_overflow": false,
+    "browser_page_errors": 0
+  },
+  "limits": [
+    "Wallet calls used a local mock adapter. No new chain payment or refund was broadcast.",
+    "Actual Oracle ARM64 deployment and a controlled payment from a compatible customer wallet remain to be verified.",
+    "G5 real ui-order-002 proof is preserved separately and is not replaced by this evidence.",
+    "Email verification and password recovery are not implemented."
+  ],
+  "privacy": [
+    "Customer projection excludes refund permission and the full return destination.",
+    "New encrypted product databases are separate from the original proof database.",
+    "Private data key and wallet cookies are never included in the build container."
+  ]
+}

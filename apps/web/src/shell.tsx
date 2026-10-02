@@ -10,6 +10,7 @@ export function AppHeader({ role }: { role?: "Merchant" | "Customer" }) {
       </Link>
       <div className="header-context">
         {role && <span>{role}</span>}
+        {!role && <Link href="/sign-in">Sign in</Link>}
         <span className="network">Zcash testnet</span>
       </div>
     </header>

@@ -6,7 +6,11 @@ Nostos provides private refunds for shielded ZEC payments. A customer includes a
 
 ## Current status
 
-Gate G0 repository foundation passes locally. Gate G1 passed on Zcash testnet with a confirmed shielded payment, encrypted memo recovery, and confirmed shielded refund. Gate G2 domain and schema tests pass. Gate G3 restart-safe payment intake passed with one real payment stored exactly once across separate scanner processes.
+The testnet shielded payment, memo recovery, durable intake, safe partial refund and controlled phone UI proofs are preserved in `scripts/evidence/gate-g1.json`, `gate-g3.json`, `gate-g4.json` and `gate-g5.json`.
+
+The merchant product now has account creation, store setup, payment requests, checkout, an owned payment ledger and private receipts. Local browser tests use a mock wallet and do not establish a new on-chain proof. See [product flow and deployment](docs/product-flow.md) for the current scope and remaining verification.
+
+[Rendered receipt design](docs/screenshots/receipt-card-mobile.png) uses a local test fixture, not a new transaction. [Deletion review](docs/module-deletion-review.md) records the two-call-site examples and retention decisions.
 
 Build started: `2026-09-29T00:01:43Z`
 
@@ -51,7 +55,7 @@ pnpm check
 
 ## Safety
 
-Use isolated demo wallets only. Never use a personal wallet, seed phrase, spending key, or real credential in this repository, logs, screenshots, or evidence.
+Use isolated testnet wallets only. Never use a personal wallet, seed phrase, spending key, or real credential in this repository, logs, screenshots, or evidence.
 
 ## Open source status
 

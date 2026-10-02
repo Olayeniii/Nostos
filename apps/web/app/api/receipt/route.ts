@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       {
         receipt: {
           orderReference: payment.orderReference,
+          paymentTxid: payment.paymentTxId,
           paymentAmountZat: payment.amountZat,
           paymentConfirmations: payment.confirmations,
           refundAmountZat: refund?.amountZat ?? 0,

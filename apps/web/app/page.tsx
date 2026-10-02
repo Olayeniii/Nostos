@@ -1,27 +1,52 @@
 import Link from "next/link";
 import { AppHeader, AppFooter } from "../src/shell.js";
-
 export default function Home() {
   return (
-    <main>
+    <main className="product-app">
       <AppHeader />
-      <section className="intro product-entry">
-        <p className="eyebrow">Private refunds for shielded ZEC payments</p>
-        <h1>A private way back.</h1>
+      <section className="product-home">
+        <p className="eyebrow">SHIELDED PAYMENTS. PRIVATE REFUNDS.</p>
+        <h1>
+          Private Zcash payments
+          <br />
+          that can be refunded.
+        </h1>
         <p className="lede">
-          A private refund route travels with the payment. When a refund is due,
-          the merchant can send it without asking for another address.
+          The return route travels with the payment, encrypted in its memo. When
+          a refund is due, you already know where to send it.
         </p>
-        <div className="entry-actions">
-          <Link className="primary" href="/merchant">
-            Open merchant workspace
+        <div className="home-actions">
+          <Link className="primary" href="/sign-up">
+            Accept ZEC payments
           </Link>
-          <Link className="text-button" href="/receipt">
-            View your receipt
+          <Link className="secondary" href="/sign-in">
+            Sign in
           </Link>
         </div>
-        <p className="privacy">
-          Shielded payment. Encrypted return route. Shielded refund.
+        <div className="product-steps">
+          <article>
+            <span>01</span>
+            <h2>Create a payment request</h2>
+            <p>
+              Share a private link with the amount and what the payment is for.
+            </p>
+          </article>
+          <article>
+            <span>02</span>
+            <h2>Customer pays shielded ZEC</h2>
+            <p>
+              The payment memo carries an encrypted, fresh refund destination.
+            </p>
+          </article>
+          <article>
+            <span>03</span>
+            <h2>Refund from your workspace</h2>
+            <p>Use the recovered return route. No address request afterward.</p>
+          </article>
+        </div>
+        <p className="home-note">
+          Built for Zcash testnet. Customers pay using a wallet that supports
+          shielded testnet payments and memos.
         </p>
       </section>
       <AppFooter />

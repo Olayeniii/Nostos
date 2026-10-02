@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, openSync, closeSync, chmodSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
@@ -59,8 +59,18 @@ function fromRow(row: PaymentRow): PaymentRecord {
 export class SqlitePaymentStore {
   readonly #database: DatabaseSync;
 
-  constructor(path: string) {
+  constructor(
+    path: string,
+    private readonly codec?: {
+      encrypt(value: string): string;
+      decrypt(value: string): string;
+    },
+  ) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+    if (this.codec && path !== ":memory:") {
+      closeSync(openSync(path, "a", 0o600));
+      chmodSync(path, 0o600);
+    }
     this.#database = new DatabaseSync(path);
     this.#database.exec("PRAGMA journal_mode = WAL");
     this.#database.exec("PRAGMA foreign_keys = ON");
@@ -104,6 +114,16 @@ export class SqlitePaymentStore {
     }
   }
 
+  private decodeRow(row: PaymentRow): PaymentRecord {
+    return fromRow({
+      ...row,
+      order_reference:
+        this.codec?.decrypt(row.order_reference) ?? row.order_reference,
+      refund_address:
+        this.codec?.decrypt(row.refund_address) ?? row.refund_address,
+    });
+  }
+
   close(): void {
     this.#database.close();
   }
@@ -124,10 +144,10 @@ export class SqlitePaymentStore {
       .run(
         valid.id,
         valid.merchantId,
-        valid.orderReference,
+        this.codec?.encrypt(valid.orderReference) ?? valid.orderReference,
         valid.paymentTxId,
         valid.amountZat,
-        valid.refundAddress,
+        this.codec?.encrypt(valid.refundAddress) ?? valid.refundAddress,
         valid.confirmations,
         valid.status,
         new Date().toISOString(),
@@ -150,7 +170,7 @@ export class SqlitePaymentStore {
     const row = this.#database
       .prepare("SELECT * FROM payments WHERE payment_txid = ?")
       .get(paymentTxId) as unknown as PaymentRow | undefined;
-    return row ? fromRow(row) : undefined;
+    return row ? this.decodeRow(row) : undefined;
   }
 
   paymentCount(): number {
@@ -164,7 +184,7 @@ export class SqlitePaymentStore {
     const rows = this.#database
       .prepare("SELECT * FROM payments ORDER BY created_at DESC LIMIT 100")
       .all() as unknown as PaymentRow[];
-    return rows.map(fromRow);
+    return rows.map((row) => this.decodeRow(row));
   }
 
   recordScannerRun(observedPayments: number, createdPayments: number): void {

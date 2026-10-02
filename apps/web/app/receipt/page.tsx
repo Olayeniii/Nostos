@@ -2,40 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AppHeader, AppFooter } from "../../src/shell.js";
-import { StateLabel, type Status } from "../../src/status-label.js";
-import { requestJson } from "../../src/requests.js";
+import { StateLabel } from "../../src/status-label.js";
+import { requestJson, RequestError } from "../../src/requests.js";
 
-type Receipt = {
-  orderReference: string;
-  paymentAmountZat: number;
-  paymentConfirmations: number;
-  refundAmountZat: number;
-  status: string;
-  refundTxid?: string;
-};
-const zec = (amount: number) =>
-  (amount / 100000000).toLocaleString("en", { maximumFractionDigits: 8 });
-function receiptState(receipt: Receipt): { state: Status; text: string } {
-  if (receipt.status === "confirmed")
-    return { state: "confirmed", text: "Refund received privately" };
-  if (receipt.status === "broadcast")
-    return {
-      state: "broadcast",
-      text: "Refund sent, waiting for confirmation",
-    };
-  if (["broadcast_unknown", "broadcasting"].includes(receipt.status))
-    return { state: "broadcast_unknown", text: "Checking refund state" };
-  if (receipt.status === "pending")
-    return { state: "loading", text: "Preparing refund" };
-  return { state: "ready", text: "No refund issued for this payment" };
-}
+import { ReceiptCard, type ReceiptData } from "../../src/receipt-card.js";
+type Receipt = ReceiptData;
 export default function CustomerReceipt() {
   const [draft, setDraft] = useState("");
   const [access, setAccess] = useState("");
   const [receipt, setReceipt] = useState<Receipt>();
   const [loading, setLoading] = useState(false);
   const [warning, setWarning] = useState("");
-  const [copyMessage, setCopyMessage] = useState("");
+  const [initialized, setInitialized] = useState(false);
   const request = useRef<AbortController | undefined>(undefined);
   const version = useRef(0);
   const saved = useRef(false);
@@ -54,6 +32,7 @@ export default function CustomerReceipt() {
   useEffect(() => {
     const token = window.location.hash.slice(1);
     if (/^[A-Za-z0-9_-]{43}$/.test(token)) setAccess(token);
+    setInitialized(true);
   }, []);
   async function refresh() {
     if (!access || request.current) return;
@@ -62,19 +41,42 @@ export default function CustomerReceipt() {
     const current = ++version.current;
     setLoading(true);
     try {
-      const result = await requestJson<{ receipt: Receipt }>(
-        "/api/receipt",
-        {
-          headers: { Authorization: `Bearer ${access}` },
-          cache: "no-store",
-        },
-        12000,
-        controller.signal,
-      );
+      const options = {
+        headers: { Authorization: `Bearer ${access}` },
+        cache: "no-store" as const,
+      };
+      let result: { receipt: Receipt; syncWarning?: boolean };
+      try {
+        result = await requestJson<{ receipt: Receipt }>(
+          "/api/product/checkout",
+          options,
+          12000,
+          controller.signal,
+        );
+      } catch (error) {
+        if (
+          !(error instanceof RequestError) ||
+          ![401, 503].includes(error.status)
+        )
+          throw error;
+        result = await requestJson<{ receipt: Receipt }>(
+          "/api/receipt",
+          {
+            headers: { Authorization: `Bearer ${access}` },
+            cache: "no-store",
+          },
+          12000,
+          controller.signal,
+        );
+      }
       if (current !== version.current) return;
       setReceipt(result.receipt);
       saved.current = true;
-      setWarning("");
+      setWarning(
+        result.syncWarning
+          ? "Wallet sync is temporarily unavailable. The last recorded receipt status is shown."
+          : "",
+      );
     } catch {
       if (current !== version.current) return;
       setWarning(
@@ -107,11 +109,8 @@ export default function CustomerReceipt() {
       request.current = undefined;
     };
   }, [access]);
-  const state = receipt
-    ? receiptState(receipt)
-    : { state: "ready" as const, text: "Private receipt access" };
   return (
-    <main>
+    <main className="product-app">
       <AppHeader role="Customer" />
       <section className="workspace-intro">
         <h1>Your private receipt.</h1>
@@ -120,16 +119,14 @@ export default function CustomerReceipt() {
           needed to view this receipt.
         </p>
       </section>
-      {!receipt && (
+      {initialized && !access && !receipt && (
         <form
           className="access"
           onSubmit={(event) => {
             event.preventDefault();
             const token = accessFrom(draft.trim());
             if (!token) {
-              setWarning(
-                "Enter the private receipt link supplied by the merchant.",
-              );
+              setWarning("Enter the private receipt link saved from checkout.");
               return;
             }
             if (token === access) void refresh();
@@ -150,7 +147,7 @@ export default function CustomerReceipt() {
             />
           </label>
           <p className="privacy">
-            Use the private link supplied by the merchant for this payment.
+            Use the private link saved from your payment checkout.
           </p>
           <button className="primary" disabled={loading || !draft.trim()}>
             Open receipt
@@ -163,72 +160,15 @@ export default function CustomerReceipt() {
         </p>
       )}
       {receipt && (
-        <section className="receipts">
-          <article className="receipt">
-            <StateLabel state={state.state} text={state.text} />
-            <h2>{receipt.orderReference}</h2>
-            {receipt.refundAmountZat > 0 && (
-              <div className="amount">
-                {zec(receipt.refundAmountZat)} <span>ZEC</span>
-              </div>
-            )}
-            <dl>
-              <div>
-                <dt>Original payment</dt>
-                <dd>{zec(receipt.paymentAmountZat)} ZEC</dd>
-              </div>
-              <div>
-                <dt>Payment status</dt>
-                <dd>
-                  {receipt.paymentConfirmations > 0
-                    ? "Confirmed"
-                    : "Waiting for confirmation"}
-                </dd>
-              </div>
-            </dl>
-            {receipt.refundTxid && (
-              <details>
-                <summary>Transaction details</summary>
-                <p className="mono transaction-reference">
-                  {receipt.refundTxid.slice(0, 12)}...
-                  {receipt.refundTxid.slice(-8)}
-                </p>
-                <button
-                  className="text-button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(receipt.refundTxid!);
-                      setCopyMessage("Transaction reference copied.");
-                    } catch {
-                      setCopyMessage(
-                        "Could not copy the transaction reference.",
-                      );
-                    }
-                  }}
-                >
-                  Copy transaction reference
-                </button>
-                {copyMessage && (
-                  <p role="status" className="privacy">
-                    {copyMessage}
-                  </p>
-                )}
-              </details>
-            )}
-            <button
-              className="text-button"
-              disabled={loading}
-              onClick={() => void refresh()}
-            >
-              Refresh receipt
-            </button>
-            {loading && (
-              <StateLabel state="loading" text="Checking your receipt" />
-            )}
-          </article>
+        <section className="receipt-container">
+          <ReceiptCard
+            receipt={receipt}
+            loading={loading}
+            onRefresh={() => void refresh()}
+          />
           <p className="privacy">
-            This link grants read-only access to this payment's receipt. Keep it
-            private.
+            This private link grants read-only access to this receipt. Save it
+            somewhere safe.
           </p>
         </section>
       )}
