@@ -1,0 +1,46 @@
+{
+  "gate": "G6",
+  "status": "in-progress",
+  "classification": "automated isolated checks; no real wallet broadcast",
+  "checks": {
+    "repositoryChecks": "passed",
+    "testCount": 59,
+    "newHttpBoundaryTests": 6,
+    "productionWebBuild": "passed",
+    "secretScan": "passed",
+    "custom404": {
+      "httpStatus": 404,
+      "existingBrandMark": true,
+      "homeLink": true,
+      "verification": "local production HTTP response; visual phone check pending"
+    },
+    "privacy": [
+      "unauthenticated reads denied",
+      "full destination omitted from authenticated payment response",
+      "internal merchant account omitted",
+      "no-store on payment response",
+      "wallet failure details redacted"
+    ],
+    "refundSafety": [
+      "untrusted origin rejected before instruction creation",
+      "unauthorized payment rejected before wallet access",
+      "zero amount creates no instruction",
+      "mocked ambiguous broadcast persists broadcast_unknown and second request cannot broadcast again"
+    ]
+  },
+  "pending": [
+    "Controlled stale/overlapping browser refresh checks",
+    "Interrupted-send browser reconciliation test using isolated mock environment",
+    "Logo formation animation timing and reduced-motion visual checks",
+    "VPS firewall service enabled state and renewal verification"
+  ],
+  "preserved": [
+    "G1",
+    "G3",
+    "G4",
+    "G5",
+    "one refund instruction per payment",
+    "wallet authentication and allowed payment boundary"
+  ],
+  "transactionsSent": 0
+}
