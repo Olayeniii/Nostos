@@ -14,6 +14,7 @@ import { SqlitePaymentStore } from "../../../../packages/database/src/index.js";
 import { ZalletRpcClient } from "../../../../packages/zcash-adapter/src/index.js";
 import { GET } from "./payments/route.js";
 import { POST } from "./refunds/route.js";
+import { requestJson, hasRecordedRefund } from "../../src/requests.js";
 
 const paymentId = "a".repeat(64);
 const destination = `utest1${"b".repeat(80)}`;
@@ -53,6 +54,7 @@ afterEach(() => {
   rmSync(directory, { recursive: true, force: true });
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 function request(body: unknown, origin = "https://private.example") {
   return new Request("http://localhost:3000/api/refunds", {
@@ -127,4 +129,58 @@ describe("private HTTP boundary with isolated database", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(store.findRefundByPayment(paymentId)?.amountZat).toBe(300000);
   });
+});
+
+it("reconciles a lost response to the persisted txid without a second broadcast", async () => {
+  const txid = "d".repeat(64);
+  send.mockResolvedValue(txid);
+  const body = { paymentTxid: paymentId, amountZat: 300000 };
+  let serverFinished: Promise<Response> | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((_url, init: RequestInit) => {
+      serverFinished = POST(request(JSON.parse(String(init.body))));
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener(
+          "abort",
+          () => reject(new Error("Response lost")),
+          { once: true },
+        );
+      });
+    }),
+  );
+  const controller = new AbortController();
+  const client = requestJson(
+    "/api/refunds",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    1000,
+    controller.signal,
+  );
+  const lost = expect(client).rejects.toThrow("Response lost");
+  expect((await serverFinished)?.status).toBe(200);
+  controller.abort();
+  await lost;
+  expect(store.findRefundByPayment(paymentId)).toMatchObject({
+    txid,
+    status: "broadcast",
+    amountZat: 300000,
+  });
+  const read = await GET(
+    new Request("http://localhost/api/payments", {
+      headers: { authorization: "Bearer fixture-access" },
+    }),
+  );
+  const data = await read.json();
+  expect(hasRecordedRefund(data.payments[0])).toBe(true);
+  expect(data.payments[0]).toMatchObject({
+    refundTxid: txid,
+    canRefund: false,
+    availableZat: 700000,
+  });
+  const retry = await POST(request(body));
+  expect(await retry.json()).toEqual({ broadcast: false, txid });
+  expect(send).toHaveBeenCalledTimes(1);
 });
