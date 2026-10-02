@@ -1,5 +1,6 @@
-import { readFileSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { join, relative } from "node:path";
 
 const listed = spawnSync(
   "git",
@@ -7,11 +8,40 @@ const listed = spawnSync(
   { encoding: "utf8" },
 );
 
-if (listed.status !== 0) {
-  throw new Error("Secret scan could not list repository files.");
+const ignoredDirectories = new Set([
+  ".git",
+  ".build",
+  ".next",
+  ".pnpm-store",
+  "coverage",
+  "dist",
+  "node_modules",
+  "playwright-report",
+  "test-results",
+]);
+
+function releaseFiles(root = ".") {
+  const files = [];
+  function visit(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
+      const absolute = join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isFile() && !lstatSync(absolute).isSymbolicLink())
+        files.push(relative(root, absolute));
+    }
+  }
+  visit(root);
+  return files.sort();
 }
 
-const files = listed.stdout.split("\0").filter(Boolean);
+// A deployed release is created with `git archive`, so it deliberately has no
+// Git metadata. In a working tree, keep Git as the source of truth. In an
+// isolated release, scan every regular file except dependency and build caches.
+const files =
+  listed.status === 0
+    ? listed.stdout.split("\0").filter(Boolean)
+    : releaseFiles();
 const forbiddenPaths = [
   /(^|\/)wallet-data(\/|$)/i,
   /(^|\/)zcash-data(\/|$)/i,
