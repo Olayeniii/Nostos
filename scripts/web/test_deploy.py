@@ -61,7 +61,7 @@ class DeployTests(unittest.TestCase):
                 if method == 'GET':
                     return {'State': {'Running': False, 'ExitCode': 0}}
                 return {'Warnings': []}
-            with patch.object(deploy, '__file__', str(repo/'scripts/web/deploy.py')), patch.object(deploy, 'docker', fake), patch.object(deploy, 'healthy', side_effect=[True, False]), patch.object(deploy.os, 'chown'), patch('builtins.print'):
+            with patch.object(deploy, '__file__', str(repo/'scripts/web/deploy.py')), patch.object(deploy, 'docker', fake), patch.object(deploy, 'healthy', side_effect=[True, False, True]), patch.object(deploy.os, 'chown'), patch('builtins.print'):
                 with self.assertRaisesRegex(RuntimeError, 'Previous release restored'):
                     deploy.run()
             build = payloads[0]
