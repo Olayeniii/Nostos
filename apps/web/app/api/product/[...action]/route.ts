@@ -197,7 +197,7 @@ async function handle(request: Request) {
       if (pending.length) {
         try {
           const rpc = wallet();
-          const notes = await rpc.listUnspent([merchant.destination]);
+          const notes = await rpc.listUnspent();
           const results = await Promise.allSettled(
             pending.map((r) => reconcile(store!, core!, r, rpc, notes)),
           );

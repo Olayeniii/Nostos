@@ -397,3 +397,57 @@ it("puts only the Orchard receiver from a combined shielded UA in the paying mem
     preparePayment(store, store.checkout(second.id)!, route, rpc),
   ).rejects.toThrow();
 });
+
+describe("live wallet note representation", () => {
+  it.each([false, true])(
+    "matches equivalent Orchard receivers with unspent direction absent, reject=%s",
+    async (reject) => {
+      const m = merchant();
+      const created = newRequest(store, m, "Receiver representation", 1000000);
+      await preparePayment(store, store.checkout(created.id)!, route, rpc);
+      const c = store.checkout(created.id)!;
+      const alias = "utest1" + "z".repeat(60);
+      vi.mocked(rpc.decodeUnifiedAddress).mockImplementation(
+        async (address): Promise<Record<string, string>> => ({
+          orchard: address === alias && !reject ? destination : address,
+        }),
+      );
+      const note = {
+        txid,
+        address: alias,
+        pool: "ironwood",
+        valueZat: 1000000,
+        memo: encodeMemo(c.order, route),
+      };
+      vi.mocked(rpc.listUnspent).mockResolvedValue([note]);
+      vi.mocked(rpc.viewTransaction).mockResolvedValue({
+        txid,
+        confirmations: 2,
+        outputs: [{ ...note, outgoing: false }],
+      });
+      await reconcile(store, core, c, rpc);
+      expect(core.paymentCount()).toBe(reject ? 0 : 1);
+    },
+  );
+  it("does not infer incoming direction from a transaction output with no direction", async () => {
+    const m = merchant();
+    const created = newRequest(store, m, "Missing direction", 1000000);
+    await preparePayment(store, store.checkout(created.id)!, route, rpc);
+    const c = store.checkout(created.id)!;
+    const note = {
+      txid,
+      address: destination,
+      pool: "ironwood",
+      valueZat: 1000000,
+      memo: encodeMemo(c.order, route),
+    };
+    vi.mocked(rpc.listUnspent).mockResolvedValue([note]);
+    vi.mocked(rpc.viewTransaction).mockResolvedValue({
+      txid,
+      confirmations: 2,
+      outputs: [note],
+    });
+    await reconcile(store, core, c, rpc);
+    expect(core.paymentCount()).toBe(0);
+  });
+});

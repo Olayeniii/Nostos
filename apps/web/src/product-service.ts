@@ -53,6 +53,50 @@ export function matchesNote(
     return false;
   }
 }
+async function sameOrchardReceiver(
+  a: string | undefined,
+  b: string,
+  rpc: ProductWallet,
+) {
+  if (!a) return false;
+  if (a === b) return true;
+  if (a.startsWith("utest1") !== b.startsWith("utest1")) return false;
+  try {
+    const [left, right] = await Promise.all([
+      rpc.decodeUnifiedAddress(a),
+      rpc.decodeUnifiedAddress(b),
+    ]);
+    return (
+      typeof left.orchard === "string" &&
+      left.orchard.length > 0 &&
+      left.orchard === right.orchard
+    );
+  } catch {
+    return false;
+  }
+}
+async function matchesReceivedNote(
+  note: ShieldedNote,
+  checkout: Checkout,
+  merchant: Merchant,
+  rpc: ProductWallet,
+  unspentCandidate = false,
+) {
+  // Only z_listunspent candidates may omit direction. The transaction view
+  // must independently establish incoming direction before payment recording.
+  if (
+    note.outgoing !== false &&
+    !(unspentCandidate && note.outgoing === undefined)
+  )
+    return false;
+  if (!(await sameOrchardReceiver(note.address, merchant.destination, rpc)))
+    return false;
+  return matchesNote(
+    { ...note, address: merchant.destination, outgoing: false },
+    checkout,
+    merchant,
+  );
+}
 export async function reconcile(
   store: ProductStore,
   core: SqlitePaymentStore,
@@ -74,17 +118,29 @@ export async function reconcile(
   await orchardRefundReceiver(checkout.route, rpc);
   let txid = checkout.paymentTxid;
   if (!txid) {
-    const notes = observed ?? (await rpc.listUnspent([merchant.destination]));
-    txid =
-      notes.find((n) => n.txid && matchesNote(n, checkout, merchant))?.txid ??
-      null;
+    const notes = observed ?? (await rpc.listUnspent());
+    for (const note of notes) {
+      if (
+        note.txid &&
+        (await matchesReceivedNote(note, checkout, merchant, rpc, true))
+      ) {
+        txid = note.txid;
+        break;
+      }
+    }
   }
   if (txid) {
     const transaction = await rpc.viewTransaction(txid);
     if (
       transaction.txid !== txid ||
       transaction.confirmations < 1 ||
-      !transaction.outputs.some((n) => matchesNote(n, checkout, merchant))
+      !(
+        await Promise.all(
+          transaction.outputs.map((n) =>
+            matchesReceivedNote(n, checkout, merchant, rpc),
+          ),
+        )
+      ).some(Boolean)
     )
       return;
     core.insertPayment({
