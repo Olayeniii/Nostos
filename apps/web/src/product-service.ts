@@ -43,7 +43,7 @@ export function matchesNote(
     note.outgoing !== false ||
     note.address !== merchant.destination ||
     note.valueZat !== checkout.amountZat ||
-    !["orchard", "sapling"].includes(note.pool ?? "")
+    !["orchard", "sapling", "ironwood"].includes(note.pool ?? "")
   )
     return false;
   try {
@@ -110,7 +110,7 @@ export async function reconcile(
             n.outgoing === true &&
             n.address === checkout.route &&
             n.valueZat === refund.amountZat &&
-            ["orchard", "sapling"].includes(n.pool ?? ""),
+            ["orchard", "sapling", "ironwood"].includes(n.pool ?? ""),
         )
       ) {
         core.confirmRefund(txid);
