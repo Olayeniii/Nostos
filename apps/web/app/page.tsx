@@ -1,3 +1,4 @@
+import { Mark } from "../src/mark.js";
 import Link from "next/link";
 import { AppHeader, AppFooter } from "../src/shell.js";
 export default function Home() {
@@ -5,23 +6,54 @@ export default function Home() {
     <main className="product-app">
       <AppHeader />
       <section className="product-home">
-        <p className="eyebrow">SHIELDED PAYMENTS. PRIVATE REFUNDS.</p>
-        <h1>
-          Private Zcash payments
-          <br />
-          that can be refunded.
-        </h1>
-        <p className="lede">
-          The return route travels with the payment, encrypted in its memo. When
-          a refund is due, you already know where to send it.
-        </p>
-        <div className="home-actions">
-          <Link className="primary" href="/sign-up">
-            Accept ZEC payments
-          </Link>
-          <Link className="secondary" href="/sign-in">
-            Sign in
-          </Link>
+        <div className="home-hero">
+          <div className="home-intro">
+            <p className="eyebrow">SHIELDED PAYMENTS. PRIVATE REFUNDS.</p>
+            <h1>
+              Private payments.
+              <br />
+              <span>A way back.</span>
+            </h1>
+            <p className="lede">
+              Accept shielded Zcash payments. When a refund is due, use the
+              route supplied with the original payment. No second address
+              request.
+            </p>
+            <div className="home-actions">
+              <Link className="primary" href="/sign-up">
+                Accept ZEC payments
+              </Link>
+              <Link className="secondary" href="/sign-in">
+                Sign in
+              </Link>
+            </div>
+          </div>
+          <aside className="home-route-card" aria-label="How a refund returns">
+            <div className="route-card-head">
+              <Mark />
+              <span>PAYMENT TO RETURN</span>
+            </div>
+            <div className="route-card-step">
+              <span className="route-dot" />
+              <div>
+                <small>Customer</small>
+                <h2>Pay shielded.</h2>
+                <p>Include a refund route in the payment memo.</p>
+              </div>
+            </div>
+            <div className="route-card-step">
+              <span className="route-dot" />
+              <div>
+                <small>Merchant</small>
+                <h2>Refund when needed.</h2>
+                <p>Approve a request. Send to the supplied route.</p>
+              </div>
+            </div>
+            <div className="route-card-note">
+              One payment. One private receipt.
+              <br />A shielded return path.
+            </div>
+          </aside>
         </div>
         <div className="product-steps">
           <article>
@@ -41,8 +73,11 @@ export default function Home() {
           </article>
           <article>
             <span>03</span>
-            <h2>Refund from your workspace</h2>
-            <p>Use the recovered return route. No address request afterward.</p>
+            <h2>Review and refund</h2>
+            <p>
+              Customers can request a refund from their receipt. You review the
+              amount and give a decision.
+            </p>
           </article>
         </div>
         <p className="home-note">

@@ -1465,3 +1465,154 @@ form .primary {
 .refund-request-panel .section-head {
   flex-wrap: wrap;
 }
+
+/* Product polish: shared controls, quieter panels and a focused home layout. */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.8fr);
+  gap: 64px;
+  align-items: center;
+  margin-bottom: 44px;
+}
+.home-hero h1 {
+  font-size: clamp(42px, 5.3vw, 70px);
+  letter-spacing: -2.7px;
+  margin: 20px 0;
+}
+.home-hero h1 span {
+  color: var(--mint);
+}
+.home-hero .home-actions {
+  margin-bottom: 0;
+}
+.home-route-card {
+  border: 1px solid #345447;
+  background: linear-gradient(145deg, #152a23, #0e1c18);
+  border-radius: 24px;
+  padding: 30px;
+}
+.route-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #a9b6b0;
+  margin-bottom: 32px;
+}
+.route-card-head .mark {
+  width: 32px;
+  height: 32px;
+  color: var(--mint);
+}
+.route-card-step {
+  display: flex;
+  gap: 18px;
+  position: relative;
+  padding-bottom: 30px;
+}
+.route-card-step small {
+  color: var(--mint);
+  font-size: 12px;
+}
+.route-card-step h2 {
+  margin: 8px 0;
+  font-size: 22px;
+}
+.route-card-step p {
+  color: #a9b6b0;
+  font-size: 13px;
+  margin: 0;
+  max-width: 240px;
+}
+.route-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border: 2px solid var(--mint);
+  border-radius: 50%;
+  margin-top: 5px;
+}
+.route-card-step:not(:nth-last-child(2))::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 22px;
+  bottom: 9px;
+  width: 1px;
+  background: #345447;
+}
+.route-card-note {
+  border-top: 1px solid #345447;
+  padding-top: 20px;
+  color: #a9b6b0;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.product-app button,
+.product-app a.primary,
+.product-app a.secondary {
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+.product-app button:not(:disabled):active,
+.product-app a.primary:active {
+  transform: translateY(1px);
+}
+.product-app input,
+.product-app textarea {
+  transition: border-color 0.15s;
+}
+.product-app input:focus,
+.product-app textarea:focus {
+  border-color: var(--mint);
+}
+.refund-request-panel .section-head {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.refund-request-panel p,
+.preserve-lines {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .home-hero {
+    gap: 28px;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  }
+  .home-hero h1 {
+    font-size: 48px;
+  }
+}
+@media (max-width: 650px) {
+  .home-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    margin-bottom: 32px;
+  }
+  .home-hero h1 {
+    font-size: 44px;
+    letter-spacing: -1.8px;
+  }
+  .home-route-card {
+    padding: 24px;
+    border-radius: 18px;
+  }
+  .home-hero .home-actions {
+    flex-wrap: wrap;
+  }
+  .route-card-head {
+    margin-bottom: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-app button,
+  .product-app a.primary,
+  .product-app a.secondary,
+  .product-app input,
+  .product-app textarea {
+    transition: none;
+  }
+}

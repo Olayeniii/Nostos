@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import localFont from "next/font/local";
@@ -14,9 +15,35 @@ const mono = localFont({
   weight: "400",
 });
 
-export const metadata = {
-  title: "NOSTOS | Private Zcash payments",
-  description: "Private refunds for shielded ZEC payments.",
+export const metadata: Metadata = {
+  metadataBase: new URL("https://nostos.iyforge.xyz"),
+  title: {
+    default: "NOSTOS | Private Zcash payments",
+    template: "%s | NOSTOS",
+  },
+  description:
+    "Accept shielded Zcash payments. Refund later using the return route supplied with the original payment.",
+  openGraph: {
+    type: "website",
+    siteName: "NOSTOS",
+    title: "Private payments. A way back.",
+    description:
+      "Shielded Zcash payments with a refund route supplied in the original payment.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "NOSTOS. Private payments. A way back.",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NOSTOS | Private payments. A way back.",
+    images: ["/opengraph-image"],
+  },
+  robots: { index: false, follow: false },
 };
 
 export const viewport = { themeColor: "#0b1514" };

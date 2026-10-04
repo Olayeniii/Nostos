@@ -1,8 +1,16 @@
-export function Mark({ loading = false }: { loading?: boolean }) {
+export function Mark({
+  loading = false,
+  size = 100,
+}: {
+  loading?: boolean;
+  size?: number;
+}) {
   return (
     <svg
       className={loading ? "mark looping" : "mark"}
       viewBox="0 0 100 100"
+      width={size}
+      height={size}
       aria-hidden="true"
     >
       <g fill="currentColor">
