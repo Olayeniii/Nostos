@@ -124,7 +124,13 @@ def run():
             subprocess.run(git_command(repo, 'archive', 'HEAD'), cwd=repo, stdout=archive, check=True)
             archive.seek(0)
             with tarfile.open(fileobj=archive) as files:
-                files.extractall(release, filter='data')
+                # The data filter leaves directory modes to mkdir/umask. Only
+                # tracked source extraction needs public read/traverse access.
+                previous_umask = os.umask(0o022)
+                try:
+                    files.extractall(release, filter='data')
+                finally:
+                    os.umask(previous_umask)
         # Docker cannot create a nested bind mountpoint below a read-only /app
         # mount. Include the empty directory before mounting the release.
         (release / 'runtime').mkdir(exist_ok=True)

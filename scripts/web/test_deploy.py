@@ -66,6 +66,7 @@ class DeployTests(unittest.TestCase):
         previous_umask = os.umask(0o077)
         try:
             self.exercise_failed_final_health_restore()
+            self.assertEqual(os.umask(0o077), 0o077)
         finally:
             os.umask(previous_umask)
 
@@ -75,8 +76,15 @@ class DeployTests(unittest.TestCase):
             (repo/'scripts/web').mkdir(parents=True)
             (repo/'runtime').mkdir()
             (repo/'tracked.txt').write_text('Build source, no runtime data.\n')
+            (repo/'apps/web/src').mkdir(parents=True)
+            (repo/'apps/web/src/page.ts').write_text('export const page = "fixture";\n')
+            (repo/'packages/core').mkdir(parents=True)
+            (repo/'packages/core/index.ts').write_text('export const core = "fixture";\n')
+            executable = repo/'scripts/web/run.sh'
+            executable.write_text('#!/bin/sh\nexit 0\n')
+            executable.chmod(0o755)
             subprocess.run(['git', 'init', '-q', str(repo)], check=True)
-            subprocess.run(['git', '-C', str(repo), 'add', 'tracked.txt'], check=True)
+            subprocess.run(['git', '-C', str(repo), 'add', 'tracked.txt', 'apps', 'packages', 'scripts'], check=True)
             subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture'], check=True)
             base = self.base(repo)
             calls = []
@@ -103,6 +111,13 @@ class DeployTests(unittest.TestCase):
             releases = list((Path(root)/'releases').iterdir())
             self.assertEqual(len(releases), 1)
             self.assertEqual(stat.S_IMODE(releases[0].stat().st_mode), 0o755)
+            for path in ['apps', 'apps/web', 'apps/web/src', 'packages', 'packages/core', 'scripts', 'scripts/web']:
+                with self.subTest(extracted_directory=path):
+                    self.assertEqual(stat.S_IMODE((releases[0]/path).stat().st_mode), 0o755)
+            for path in ['tracked.txt', 'apps/web/src/page.ts', 'packages/core/index.ts']:
+                with self.subTest(extracted_file=path):
+                    self.assertEqual(stat.S_IMODE((releases[0]/path).stat().st_mode), 0o644)
+            self.assertEqual(stat.S_IMODE((releases[0]/'scripts/web/run.sh').stat().st_mode), 0o755)
             self.assertEqual(stat.S_IMODE((Path(root)/'product-data').stat().st_mode), 0o700)
             self.assertEqual(stat.S_IMODE((Path(root)/'product-data.key').stat().st_mode), 0o600)
             self.assertTrue((releases[0]/'runtime').is_dir())
