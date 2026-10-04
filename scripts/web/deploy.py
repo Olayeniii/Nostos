@@ -118,7 +118,8 @@ def run():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         suffix = str(int(time.time()))
         release = root / 'releases' / (revision[:12]+'-'+suffix)
-        release.mkdir(parents=True)
+        release.mkdir(parents=True, mode=0o755)
+        os.chmod(release, 0o755)
         with tempfile.TemporaryFile() as archive:
             subprocess.run(git_command(repo, 'archive', 'HEAD'), cwd=repo, stdout=archive, check=True)
             archive.seek(0)

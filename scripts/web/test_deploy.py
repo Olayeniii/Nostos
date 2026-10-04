@@ -1,7 +1,9 @@
 """Local deployment configuration and failed-switch recovery tests. No Docker calls."""
 import copy
 import importlib.util
+import os
 from pathlib import Path
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -58,6 +60,16 @@ class DeployTests(unittest.TestCase):
             self.assertFalse((Path(root)/'releases').exists())
 
     def test_failed_final_health_restores_previous_container(self):
+        self.exercise_failed_final_health_restore()
+
+    def test_release_is_traversable_under_restrictive_umask(self):
+        previous_umask = os.umask(0o077)
+        try:
+            self.exercise_failed_final_health_restore()
+        finally:
+            os.umask(previous_umask)
+
+    def exercise_failed_final_health_restore(self):
         with tempfile.TemporaryDirectory() as root:
             repo = Path(root)/'repo'
             (repo/'scripts/web').mkdir(parents=True)
@@ -90,6 +102,9 @@ class DeployTests(unittest.TestCase):
             self.assertFalse(any('wallet' in v for v in build['HostConfig']['Binds']))
             releases = list((Path(root)/'releases').iterdir())
             self.assertEqual(len(releases), 1)
+            self.assertEqual(stat.S_IMODE(releases[0].stat().st_mode), 0o755)
+            self.assertEqual(stat.S_IMODE((Path(root)/'product-data').stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE((Path(root)/'product-data.key').stat().st_mode), 0o600)
             self.assertTrue((releases[0]/'runtime').is_dir())
             self.assertEqual(calls[-1], ('POST', '/containers/nostos-web/start'))
             self.assertTrue(any('/rename?name=nostos-web' in path and 'nostos-web-before-' in path for _, path in calls))
