@@ -1,9 +1,11 @@
 "use client";
+import { EmailField, PasswordField } from "./account-fields.js";
 import { useState } from "react";
 import { requestJson } from "./requests.js";
 export function ChangeEmail() {
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
+  const [formKey, setFormKey] = useState(0);
   return (
     <article className="panel">
       <h2>Change account email</h2>
@@ -13,6 +15,7 @@ export function ChangeEmail() {
         sessions.
       </p>
       <form
+        key={formKey}
         onSubmit={async (e) => {
           e.preventDefault();
           if (busy) return;
@@ -32,7 +35,7 @@ export function ChangeEmail() {
               },
               15000,
             );
-            form.reset();
+            setFormKey((key) => key + 1);
             setMessage(r.message);
           } catch {
             setMessage(
@@ -43,28 +46,8 @@ export function ChangeEmail() {
           }
         }}
       >
-        <label>
-          New email
-          <input
-            name="email"
-            type="email"
-            required
-            maxLength={254}
-            disabled={busy}
-          />
-        </label>
-        <label>
-          Current password
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            minLength={12}
-            maxLength={128}
-            required
-            disabled={busy}
-          />
-        </label>
+        <EmailField label="New email" disabled={busy} />
+        <PasswordField label="Current password" disabled={busy} />
         <button className="secondary" disabled={busy}>
           Verify new email
         </button>

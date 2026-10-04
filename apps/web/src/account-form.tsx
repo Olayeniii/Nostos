@@ -1,4 +1,5 @@
 "use client";
+import { EmailField, PasswordField } from "./account-fields.js";
 import { useState } from "react";
 import Link from "next/link";
 import { AppHeader, AppFooter } from "./shell.js";
@@ -135,36 +136,11 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
                 ? "Start accepting refundable Zcash payments."
                 : "Sign in to your merchant workspace."}
             </p>
-            <label>
-              Email
-              <input
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                maxLength={254}
-                disabled={busy}
-              />
-            </label>
-            {!signup && (
-              <label>
-                Password
-                <input
-                  name="password"
-                  type="password"
-                  autoComplete={signup ? "new-password" : "current-password"}
-                  required
-                  minLength={12}
-                  maxLength={128}
-                  disabled={busy}
-                />
-              </label>
+            <EmailField disabled={busy} />
+            {!signup && <PasswordField disabled={busy} />}
+            {signup && (
+              <small>Verify your email, then set your password.</small>
             )}
-            <small>
-              {signup
-                ? "Verify your email, then set your password."
-                : "Use at least 12 characters."}
-            </small>
             {message && <p role="status">{message}</p>}
             {!signup && (
               <p>

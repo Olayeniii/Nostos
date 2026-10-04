@@ -1,3 +1,7 @@
+import {
+  validAccountEmail,
+  validAccountPassword,
+} from "../../../../src/account-validation.js";
 import { randomBytes } from "node:crypto";
 import {
   emailConfigured,
@@ -95,8 +99,8 @@ async function handle(request: Request) {
       const password = typeof body.password === "string" ? body.password : "";
       if (
         !email ||
-        !/^\S+@\S+\.\S+$/.test(email) ||
-        (route === "login" && (password.length < 12 || password.length > 128))
+        !validAccountEmail(email) ||
+        (route === "login" && !validAccountPassword(password))
       )
         return json(
           {
@@ -165,7 +169,7 @@ async function handle(request: Request) {
       ["resend-verification", "recover-password"].includes(route ?? "")
     ) {
       const email = text(body.email, 3, 254)?.toLowerCase();
-      if (!email || !/^\S+@\S+\.\S+$/.test(email))
+      if (!email || !validAccountEmail(email))
         return json({ error: "Enter a valid email." }, 400);
       if (!emailConfigured())
         return json({ error: "Account email delivery is unavailable." }, 503);
@@ -197,7 +201,7 @@ async function handle(request: Request) {
         const merchant = consumeIdentityToken(
           store,
           String(body.token ?? ""),
-          String(body.password ?? ""),
+          typeof body.password === "string" ? body.password : "",
         );
         return json({ ready: Boolean(merchant.destination) }, 200, {
           "Set-Cookie": accountHeader(store.session(merchant.id)),
@@ -277,7 +281,7 @@ async function handle(request: Request) {
       const password = typeof body.password === "string" ? body.password : "";
       if (
         !email ||
-        !/^\S+@\S+\.\S+$/.test(email) ||
+        !validAccountEmail(email) ||
         password.length > 128 ||
         !reauthenticated(store, merchant.id, password)
       )

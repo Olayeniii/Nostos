@@ -1,4 +1,5 @@
 "use client";
+import { EmailField, PasswordField } from "./account-fields.js";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader, AppFooter } from "./shell.js";
@@ -76,32 +77,9 @@ export function AccountHelp({
           }}
         >
           {link ? (
-            <label>
-              New password
-              <input
-                type="password"
-                name="password"
-                autoComplete="new-password"
-                minLength={12}
-                maxLength={128}
-                required
-                disabled={busy}
-              />
-            </label>
+            <PasswordField label="New password" newPassword disabled={busy} />
           ) : (
-            <>
-              <label>
-                Email
-                <input
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  required
-                  maxLength={254}
-                  disabled={busy}
-                />
-              </label>
-            </>
+            <EmailField disabled={busy} />
           )}
           <button className="primary" disabled={busy || (link && !token)}>
             {busy

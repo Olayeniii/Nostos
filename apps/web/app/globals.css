@@ -1679,3 +1679,46 @@ form .primary {
     font-size: 11px;
   }
 }
+
+.account-field {
+  display: grid;
+  gap: 9px;
+  margin-top: 20px;
+}
+.account-field:first-child {
+  margin-top: 0;
+}
+.account-field small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.account-field small.warning {
+  color: var(--ivory);
+}
+.password-input {
+  position: relative;
+}
+.password-input input {
+  padding-right: 56px;
+}
+.password-toggle {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+}
+.password-toggle:hover:not(:disabled) {
+  color: var(--ivory);
+}
+.product-app .password-toggle:not(:disabled):active {
+  transform: translateY(-50%);
+}

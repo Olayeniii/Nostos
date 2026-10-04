@@ -49,6 +49,42 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 describe("merchant email ownership", () => {
+  it("keeps a valid email link usable after rejected password input", async () => {
+    const merchant = store.signup("password-check@example.com", password);
+    const token = issueIdentityToken(
+      store,
+      merchant.id,
+      "verify",
+      merchant.email,
+    );
+    for (const invalid of ["a".repeat(11), "a".repeat(129), {}])
+      expect(
+        (await POST(req("account-link", { token, password: invalid }))).status,
+      ).toBe(400);
+    expect(store.merchant(merchant.id)!.emailVerifiedAt).toBeNull();
+    expect(
+      (await POST(req("account-link", { token, password: newPassword })))
+        .status,
+    ).toBe(200);
+  });
+  it("rejects script and header payloads before storage or email delivery", async () => {
+    for (const route of [
+      "signup",
+      "login",
+      "resend-verification",
+      "recover-password",
+    ])
+      for (const email of [
+        "<script>@example.com",
+        "a@example.com\r\nBcc:b@example.com",
+        "a@example..com",
+      ])
+        expect((await POST(req(route, { email, password }))).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      store.db.prepare("SELECT COUNT(*) AS count FROM merchants").get()!.count,
+    ).toBe(0);
+  });
   it("registration sends only a verification link, grants no session and blocks all merchant operations", async () => {
     const r = await POST(req("signup", { email: "new@example.com" }));
     expect(r.status).toBe(200);

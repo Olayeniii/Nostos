@@ -1,3 +1,4 @@
+import { validAccountPassword } from "./account-validation.js";
 import { randomBytes } from "node:crypto";
 import {
   ProductStore,
@@ -81,11 +82,7 @@ export function consumeIdentityToken(
   password: string,
   now = Date.now(),
 ) {
-  if (
-    !/^[A-Za-z0-9_-]{43}$/.test(token) ||
-    password.length < 12 ||
-    password.length > 128
-  )
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token) || !validAccountPassword(password))
     throw new Error("Invalid account link or password.");
   const encoded = passwordHash(password);
   store.db.exec("BEGIN IMMEDIATE");
