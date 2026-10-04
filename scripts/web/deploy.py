@@ -150,7 +150,8 @@ def run():
         if 'https://nostos.iyforge.xyz' not in env.get('NOSTOS_WEB_TRUSTED_ORIGINS', '').split(','):
             raise RuntimeError('Trusted HTTPS origin is missing. Original left running.')
         preview = 'nostos-check-'+suffix
-        created = docker('POST', '/containers/create?name='+preview, start_config(base, release, data, env, 3001))
+        preview_env = dict(env, NOSTOS_RETENTION_ENABLED='0')
+        created = docker('POST', '/containers/create?name='+preview, start_config(base, release, data, preview_env, 3001))
         if created.get('Warnings'):
             raise RuntimeError('Container configuration warning. Original left running.')
         docker('POST', '/containers/'+preview+'/start')

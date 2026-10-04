@@ -1,15 +1,21 @@
 "use client";
+import { useState } from "react";
+import { requestJson } from "../../../src/requests.js";
 import Link from "next/link";
 import { useRecord } from "../../../src/use-record.js";
 import { AppHeader, AppFooter } from "../../../src/shell.js";
 import { StateLabel } from "../../../src/status-label.js";
 export default function Settings() {
-  const { data, warning, loading } = useRecord<{
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const { data, warning, loading, refresh } = useRecord<{
     merchant: {
       name: string;
       email: string;
       ready: boolean;
       setupPending: boolean;
+      refundPolicy: string;
+      refundWindowDays: number | null;
     };
   }>("/api/product/me");
   return (
@@ -25,7 +31,7 @@ export default function Settings() {
         <div>
           <p className="eyebrow">STORE SETTINGS</p>
           <h1>Your store</h1>
-          <p>Account and wallet integration details.</p>
+          <p>Account, wallet and refund policy.</p>
         </div>
       </div>
       {warning && (
@@ -77,7 +83,9 @@ export default function Settings() {
               </div>
               <div>
                 <dt>Refund policy</dt>
-                <dd>One instruction per payment</dd>
+                <dd>
+                  Full or partial refunds within the remaining payment value
+                </dd>
               </div>
             </dl>
             <p className="privacy">
@@ -86,6 +94,77 @@ export default function Settings() {
               details. A private return route is kept encrypted in product
               storage.
             </p>
+          </article>
+          <article className="panel">
+            <h2>Refund policy</h2>
+            <p>
+              Customers see this policy before paying and on their receipt.
+              Changes apply only to new payment requests.
+            </p>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (busy) return;
+                const form = new FormData(e.currentTarget);
+                const days = String(form.get("days")).trim();
+                setBusy(true);
+                setMessage("");
+                try {
+                  await requestJson(
+                    "/api/product/policy",
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        policy: String(form.get("policy")),
+                        windowDays: days ? Number(days) : null,
+                      }),
+                    },
+                    15000,
+                  );
+                  setMessage("Policy saved for new payment requests.");
+                  void refresh();
+                } catch {
+                  setMessage(
+                    "Could not save the policy. Refresh before trying again.",
+                  );
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <label>
+                Store refund policy
+                <textarea
+                  name="policy"
+                  defaultValue={data.merchant.refundPolicy}
+                  minLength={3}
+                  maxLength={1000}
+                  required
+                  disabled={busy}
+                />
+              </label>
+              <label>
+                Request window in days
+                <input
+                  name="days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  defaultValue={data.merchant.refundWindowDays ?? ""}
+                  disabled={busy}
+                />
+              </label>
+              <p className="privacy">
+                The window begins when payment confirms. Leave it blank for no
+                deadline. Open requests and unconfirmed refunds keep their route
+                until resolved.
+              </p>
+              <button className="primary" disabled={busy}>
+                {busy ? "Saving policy" : "Save refund policy"}
+              </button>
+              {message && <p role="status">{message}</p>}
+            </form>
           </article>
         </section>
       )}

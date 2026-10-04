@@ -32,11 +32,11 @@ describe("browser payment projection", () => {
     expect(response).not.toContain("idempotencyKey");
     expect(response).not.toContain("merchantId");
   });
-  it("shows accurate amounts but blocks another refund under the current core", () => {
+  it("shows the remaining amount after a confirmed partial refund", () => {
     expect(paymentView(payment, refund)).toMatchObject({
       refundedZat: 300_000,
       availableZat: 700_000,
-      canRefund: false,
+      canRefund: true,
     });
   });
   it("holds value while broadcast is unknown", () => {

@@ -5,6 +5,7 @@ import { AppHeader, AppFooter } from "../../src/shell.js";
 import { StateLabel } from "../../src/status-label.js";
 import { requestJson, RequestError } from "../../src/requests.js";
 
+import { CustomerRefundRequest } from "../../src/customer-refund-request.js";
 import { ReceiptCard, type ReceiptData } from "../../src/receipt-card.js";
 type Receipt = ReceiptData;
 export default function CustomerReceipt() {
@@ -166,9 +167,14 @@ export default function CustomerReceipt() {
             loading={loading}
             onRefresh={() => void refresh()}
           />
+          <CustomerRefundRequest
+            receipt={receipt}
+            token={access}
+            onRefresh={() => void refresh()}
+          />
           <p className="privacy">
-            This private link grants read-only access to this receipt. Save it
-            somewhere safe.
+            This private link lets its holder view this receipt and request a
+            refund. Save it somewhere safe.
           </p>
         </section>
       )}

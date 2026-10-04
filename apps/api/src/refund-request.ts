@@ -10,6 +10,7 @@ export async function submitRefund(
     store: SqlitePaymentStore;
     broadcaster: RefundBroadcaster;
     merchantAccountUuid: string;
+    authorizeBeforePrepare?: () => void;
   },
 ) {
   if (!body || typeof body !== "object" || Array.isArray(body))
@@ -24,10 +25,20 @@ export async function submitRefund(
   ) {
     throw new Error("Invalid refund amount or payment identifier");
   }
+  if (
+    input.idempotencyKey !== undefined &&
+    (typeof input.idempotencyKey !== "string" ||
+      !/^refund_[a-f0-9-]{36}$/u.test(input.idempotencyKey))
+  )
+    throw new Error("Invalid refund instruction key");
   return executePartialRefund({
     ...options,
     paymentTxid: input.paymentTxid,
     amountZat: input.amountZat,
-    idempotencyKey: `refund_${input.paymentTxid.slice(0, 48)}`,
+    idempotencyKey:
+      typeof input.idempotencyKey === "string"
+        ? input.idempotencyKey
+        : `refund_${input.paymentTxid.slice(0, 48)}`,
+    allowMultiple: typeof input.idempotencyKey === "string",
   });
 }

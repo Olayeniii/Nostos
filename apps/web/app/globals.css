@@ -1424,3 +1424,44 @@ form .primary {
     font-size: 11px;
   }
 }
+
+.refund-request-panel {
+  margin-top: 1.5rem;
+}
+.refund-request-panel form,
+.refund-request-panel label {
+  display: grid;
+  gap: 0.6rem;
+}
+.refund-request-panel form {
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+.refund-request-panel textarea,
+.settings-grid textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+.refund-request {
+  border-top: 1px solid var(--line, #d5ddd8);
+  padding: 1rem 0;
+}
+.refund-policy {
+  margin: 1rem 0;
+}
+.preserve-lines {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.refund-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin: 1rem 0;
+}
+.refund-history code {
+  overflow-wrap: anywhere;
+}
+.refund-request-panel .section-head {
+  flex-wrap: wrap;
+}

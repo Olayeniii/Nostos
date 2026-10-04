@@ -7,6 +7,7 @@ import { StateLabel } from "../../src/status-label.js";
 import { useRecord } from "../../src/use-record.js";
 import { requestJson, parseZec } from "../../src/requests.js";
 import { zec, date, type ReceiptData } from "../../src/receipt-card.js";
+import { MerchantRefundRequest } from "../../src/merchant-refund-request.js";
 import type { PaymentView } from "../../../api/src/index.js";
 type RecordData = ReceiptData & {
   id: string;
@@ -21,7 +22,9 @@ type Dashboard = {
 function status(r: RecordData) {
   return r.refundAmountZat > 0
     ? r.status === "confirmed"
-      ? "Refund confirmed"
+      ? (r.remainingAmountZat ?? 0) > 0
+        ? "Partially refunded"
+        : "Refund confirmed"
       : "Refund pending"
     : r.paymentStatus === "confirmed"
       ? "Paid"
@@ -40,7 +43,11 @@ export default function Merchant() {
   const [share, setShare] = useState("");
   const [qr, setQr] = useState("");
   const [draft, setDraft] = useState("");
-  const [review, setReview] = useState<{ id: string; amountZat: number }>();
+  const [review, setReview] = useState<{
+    id: string;
+    amountZat: number;
+    instructionId: string;
+  }>();
   const [uncertain, setUncertain] = useState(false);
   const submitting = useRef(false);
   const records = data?.records ?? [];
@@ -48,7 +55,10 @@ export default function Merchant() {
   const paid = records.filter((r) => r.payment);
   const received = paid.reduce((a, r) => a + r.paymentAmountZat, 0);
   const refunded = paid.reduce(
-    (a, r) => a + (r.status === "confirmed" ? r.refundAmountZat : 0),
+    (a, r) =>
+      a +
+      (r.confirmedRefundAmountZat ??
+        (r.status === "confirmed" ? r.refundAmountZat : 0)),
     0,
   );
   const refundable = paid
@@ -145,8 +155,14 @@ export default function Merchant() {
             {zec(refunded)} <small>ZEC</small>
           </strong>
           <p>
-            {records.filter((r) => r.status === "confirmed").length} confirmed
-            refunds
+            {records.reduce(
+              (sum, r) =>
+                sum +
+                (r.refunds?.filter((f) => f.status === "confirmed").length ??
+                  (r.status === "confirmed" ? 1 : 0)),
+              0,
+            )}{" "}
+            confirmed refunds
           </p>
         </article>
       </section>
@@ -393,6 +409,45 @@ export default function Merchant() {
                 <dd>{date(current.createdAt)}</dd>
               </div>
             </dl>
+            {current.canRecoverRoute && (
+              <div className="info-panel">
+                <h3>Restore remaining refund capability</h3>
+                <p>
+                  An earlier version removed this route after a partial refund.
+                  Check the original payment memo before refunding the remaining
+                  value.
+                </p>
+                <button
+                  className="secondary"
+                  disabled={!safe}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError("");
+                    try {
+                      await post("recover-route", { id: current.id });
+                      void refresh();
+                    } catch {
+                      setError(
+                        "Could not verify the original return route. No refund was sent.",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Check original payment route
+                </button>
+              </div>
+            )}
+            {current.refundRequests?.map((r) => (
+              <MerchantRefundRequest
+                key={r.id}
+                request={r}
+                refund={current.refunds?.find((f) => f.id === `refund_${r.id}`)}
+                safe={safe}
+                onRefresh={() => void refresh()}
+              />
+            ))}
             {current.payment?.canRefund ? (
               <form
                 onSubmit={(e) => {
@@ -408,7 +463,11 @@ export default function Merchant() {
                     );
                     return;
                   }
-                  setReview({ id: current.id, amountZat: value });
+                  setReview({
+                    id: current.id,
+                    amountZat: value,
+                    instructionId: crypto.randomUUID(),
+                  });
                 }}
               >
                 <label>
@@ -492,7 +551,11 @@ export default function Merchant() {
             ) : (
               <p className="privacy">
                 {current.payment?.refundTxid
-                  ? "A refund is already recorded. This payment cannot be sent again."
+                  ? current.routeClosedReason === "expired"
+                    ? "The refund window has ended."
+                    : current.canRecoverRoute
+                      ? "Verify the original route to refund the remaining value."
+                      : "The recorded refund history is shown above. Open requests need a merchant decision."
                   : "Refunding becomes available after a valid shielded payment is confirmed."}
               </p>
             )}

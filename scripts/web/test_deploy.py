@@ -65,6 +65,10 @@ class DeployTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'Previous release restored'):
                     deploy.run()
             build = payloads[0]
+            preview_config = next(p for p in payloads if p.get('Cmd', [])[-1:] == ['3001'])
+            self.assertIn('NOSTOS_RETENTION_ENABLED=0', preview_config['Env'])
+            final_config = next(p for p in payloads if p.get('Cmd', [])[-1:] == ['3000'])
+            self.assertNotIn('NOSTOS_RETENTION_ENABLED=0', final_config['Env'])
             self.assertFalse(any('NOSTOS_WEB_TOKEN=' in v for v in build['Env']))
             self.assertFalse(any('wallet' in v for v in build['HostConfig']['Binds']))
             releases = list((Path(root)/'releases').iterdir())

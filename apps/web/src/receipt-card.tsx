@@ -16,6 +16,25 @@ export type ReceiptData = {
   refundTxid?: string;
   createdAt?: string;
   paidAt?: string | null;
+  confirmedRefundAmountZat?: number;
+  pendingRefundAmountZat?: number;
+  remainingAmountZat?: number;
+  refunds?: { id: string; amountZat: number; status: string; txid?: string }[];
+  refundRequests?: {
+    id: string;
+    amountZat: number;
+    reason: string;
+    status: string;
+    decisionReason: string;
+    approvedZat: number | null;
+    createdAt: string;
+    decidedAt: string | null;
+  }[];
+  canRequestRefund?: boolean;
+  canRecoverRoute?: boolean;
+  refundPolicy?: string;
+  refundExpiresAt?: string | null;
+  routeClosedReason?: string | null;
 };
 export const zec = (amount: number) =>
   (amount / 1e8).toLocaleString("en", { maximumFractionDigits: 8 });
@@ -148,11 +167,31 @@ export function ReceiptCard({
           </>
         ) : (
           <p>
-            The merchant can refund to the route supplied in the shielded memo
-            of this payment if a refund is due.
+            {receipt.routeClosedReason === "expired"
+              ? "The refund request window has ended. The return route has been removed from active product records."
+              : "The merchant can refund to the route supplied in the shielded memo of this payment if a refund is due."}
           </p>
         )}
       </section>
+      {receipt.confirmedRefundAmountZat !== undefined &&
+        receipt.refundAmountZat > 0 && (
+          <dl className="receipt-facts">
+            <div>
+              <dt>Refund confirmed</dt>
+              <dd>{zec(receipt.confirmedRefundAmountZat)} ZEC</dd>
+            </div>
+            {!!receipt.pendingRefundAmountZat && (
+              <div>
+                <dt>Refund pending</dt>
+                <dd>{zec(receipt.pendingRefundAmountZat)} ZEC</dd>
+              </div>
+            )}
+            <div>
+              <dt>Remaining payment value</dt>
+              <dd>{zec(receipt.remainingAmountZat ?? 0)} ZEC</dd>
+            </div>
+          </dl>
+        )}
       <details className="receipt-details">
         <summary>Payment and transaction details</summary>
         <div className="receipt-tx">
@@ -179,6 +218,20 @@ export function ReceiptCard({
                 </button>
               </div>
             ),
+        )}
+        {(receipt.refunds?.length ?? 0) > 1 && (
+          <div className="refund-history">
+            <h4>Refund history</h4>
+            {receipt.refunds!.map((r) => (
+              <div key={r.id}>
+                <p>
+                  {zec(r.amountZat)} ZEC,{" "}
+                  {r.status === "confirmed" ? "confirmed" : "being checked"}
+                </p>
+                {r.txid && <code>{r.txid}</code>}
+              </div>
+            ))}
+          </div>
         )}
         <p>
           This is NOSTOS application status, not a cryptographic payment

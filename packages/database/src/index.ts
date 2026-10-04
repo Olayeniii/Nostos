@@ -74,7 +74,7 @@ export class SqlitePaymentStore {
     this.#database = new DatabaseSync(path);
     this.#database.exec("PRAGMA journal_mode = WAL");
     this.#database.exec("PRAGMA foreign_keys = ON");
-    this.#database.exec("PRAGMA secure_delete = ON");
+    this.#database.exec("PRAGMA secure_delete = ON; PRAGMA busy_timeout=5000");
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS payments (
         id TEXT PRIMARY KEY,
@@ -113,6 +113,17 @@ export class SqlitePaymentStore {
         "ALTER TABLE refunds ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
       );
     }
+    // Additive ledger: keep the first real refund in the legacy table so older
+    // releases still see an instruction and cannot create a second first send.
+    this.#database.exec(`CREATE TABLE IF NOT EXISTS refund_events (
+      id TEXT PRIMARY KEY, payment_id TEXT NOT NULL REFERENCES payments(id),
+      idempotency_key TEXT NOT NULL UNIQUE, amount_zat INTEGER NOT NULL CHECK(amount_zat>0),
+      status TEXT NOT NULL, txid TEXT UNIQUE, retry_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS refund_events_payment ON refund_events(payment_id);
+    INSERT OR IGNORE INTO refund_events (id,payment_id,idempotency_key,amount_zat,status,txid,retry_count,created_at,updated_at)
+      SELECT id,payment_id,idempotency_key,amount_zat,status,txid,retry_count,created_at,updated_at FROM refunds;`);
   }
 
   private decodeRow(row: PaymentRow): PaymentRecord {
@@ -233,50 +244,113 @@ export class SqlitePaymentStore {
   prepareRefund(
     paymentTxid: string,
     intent: RefundIntent,
+    allowMultiple = false,
   ): {
     created: boolean;
     refund: RefundRecord;
   } {
-    const payment = this.findByTxid(paymentTxid);
-    if (!payment) throw new Error("Refund payment was not found.");
-    const valid = parseRefundIntent(intent, payment);
-    const now = new Date().toISOString();
-    const result = this.#database
-      .prepare(
-        `INSERT INTO refunds (
-          id, payment_id, idempotency_key, amount_zat, status,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, 'pending', ?, ?)
-        ON CONFLICT(payment_id) DO NOTHING`,
-      )
-      .run(
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      const payment = this.findByTxid(paymentTxid);
+      if (!payment) throw new Error("Refund payment was not found.");
+      const existing = this.findRefundByKey(intent.idempotencyKey);
+      if (existing) {
+        if (
+          existing.paymentId !== payment.id ||
+          existing.amountZat !== intent.amountZat
+        )
+          throw new Error("A conflicting refund already exists for this key.");
+        this.#database.exec("COMMIT");
+        return { created: false, refund: existing };
+      }
+      const valid = parseRefundIntent(intent, payment);
+      const records = this.listRefundsByPayment(payment.id);
+      if (records.some((r) => r.status !== "confirmed"))
+        throw new Error("A refund is in progress or its broadcast is unknown.");
+      if (records.length && !allowMultiple)
+        throw new Error(
+          "A conflicting refund already exists for this payment.",
+        );
+      const refunded = records.reduce((sum, r) => sum + r.amountZat, 0);
+      if (valid.amountZat > payment.amountZat - refunded)
+        throw new Error("Refund cannot exceed the remaining payment amount.");
+      const now = new Date().toISOString();
+      const values = [
         valid.id,
         valid.paymentId,
         valid.idempotencyKey,
         valid.amountZat,
         now,
         now,
-      );
-    const refund = this.findRefundByPayment(valid.paymentId);
-    if (!refund) throw new Error("Refund insert did not return a record.");
-    if (
-      refund.idempotencyKey !== valid.idempotencyKey ||
-      refund.amountZat !== valid.amountZat
-    ) {
-      throw new Error("A conflicting refund already exists for this payment.");
+      ];
+      this.#database
+        .prepare(
+          `INSERT INTO refund_events
+        (id,payment_id,idempotency_key,amount_zat,status,created_at,updated_at)
+        VALUES(?,?,?,?,'pending',?,?)`,
+        )
+        .run(...values);
+      this.#database
+        .prepare(
+          `INSERT INTO refunds
+        (id,payment_id,idempotency_key,amount_zat,status,created_at,updated_at)
+        VALUES(?,?,?,?,'pending',?,?) ON CONFLICT(payment_id) DO NOTHING`,
+        )
+        .run(...values);
+      this.#database.exec("COMMIT");
+      return { created: true, refund: this.findRefund(valid.id)! };
+    } catch (error) {
+      this.#database.exec("ROLLBACK");
+      throw error;
     }
-    return { created: result.changes === 1, refund };
   }
 
-  findRefundByPayment(paymentId: string): RefundRecord | undefined {
+  listRefundsByPayment(paymentId: string): RefundRecord[] {
+    return (
+      this.#database
+        .prepare(
+          "SELECT * FROM refund_events WHERE payment_id=? ORDER BY rowid",
+        )
+        .all(paymentId) as unknown as RefundRow[]
+    ).map(refundFromRow);
+  }
+  findRefund(id: string): RefundRecord | undefined {
     const row = this.#database
-      .prepare("SELECT * FROM refunds WHERE payment_id = ?")
-      .get(paymentId) as unknown as RefundRow | undefined;
+      .prepare("SELECT * FROM refund_events WHERE id=?")
+      .get(id) as unknown as RefundRow | undefined;
     return row ? refundFromRow(row) : undefined;
   }
+  findRefundByKey(key: string): RefundRecord | undefined {
+    const row = this.#database
+      .prepare("SELECT * FROM refund_events WHERE idempotency_key=?")
+      .get(key) as unknown as RefundRow | undefined;
+    return row ? refundFromRow(row) : undefined;
+  }
+  findRefundByPayment(
+    paymentId: string,
+    refundId?: string,
+  ): RefundRecord | undefined {
+    if (refundId) {
+      const refund = this.findRefund(refundId);
+      return refund?.paymentId === paymentId ? refund : undefined;
+    }
+    return this.listRefundsByPayment(paymentId).at(-1);
+  }
+  refundTotals(paymentId: string) {
+    const records = this.listRefundsByPayment(paymentId);
+    return {
+      refundedZat: records
+        .filter((r) => r.status === "confirmed")
+        .reduce((sum, r) => sum + r.amountZat, 0),
+      reservedZat: records
+        .filter((r) => r.status !== "confirmed")
+        .reduce((sum, r) => sum + r.amountZat, 0),
+      inProgress: records.some((r) => r.status !== "confirmed"),
+    };
+  }
 
-  claimRefundBroadcast(paymentId: string): RefundRecord {
-    const refund = this.findRefundByPayment(paymentId);
+  claimRefundBroadcast(paymentId: string, refundId?: string): RefundRecord {
+    const refund = this.findRefundByPayment(paymentId, refundId);
     if (!refund) throw new Error("Refund instruction was not found.");
     if (refund.status === "broadcasting") {
       throw new Error(
@@ -286,7 +360,7 @@ export class SqlitePaymentStore {
     if (refund.status !== "pending") return refund;
     const claim = this.#database
       .prepare(
-        `UPDATE refunds SET status = 'broadcasting', updated_at = ?
+        `UPDATE refund_events SET status = 'broadcasting', updated_at = ?
          WHERE id = ? AND status = 'pending'`,
       )
       .run(new Date().toISOString(), refund.id);
@@ -295,41 +369,44 @@ export class SqlitePaymentStore {
         "Refund was claimed by another worker; retry is blocked.",
       );
     }
+    this.#mirrorRefund(refund.id);
     return { ...refund, status: "broadcasting" };
   }
 
   recordRefundBroadcast(
     paymentId: string,
     transactionId: string,
+    refundId?: string,
   ): RefundRecord {
     if (!/^[a-f0-9]{64}$/u.test(transactionId)) {
       throw new Error("Refund transaction ID is invalid.");
     }
-    const refund = this.findRefundByPayment(paymentId);
+    const refund = this.findRefundByPayment(paymentId, refundId);
     if (!refund || refund.status !== "broadcasting") {
       throw new Error("Refund is not awaiting a broadcast result.");
     }
     this.#database
       .prepare(
-        `UPDATE refunds
+        `UPDATE refund_events
          SET status = 'broadcast', txid = ?, updated_at = ?
          WHERE id = ? AND status = 'broadcasting'`,
       )
       .run(transactionId, new Date().toISOString(), refund.id);
-    const updated = this.findRefundByPayment(paymentId);
+    this.#mirrorRefund(refund.id);
+    const updated = this.findRefundByPayment(paymentId, refundId);
     if (!updated) throw new Error("Refund disappeared after broadcast.");
     return updated;
   }
 
-  markRefundBroadcastUnknown(paymentId: string): void {
-    const refund = this.findRefundByPayment(paymentId);
+  markRefundBroadcastUnknown(paymentId: string, refundId?: string): void {
+    const refund = this.findRefundByPayment(paymentId, refundId);
     if (refund?.status === "broadcasting") {
       this.#setRefundStatus(refund.id, "broadcast_unknown");
     }
   }
 
-  recordRefundRetry(paymentId: string): RefundRecord {
-    const refund = this.findRefundByPayment(paymentId);
+  recordRefundRetry(paymentId: string, refundId?: string): RefundRecord {
+    const refund = this.findRefundByPayment(paymentId, refundId);
     if (
       !refund ||
       (refund.status !== "broadcast" && refund.status !== "confirmed")
@@ -338,18 +415,19 @@ export class SqlitePaymentStore {
     }
     this.#database
       .prepare(
-        `UPDATE refunds
+        `UPDATE refund_events
          SET retry_count = retry_count + 1, updated_at = ?
          WHERE id = ?`,
       )
       .run(new Date().toISOString(), refund.id);
-    const updated = this.findRefundByPayment(paymentId);
+    this.#mirrorRefund(refund.id);
+    const updated = this.findRefundByPayment(paymentId, refundId);
     if (!updated) throw new Error("Refund disappeared after retry recording.");
     return updated;
   }
 
-  confirmRefund(paymentId: string): RefundRecord {
-    const refund = this.findRefundByPayment(paymentId);
+  confirmRefund(paymentId: string, refundId?: string): RefundRecord {
+    const refund = this.findRefundByPayment(paymentId, refundId);
     if (!refund || refund.status !== "broadcast" || !refund.txid) {
       throw new Error("Refund is not ready for confirmation.");
     }
@@ -357,22 +435,73 @@ export class SqlitePaymentStore {
     return { ...refund, status: "confirmed" };
   }
 
-  retireConfirmedRefundRoute(paymentId: string): void {
-    const refund = this.findRefundByPayment(paymentId);
-    if (refund?.status !== "confirmed")
+  retireConfirmedRefundRoute(paymentId: string): boolean {
+    const payment = this.findByTxid(paymentId);
+    const totals = this.refundTotals(paymentId);
+    if (!payment || totals.inProgress)
       throw new Error(
         "Return route is still required for refund reconciliation.",
       );
+    if (totals.refundedZat < payment.amountZat) return false;
     this.#database
       .prepare(
         "UPDATE payments SET refund_address='',status='refunded' WHERE id=?",
       )
       .run(paymentId);
+    return true;
+  }
+  expireRefundRoute(paymentId: string): void {
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      if (this.refundTotals(paymentId).inProgress)
+        throw new Error(
+          "Return route is still required for refund reconciliation.",
+        );
+      this.#database
+        .prepare(
+          "UPDATE payments SET refund_address='',status='refunded' WHERE id=?",
+        )
+        .run(paymentId);
+      this.#database.exec("COMMIT");
+    } catch (error) {
+      this.#database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  restorePartialRefundRoute(paymentId: string, route: string): void {
+    const payment = this.findByTxid(paymentId);
+    const totals = this.refundTotals(paymentId);
+    if (
+      !payment ||
+      totals.inProgress ||
+      totals.refundedZat >= payment.amountZat
+    )
+      throw new Error("Refund capability cannot be restored.");
+    this.#database
+      .prepare(
+        "UPDATE payments SET refund_address=?,status='confirmed' WHERE id=? AND refund_address=''",
+      )
+      .run(this.codec?.encrypt(route) ?? route, paymentId);
+  }
+  #mirrorRefund(id: string): void {
+    // Only the first instruction exists in refunds; never overwrite its amount or txid.
+    this.#database
+      .prepare(
+        `UPDATE refunds SET
+      status=(SELECT status FROM refund_events WHERE id=?),
+      txid=(SELECT txid FROM refund_events WHERE id=?),
+      retry_count=(SELECT retry_count FROM refund_events WHERE id=?),
+      updated_at=(SELECT updated_at FROM refund_events WHERE id=?) WHERE id=?`,
+      )
+      .run(id, id, id, id, id);
   }
 
   #setRefundStatus(id: string, status: RefundStatus): void {
     this.#database
-      .prepare("UPDATE refunds SET status = ?, updated_at = ? WHERE id = ?")
+      .prepare(
+        "UPDATE refund_events SET status = ?, updated_at = ? WHERE id = ?",
+      )
       .run(status, new Date().toISOString(), id);
+    this.#mirrorRefund(id);
   }
 }

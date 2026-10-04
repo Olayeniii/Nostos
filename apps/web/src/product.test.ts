@@ -317,12 +317,12 @@ describe("protocol rejection and route retirement", () => {
                   outgoing: true,
                   address: route,
                   pool,
-                  valueZat: 300000,
+                  valueZat: 1000000,
                 },
               ],
       }));
       await reconcile(store, core, c, rpc);
-      await refundPayment(store, core, m, c.id, 300000, rpc);
+      await refundPayment(store, core, m, c.id, 1000000, rpc);
       await reconcile(store, core, store.checkout(c.id)!, rpc);
       expect(store.checkout(c.id)?.route).toBe(route);
       expect(() => core.retireConfirmedRefundRoute(txid)).toThrow();
@@ -337,7 +337,7 @@ describe("protocol rejection and route retirement", () => {
                   outgoing: true,
                   address: route,
                   pool,
-                  valueZat: 300000,
+                  valueZat: 1000000,
                 },
               ],
       }));
@@ -350,12 +350,12 @@ describe("protocol rejection and route retirement", () => {
       expect(checkoutView(store, core, store.checkout(c.id)!)).toMatchObject({
         status: "confirmed",
         refundTxid,
-        refundAmountZat: 300000,
+        refundAmountZat: 1000000,
         paymentConfirmations: 2,
       });
       await expect(
-        refundPayment(store, core, m, c.id, 300000, rpc),
-      ).rejects.toThrow();
+        refundPayment(store, core, m, c.id, 1000000, rpc),
+      ).resolves.toMatchObject({ broadcast: false, txid: refundTxid });
       expect(rpc.sendFromAccount).toHaveBeenCalledTimes(1);
       core.close();
       core = coreStore(store);

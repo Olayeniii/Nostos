@@ -9,6 +9,9 @@ import {
   setupMerchant,
   newRequest,
   refundPayment,
+  requestCustomerRefund,
+  decideCustomerRefund,
+  recoverOriginalRefundRoute,
 } from "../../../../src/product-service.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -119,10 +122,43 @@ async function handle(request: Request) {
         "Set-Cookie": accountHeader(store.session(merchant.id)),
       });
     }
-    if (route === "checkout" || route === "prepare") {
+    if (
+      route === "checkout" ||
+      route === "prepare" ||
+      route === "refund-request"
+    ) {
       const checkout = store.byToken(token(request));
       if (!checkout)
         return json({ error: "Private payment link required" }, 401);
+      if (route === "refund-request" && isPost) {
+        const id = text(body.requestId, 36, 36);
+        const value = amount(body.amountZat);
+        const reason = text(body.reason, 3, 1000);
+        if (
+          !id ||
+          !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(
+            id,
+          ) ||
+          !value ||
+          !reason ||
+          Object.keys(body).some(
+            (k) => !["requestId", "amountZat", "reason"].includes(k),
+          )
+        )
+          return json({ error: "Enter a refund amount and reason." }, 400);
+        const created = requestCustomerRefund(
+          store,
+          core,
+          checkout,
+          id,
+          value,
+          reason,
+        );
+        return json({
+          requestId: created.id,
+          receipt: checkoutView(store, core, store.checkout(checkout.id)!),
+        });
+      }
       if (route === "prepare" && isPost) {
         const route = text(body.route, 20, 506);
         if (!route)
@@ -152,8 +188,74 @@ async function handle(request: Request) {
           email: merchant.email,
           ready: Boolean(merchant.destination),
           setupPending: merchant.wallet === "provisioning",
+          refundPolicy: merchant.refundPolicy,
+          refundWindowDays: merchant.refundWindowDays,
         },
       });
+    if (route === "policy" && isPost) {
+      const policy = text(body.policy, 3, 1000);
+      const days = body.windowDays;
+      if (
+        !policy ||
+        !(
+          days === null ||
+          (typeof days === "number" &&
+            Number.isInteger(days) &&
+            days >= 1 &&
+            days <= 365)
+        )
+      )
+        return json(
+          {
+            error:
+              "Enter a policy and a window from 1 to 365 days, or no deadline.",
+          },
+          400,
+        );
+      store.setRefundPolicy(merchant.id, policy, days);
+      return json({ ok: true });
+    }
+    if (route === "recover-route" && isPost) {
+      const id = text(body.id, 36, 36);
+      if (!id) return json({ error: "Invalid payment." }, 400);
+      return json(
+        await recoverOriginalRefundRoute(
+          store,
+          core,
+          merchant,
+          id,
+          wallet(15000),
+        ),
+      );
+    }
+    if (route === "refund-decision" && isPost) {
+      const id = text(body.requestId, 36, 36);
+      const reason = text(body.reason, 3, 1000);
+      const decision =
+        body.decision === "approve"
+          ? "approved"
+          : body.decision === "decline"
+            ? "declined"
+            : undefined;
+      const value = amount(body.amountZat);
+      if (!id || !reason || !decision || (decision === "approved" && !value))
+        return json(
+          { error: "Enter a decision, reason and approval amount." },
+          400,
+        );
+      return json(
+        await decideCustomerRefund(
+          store,
+          core,
+          merchant,
+          id,
+          decision,
+          reason,
+          value,
+          wallet(120000),
+        ),
+      );
+    }
     if (route === "logout" && isPost) {
       store.logout(request);
       return json({ ok: true }, 200, { "Set-Cookie": accountHeader("") });
@@ -217,9 +319,29 @@ async function handle(request: Request) {
     if (route === "refund" && isPost) {
       const id = text(body.id, 36, 36);
       const value = amount(body.amountZat);
-      if (!id || !value) return json({ error: "Invalid refund" }, 400);
+      const instructionId = text(body.instructionId, 36, 36);
+      if (
+        !id ||
+        !value ||
+        !instructionId ||
+        !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(
+          instructionId,
+        )
+      )
+        return json(
+          { error: "Refresh and review a new refund instruction." },
+          400,
+        );
       return json(
-        await refundPayment(store, core, merchant, id, value, wallet(120000)),
+        await refundPayment(
+          store,
+          core,
+          merchant,
+          id,
+          value,
+          wallet(120000),
+          instructionId,
+        ),
       );
     }
     return json({ error: "Not found" }, 404);

@@ -54,6 +54,12 @@ export default function Checkout() {
               {zec(r.paymentAmountZat)} <span>ZEC</span>
             </div>
           )}
+          {r?.refundPolicy && (
+            <div className="refund-policy">
+              <h3>Store refund policy</h3>
+              <p className="preserve-lines">{r.refundPolicy}</p>
+            </div>
+          )}
           <div className="checkout-assurance">
             <strong>A private route back.</strong>
             <p>

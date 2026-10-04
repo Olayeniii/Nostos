@@ -105,14 +105,28 @@ export async function reconcile(
   observed?: ShieldedNote[],
 ) {
   const merchant = store.merchant(checkout.merchantId)!;
-  // Also finish cleanup after interruption between the two database updates.
-  if (
-    checkout.paymentTxid &&
-    core.findRefundByPayment(checkout.paymentTxid)?.status === "confirmed"
-  ) {
-    core.retireConfirmedRefundRoute(checkout.paymentTxid);
-    store.retireRoute(checkout.id);
-    return;
+  if (checkout.paymentTxid) {
+    for (const r of store.refundRequests(checkout.id)) {
+      if (
+        r.status === "approved" &&
+        core.findRefundByKey(`refund_${r.id}`)?.status === "confirmed"
+      )
+        store.settleRefundRequest(r.id);
+    }
+    const totals = core.refundTotals(checkout.paymentTxid);
+    if (!totals.inProgress && totals.refundedZat >= checkout.amountZat) {
+      core.retireConfirmedRefundRoute(checkout.paymentTxid);
+      store.retireRoute(checkout.id);
+      return;
+    }
+    if (
+      refundWindowExpired(checkout) &&
+      !totals.inProgress &&
+      !hasOpenRequest(store, checkout.id)
+    ) {
+      retireExpiredCheckout(store, core, checkout.id);
+      return;
+    }
   }
   if (!checkout.route || !merchant.destination) return;
   await orchardRefundReceiver(checkout.route, rpc);
@@ -155,24 +169,44 @@ export async function reconcile(
     });
     store.recordPayment(checkout.id, txid);
     store.paid(checkout.id);
-    const refund = core.findRefundByPayment(txid);
-    if (refund?.status === "broadcast" && refund.txid) {
+    for (const refund of core.listRefundsByPayment(txid)) {
+      if (refund.status !== "broadcast" || !refund.txid) continue;
       const transaction = await rpc.viewTransaction(refund.txid);
+      const outputs = await Promise.all(
+        transaction.outputs.map(
+          async (n) =>
+            n.outgoing === true &&
+            n.valueZat === refund.amountZat &&
+            ["orchard", "ironwood"].includes(n.pool ?? "") &&
+            (await sameOrchardReceiver(n.address, checkout.route, rpc)),
+        ),
+      );
       if (
         transaction.txid === refund.txid &&
         transaction.confirmations > 0 &&
-        transaction.outputs.some(
-          (n) =>
-            n.outgoing === true &&
-            n.address === checkout.route &&
-            n.valueZat === refund.amountZat &&
-            ["orchard", "sapling", "ironwood"].includes(n.pool ?? ""),
-        )
+        outputs.some(Boolean)
       ) {
-        core.confirmRefund(txid);
-        core.retireConfirmedRefundRoute(txid);
-        store.retireRoute(checkout.id);
+        core.confirmRefund(txid, refund.id);
       }
+    }
+    for (const request of store.refundRequests(checkout.id)) {
+      if (
+        request.status === "approved" &&
+        core.findRefundByKey(`refund_${request.id}`)?.status === "confirmed"
+      )
+        store.settleRefundRequest(request.id);
+    }
+    if (
+      !core.refundTotals(txid).inProgress &&
+      core.retireConfirmedRefundRoute(txid)
+    )
+      store.retireRoute(checkout.id);
+    else if (
+      refundWindowExpired(checkout) &&
+      !core.refundTotals(txid).inProgress &&
+      !hasOpenRequest(store, checkout.id)
+    ) {
+      retireExpiredCheckout(store, core, checkout.id);
     }
   }
 }
@@ -186,7 +220,23 @@ export function checkoutView(
   const payment = checkout.paymentTxid
     ? core.findByTxid(checkout.paymentTxid)
     : undefined;
-  const refund = payment ? core.findRefundByPayment(payment.id) : undefined;
+  const refunds = payment ? core.listRefundsByPayment(payment.id) : [];
+  const refund = refunds.at(-1);
+  const totals = payment
+    ? core.refundTotals(payment.id)
+    : { refundedZat: 0, reservedZat: 0, inProgress: false };
+  const remaining =
+    checkout.amountZat - totals.refundedZat - totals.reservedZat;
+  const requests = store.refundRequests(checkout.id);
+  const openRequest = requests.some((r) =>
+    ["requested", "approved"].includes(r.status),
+  );
+  const eligible =
+    !!payment &&
+    !!checkout.route &&
+    payment.status === "confirmed" &&
+    !totals.inProgress &&
+    remaining > 0;
   return {
     id: checkout.id,
     merchantName: merchant.name,
@@ -197,12 +247,50 @@ export function checkoutView(
     paymentStatus: checkout.status,
     createdAt: checkout.createdAt,
     paidAt: checkout.paidAt,
-    refundAmountZat: refund?.amountZat ?? 0,
+    refundAmountZat: totals.refundedZat + totals.reservedZat,
+    confirmedRefundAmountZat: totals.refundedZat,
+    pendingRefundAmountZat: totals.reservedZat,
+    remainingAmountZat: remaining,
+    refunds: refunds.map((r) => ({
+      id: r.id,
+      amountZat: r.amountZat,
+      status: r.status,
+      txid: r.txid,
+    })),
+    refundRequests: requests.map((r) => ({
+      id: r.id,
+      amountZat: r.amountZat,
+      reason: r.reason,
+      status: r.status,
+      decisionReason: r.decisionReason,
+      approvedZat: r.approvedZat,
+      createdAt: r.createdAt,
+      decidedAt: r.decidedAt,
+    })),
+    canRequestRefund:
+      eligible && !openRequest && !refundWindowExpired(checkout),
+    canRecoverRoute:
+      merchantView &&
+      !!payment &&
+      !checkout.route &&
+      !checkout.routeClosedReason &&
+      !totals.inProgress &&
+      remaining > 0 &&
+      !refundWindowExpired(checkout),
+    refundPolicy: checkout.refundPolicy,
+    refundExpiresAt: checkout.refundExpiresAt,
+    routeClosedReason: checkout.routeClosedReason,
     status: refund?.status ?? "no_refund",
     refundTxid: refund?.txid,
     paymentTxid: checkout.paymentTxid,
     ...(merchantView && payment
-      ? { payment: paymentView(payment, refund) }
+      ? {
+          payment: {
+            ...paymentView(payment, refund, refunds),
+            canRefund:
+              eligible && !openRequest && !refundWindowExpired(checkout),
+          },
+        }
       : {}),
   };
 }
@@ -274,6 +362,8 @@ export async function refundPayment(
   id: string,
   amountZat: number,
   rpc: ProductWallet,
+  instructionId?: string,
+  requestId?: string,
 ) {
   const checkout = store.checkout(id);
   if (!checkout || checkout.merchantId !== merchant.id || !checkout.paymentTxid)
@@ -286,8 +376,197 @@ export async function refundPayment(
     payment.amountZat !== checkout.amountZat
   )
     throw new Error("Payment authorization rejected");
+  if (
+    !requestId &&
+    (hasOpenRequest(store, id) || refundWindowExpired(checkout))
+  )
+    throw new Error("Review the open request or refund window before sending.");
+  if (requestId && store.refundRequest(requestId)?.status !== "approved")
+    throw new Error("Merchant approval is required.");
   return submitRefund(
-    { paymentTxid: payment.paymentTxId, amountZat },
-    { store: core, broadcaster: rpc, merchantAccountUuid: merchant.wallet },
+    {
+      paymentTxid: payment.paymentTxId,
+      amountZat,
+      ...(instructionId ? { idempotencyKey: `refund_${instructionId}` } : {}),
+    },
+    {
+      store: core,
+      broadcaster: rpc,
+      merchantAccountUuid: merchant.wallet,
+      // Receiver validation awaits RPC. Recheck local authorization immediately
+      // before the atomic reservation so an overlapping request cannot be bypassed.
+      authorizeBeforePrepare: () => {
+        if (
+          !requestId &&
+          (hasOpenRequest(store, id) ||
+            refundWindowExpired(store.checkout(id)!))
+        )
+          throw new Error(
+            "Review the open request or refund window before sending.",
+          );
+        if (requestId) {
+          const approved = store.refundRequest(requestId);
+          if (
+            approved?.checkoutId !== id ||
+            approved.status !== "approved" ||
+            approved.approvedZat !== amountZat
+          )
+            throw new Error("Merchant approval is required.");
+        }
+      },
+    },
   );
+}
+
+export function refundWindowExpired(checkout: Checkout) {
+  return (
+    !!checkout.refundExpiresAt &&
+    Date.parse(checkout.refundExpiresAt) <= Date.now()
+  );
+}
+function hasOpenRequest(store: ProductStore, id: string) {
+  return store
+    .refundRequests(id)
+    .some((r) => ["requested", "approved"].includes(r.status));
+}
+export function requestCustomerRefund(
+  store: ProductStore,
+  core: SqlitePaymentStore,
+  checkout: Checkout,
+  id: string,
+  amountZat: number,
+  reason: string,
+) {
+  const repeated = store.refundRequest(id);
+  if (repeated) {
+    if (
+      repeated.checkoutId !== checkout.id ||
+      repeated.amountZat !== amountZat ||
+      repeated.reason !== reason.trim()
+    )
+      throw new Error("Refund request key conflict.");
+    return repeated;
+  }
+  if (
+    !checkoutView(store, core, checkout).canRequestRefund ||
+    amountZat > checkoutView(store, core, checkout).remainingAmountZat
+  )
+    throw new Error("Payment is not available for this refund request.");
+  return store.createRefundRequest(checkout.id, id, amountZat, reason);
+}
+export async function decideCustomerRefund(
+  store: ProductStore,
+  core: SqlitePaymentStore,
+  merchant: Merchant,
+  requestId: string,
+  decision: "approved" | "declined",
+  reason: string,
+  amountZat: number | undefined,
+  rpc: ProductWallet,
+) {
+  const request = store.refundRequest(requestId);
+  const checkout = request ? store.checkout(request.checkoutId) : undefined;
+  if (!request || !checkout || checkout.merchantId !== merchant.id)
+    throw new Error("Refund request unavailable.");
+  if (decision === "declined")
+    return store.decideRefundRequest(requestId, decision, reason);
+  if (!checkout.route || !checkout.paymentTxid || !amountZat)
+    throw new Error("Refund capability unavailable.");
+  const existing = core.findRefundByKey(`refund_${request.id}`);
+  const totals = core.refundTotals(checkout.paymentTxid);
+  if (
+    !existing &&
+    (totals.inProgress || amountZat > checkout.amountZat - totals.refundedZat)
+  )
+    throw new Error(
+      "Refund exceeds available value or another send needs reconciliation.",
+    );
+  if (existing && existing.amountZat !== amountZat)
+    throw new Error("Refund amount is already fixed.");
+  await orchardRefundReceiver(checkout.route, rpc);
+  store.decideRefundRequest(requestId, "approved", reason, amountZat);
+  return refundPayment(
+    store,
+    core,
+    merchant,
+    checkout.id,
+    amountZat,
+    rpc,
+    requestId,
+    requestId,
+  );
+}
+export async function recoverOriginalRefundRoute(
+  store: ProductStore,
+  core: SqlitePaymentStore,
+  merchant: Merchant,
+  id: string,
+  rpc: ProductWallet,
+) {
+  const c = store.checkout(id);
+  if (
+    !c ||
+    c.merchantId !== merchant.id ||
+    !c.paymentTxid ||
+    !checkoutView(store, core, c, true).canRecoverRoute
+  )
+    throw new Error("Refund capability cannot be restored.");
+  const tx = await rpc.viewTransaction(c.paymentTxid);
+  if (tx.txid !== c.paymentTxid || tx.confirmations < 1)
+    throw new Error("Payment evidence unavailable.");
+  const routes: string[] = [];
+  for (const n of tx.outputs) {
+    if (
+      n.outgoing !== false ||
+      n.valueZat !== c.amountZat ||
+      !["orchard", "sapling", "ironwood"].includes(n.pool ?? "") ||
+      !(await sameOrchardReceiver(n.address, merchant.destination, rpc))
+    )
+      continue;
+    try {
+      const memo = decodeMemo(n);
+      if (memo.o !== c.order || !store.routeFingerprintMatches(c.id, memo.r))
+        continue;
+      await orchardRefundReceiver(memo.r, rpc);
+      routes.push(memo.r);
+    } catch {
+      continue;
+    }
+  }
+  if (routes.length !== 1)
+    throw new Error("Original return route is not uniquely proven.");
+  // Core first; an interruption leaves recovery available through the same fingerprint check.
+  core.restorePartialRefundRoute(c.paymentTxid, routes[0]!);
+  store.restoreRoute(c.id, routes[0]!);
+  return { ok: true };
+}
+
+export function retireExpiredCheckout(
+  store: ProductStore,
+  core: SqlitePaymentStore,
+  id: string,
+  now = Date.now(),
+) {
+  store.db.exec("BEGIN IMMEDIATE");
+  try {
+    const checkout = store.checkout(id);
+    if (
+      !checkout?.route ||
+      !checkout.paymentTxid ||
+      !checkout.refundExpiresAt ||
+      Date.parse(checkout.refundExpiresAt) > now ||
+      hasOpenRequest(store, id) ||
+      core.refundTotals(checkout.paymentTxid).inProgress
+    ) {
+      store.db.exec("COMMIT");
+      return false;
+    }
+    core.expireRefundRoute(checkout.paymentTxid);
+    store.retireRoute(id, "expired");
+    store.db.exec("COMMIT");
+    return true;
+  } catch (error) {
+    store.db.exec("ROLLBACK");
+    throw error;
+  }
 }
