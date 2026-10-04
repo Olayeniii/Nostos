@@ -3,7 +3,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader, AppFooter } from "./shell.js";
 import { requestJson } from "./requests.js";
-export function AccountHelp({ link = false }: { link?: boolean }) {
+export function AccountHelp({
+  link = false,
+  reset = false,
+}: {
+  link?: boolean;
+  reset?: boolean;
+}) {
   const [token, setToken] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -17,11 +23,19 @@ export function AccountHelp({ link = false }: { link?: boolean }) {
     <main className="product-app">
       <AppHeader />
       <section className="account-card account-help">
-        <h1>{link ? "Confirm your email" : "Account access"}</h1>
+        <h1>
+          {link
+            ? "Set your password"
+            : reset
+              ? "Reset your password"
+              : "Verify your email"}
+        </h1>
         <p>
           {link
-            ? "Choose your password to finish this account change. Existing sessions will be signed out."
-            : "Request a verification email or recover access using your verified email."}
+            ? "Choose a password to finish. This link confirms your email and signs you in."
+            : reset
+              ? "Enter your verified merchant email. We will send a password reset link."
+              : "Enter your merchant email. We will send a new verification link."}
         </p>
         <form
           onSubmit={async (e) => {
@@ -35,7 +49,7 @@ export function AccountHelp({ link = false }: { link?: boolean }) {
                 message?: string;
                 ready?: boolean;
               }>(
-                `/api/product/${link ? "account-link" : data.get("purpose")}`,
+                `/api/product/${link ? "account-link" : reset ? "recover-password" : "resend-verification"}`,
                 {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -87,25 +101,31 @@ export function AccountHelp({ link = false }: { link?: boolean }) {
                   disabled={busy}
                 />
               </label>
-              <label>
-                Request
-                <select name="purpose" disabled={busy}>
-                  <option value="resend-verification">Verify email</option>
-                  <option value="recover-password">Reset password</option>
-                </select>
-              </label>
             </>
           )}
           <button className="primary" disabled={busy || (link && !token)}>
-            {busy ? "Checking" : "Continue"}
+            {busy
+              ? "Please wait"
+              : link
+                ? "Set password and sign in"
+                : reset
+                  ? "Send reset link"
+                  : "Send verification email"}
           </button>
           {message && <p role="status">{message}</p>}
         </form>
         <p>
           <Link href={link ? "/account-help" : "/sign-in"}>
-            {link ? "Request a new email" : "Back to sign in"}
+            {link ? "Resend verification email" : "Back to sign in"}
           </Link>
         </p>
+        {link && (
+          <p>
+            <Link href="/account-help?purpose=reset">
+              Request a new password reset link
+            </Link>
+          </p>
+        )}
       </section>
       <AppFooter />
     </main>

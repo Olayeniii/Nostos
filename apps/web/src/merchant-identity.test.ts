@@ -50,7 +50,7 @@ afterEach(() => {
 });
 describe("merchant email ownership", () => {
   it("registration sends only a verification link, grants no session and blocks all merchant operations", async () => {
-    const r = await POST(req("signup", { email: "new@example.com", password }));
+    const r = await POST(req("signup", { email: "new@example.com" }));
     expect(r.status).toBe(200);
     expect(r.headers.get("set-cookie")).toBeNull();
     const m = store.db.prepare("SELECT id FROM merchants").get()!;
@@ -74,7 +74,7 @@ describe("merchant email ownership", () => {
     );
     expect(
       (await POST(req("login", { email: "new@example.com", password }))).status,
-    ).toBe(403);
+    ).toBe(401);
     const token = mailToken();
     expect(
       JSON.stringify(store.db.prepare("SELECT * FROM identity_tokens").get()),

@@ -30,7 +30,7 @@ sudo python3 scripts/web/configure-email.py
 sudo systemctl start --no-block nostos-auto-deploy.service
 ```
 
-The timer will run the isolated deployment when the active service finishes. Configuring mail explicitly releases a failed deployment hold for one retry. The setup prompts for the key without echoing it and writes root-only `~/nostos/email.env` outside Git. The deploy helper reads it privately and fails before building/switching if mail settings are absent. The build container receives none of these secrets. Configuration presence is not mail-delivery proof: test a real registration email after deployment. Existing merchants use **Verify email or reset password**, select verification, and finish the emailed link to regain merchant access. Stored payments/wallet accounts are retained.
+The timer will run the isolated deployment when the active service finishes. Configuring mail explicitly releases a failed deployment hold for one retry. The setup prompts for the key without echoing it and writes root-only `~/nostos/email.env` outside Git. The deploy helper reads it privately and fails before building/switching if mail settings are absent. The build container receives none of these secrets. Configuration presence is not mail-delivery proof: test a real registration email after deployment. Existing merchants use **Resend verification email** on sign-in and finish the emailed link to regain merchant access. New signup collects email only, shows an inbox screen with resend, then asks for a password once after the email link is opened. Password recovery has a separate **Forgot password?** entry on sign-in. Stored payments/wallet accounts are retained.
 
 ## Pay, fulfill, refund
 

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   emailConfigured,
   emailMerchant,
@@ -95,13 +96,14 @@ async function handle(request: Request) {
       if (
         !email ||
         !/^\S+@\S+\.\S+$/.test(email) ||
-        password.length < 12 ||
-        password.length > 128
+        (route === "login" && (password.length < 12 || password.length > 128))
       )
         return json(
           {
             error:
-              "Enter a valid email and a password of 12 to 128 characters.",
+              route === "signup"
+                ? "Enter a valid email."
+                : "Enter a valid email and a password of 12 to 128 characters.",
           },
           400,
         );
@@ -119,7 +121,9 @@ async function handle(request: Request) {
         if (!identityLimit(store, "global", 30) || !identityLimit(store, email))
           return json({ error: "Try again in fifteen minutes." }, 429);
         let merchant = emailMerchant(store, email);
-        if (!merchant) merchant = store.signup(email, password);
+        // No usable password until the email owner completes verification.
+        if (!merchant)
+          merchant = store.signup(email, randomBytes(32).toString("base64url"));
         if (!merchant.emailVerifiedAt) {
           const verification = issueIdentityToken(
             store,
