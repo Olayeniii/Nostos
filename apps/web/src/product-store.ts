@@ -20,6 +20,7 @@ export type Merchant = {
   wallet: string;
   destination: string;
   createdAt: string;
+  emailVerifiedAt: string | null;
   refundPolicy: string;
   refundWindowDays: number | null;
 };
@@ -39,6 +40,7 @@ export type Checkout = {
   refundWindowDays: number | null;
   refundExpiresAt: string | null;
   routeClosedReason: string | null;
+  fulfillment: "pending" | "fulfilled" | "failed";
 };
 export type RefundRequest = {
   id: string;
@@ -107,6 +109,14 @@ export class ProductStore {
       if (!columns.some((c) => c.name === name))
         this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
     };
+    add("merchants", "email_verified_at", "TEXT");
+    add("checkouts", "fulfillment", "TEXT NOT NULL DEFAULT 'pending'");
+    this.db
+      .exec(`CREATE TABLE IF NOT EXISTS identity_tokens(token_hash TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES merchants(id),purpose TEXT NOT NULL,email TEXT NOT NULL,expires_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS identity_limits(bucket TEXT PRIMARY KEY,count INTEGER NOT NULL,expires_at INTEGER NOT NULL);`);
+    this.db
+      .prepare("DELETE FROM identity_tokens WHERE expires_at<=?")
+      .run(Date.now());
     add("merchants", "refund_policy", "TEXT NOT NULL DEFAULT ''");
     add("merchants", "refund_window_days", "INTEGER");
     add("checkouts", "refund_policy", "TEXT NOT NULL DEFAULT ''");
@@ -166,6 +176,7 @@ export class ProductStore {
           : this.decrypt(row.wallet!),
       destination: this.decrypt(row.destination!),
       createdAt: row.created_at!,
+      emailVerifiedAt: row.email_verified_at || null,
       refundPolicy: this.decrypt(row.refund_policy!),
       refundWindowDays:
         row.refund_window_days === null ? null : Number(row.refund_window_days),
@@ -222,7 +233,8 @@ export class ProductStore {
         "SELECT merchant_id FROM account_sessions WHERE token_hash=? AND expires_at>?",
       )
       .get(hash(token), Date.now()) as { merchant_id: string } | undefined;
-    return row ? this.merchant(row.merchant_id) : undefined;
+    const merchant = row ? this.merchant(row.merchant_id) : undefined;
+    return merchant?.emailVerifiedAt ? merchant : undefined;
   }
   logout(request: Request) {
     this.db
@@ -261,6 +273,9 @@ export class ProductStore {
   fromCheckout(row: Record<string, unknown>): Checkout {
     return {
       id: String(row.id),
+      fulfillment: String(
+        row.fulfillment ?? "pending",
+      ) as Checkout["fulfillment"],
       merchantId: String(row.merchant_id),
       description: this.decrypt(String(row.description)),
       order: this.decrypt(String(row.order_ref)),

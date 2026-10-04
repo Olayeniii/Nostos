@@ -15,9 +15,9 @@ export default function Home() {
               <span>A way back.</span>
             </h1>
             <p className="lede">
-              Accept shielded Zcash payments. When a refund is due, use the
-              route supplied with the original payment. No second address
-              request.
+              Pay privately. The merchant fulfills your order. If something goes
+              wrong, refund privately using the route supplied with the original
+              payment.
             </p>
             <div className="home-actions">
               <Link className="primary" href="/sign-up">
@@ -31,7 +31,7 @@ export default function Home() {
           <aside className="home-route-card" aria-label="How a refund returns">
             <div className="route-card-head">
               <Mark />
-              <span>PAYMENT TO RETURN</span>
+              <span>PAY, FULFILL, REFUND</span>
             </div>
             <div className="route-card-step">
               <span className="route-dot" />
@@ -45,7 +45,7 @@ export default function Home() {
               <span className="route-dot" />
               <div>
                 <small>Merchant</small>
-                <h2>Refund when needed.</h2>
+                <h2>Fulfill. Refund if needed.</h2>
                 <p>Approve a request. Send to the supplied route.</p>
               </div>
             </div>

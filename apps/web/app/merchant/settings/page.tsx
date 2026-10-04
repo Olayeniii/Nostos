@@ -1,4 +1,5 @@
 "use client";
+import { ChangeEmail } from "../../../src/change-email.js";
 import { useState } from "react";
 import { requestJson } from "../../../src/requests.js";
 import Link from "next/link";
@@ -42,6 +43,7 @@ export default function Settings() {
       {loading && <StateLabel state="loading" text="Checking your store" />}
       {data && (
         <section className="settings-grid">
+          <ChangeEmail />
           <article className="panel">
             <h2>Merchant profile</h2>
             <dl>

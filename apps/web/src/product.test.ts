@@ -57,6 +57,9 @@ afterEach(() => {
 });
 function merchant(email = "one@example.com") {
   const m = store.signup(email, "long-password-for-tests");
+  store.db
+    .prepare("UPDATE merchants SET email_verified_at=? WHERE id=?")
+    .run(new Date().toISOString(), m.id);
   store.finishSetup(m.id, "One Store", "wallet-uuid", destination);
   return store.merchant(m.id)!;
 }

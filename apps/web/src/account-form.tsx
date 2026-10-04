@@ -6,6 +6,7 @@ import { StateLabel } from "./status-label.js";
 import { requestJson } from "./requests.js";
 export function AccountForm({ signup = false }: { signup?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   return (
     <main className="product-app">
@@ -49,7 +50,13 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
                 },
                 15000,
               );
-              window.location.assign(result.ready ? "/merchant" : "/setup");
+              if (signup) {
+                setMessage(
+                  "If verification is needed, an email has been sent. Open it to choose your password and activate merchant access.",
+                );
+                setBusy(false);
+              } else
+                window.location.assign(result.ready ? "/merchant" : "/setup");
             } catch {
               setError(
                 signup
@@ -90,9 +97,13 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
             />
           </label>
           <small>
-            Use at least 12 characters. Save your password; password recovery is
-            not available yet.
+            Use at least 12 characters. Merchant access requires a verified
+            email.
           </small>
+          {message && <p role="status">{message}</p>}
+          <p>
+            <Link href="/account-help">Verify email or reset password</Link>
+          </p>
           {error && (
             <p className="warning" role="alert">
               {error}

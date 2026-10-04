@@ -245,6 +245,7 @@ export function checkoutView(
     paymentAmountZat: checkout.amountZat,
     paymentConfirmations: payment?.confirmations ?? 0,
     paymentStatus: checkout.status,
+    fulfillment: checkout.fulfillment,
     createdAt: checkout.createdAt,
     paidAt: checkout.paidAt,
     refundAmountZat: totals.refundedZat + totals.reservedZat,

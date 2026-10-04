@@ -1,3 +1,12 @@
+import {
+  emailConfigured,
+  emailMerchant,
+  identityLimit,
+  issueIdentityToken,
+  consumeIdentityToken,
+  deliverIdentityEmail,
+  reauthenticated,
+} from "../../../../src/merchant-identity.js";
 import { ProductStore, accountHeader } from "../../../../src/product-store.js";
 import { trustedOrigin } from "../../../../src/origin.js";
 import {
@@ -104,24 +113,102 @@ async function handle(request: Request) {
         );
       if (route === "signup" && !limit("signup", 10))
         return json({ error: "Account creation is temporarily limited." }, 429);
-      let merchant;
-      try {
-        merchant =
-          route === "signup"
-            ? store.signup(email, password)
-            : store.login(email, password);
-      } catch {
-        return json(
-          { error: "Could not create this account. Try signing in." },
-          409,
-        );
+      if (route === "signup") {
+        if (!emailConfigured())
+          return json({ error: "Account email delivery is unavailable." }, 503);
+        if (!identityLimit(store, "global", 30) || !identityLimit(store, email))
+          return json({ error: "Try again in fifteen minutes." }, 429);
+        let merchant = emailMerchant(store, email);
+        if (!merchant) merchant = store.signup(email, password);
+        if (!merchant.emailVerifiedAt) {
+          const verification = issueIdentityToken(
+            store,
+            merchant.id,
+            "verify",
+            email,
+          );
+          try {
+            await deliverIdentityEmail(email, verification, "verify");
+          } catch {
+            return json(
+              { error: "Account email delivery is unavailable." },
+              503,
+            );
+          }
+        }
+        return json({
+          message:
+            "If verification is needed, an email has been sent. Check your inbox.",
+        });
       }
+      const merchant = store.login(email, password);
       if (!merchant)
         return json({ error: "Email or password is incorrect." }, 401);
+      if (!merchant.emailVerifiedAt)
+        return json(
+          {
+            error: "Verify your email before signing in.",
+            verificationRequired: true,
+          },
+          403,
+        );
       return json({ ready: Boolean(merchant.destination) }, 200, {
         "Set-Cookie": accountHeader(store.session(merchant.id)),
       });
     }
+    if (
+      isPost &&
+      ["resend-verification", "recover-password"].includes(route ?? "")
+    ) {
+      const email = text(body.email, 3, 254)?.toLowerCase();
+      if (!email || !/^\S+@\S+\.\S+$/.test(email))
+        return json({ error: "Enter a valid email." }, 400);
+      if (!emailConfigured())
+        return json({ error: "Account email delivery is unavailable." }, 503);
+      if (!identityLimit(store, "global", 30) || !identityLimit(store, email))
+        return json({ error: "Try again in fifteen minutes." }, 429);
+      const merchant = emailMerchant(store, email);
+      const purpose = route === "recover-password" ? "reset" : "verify";
+      if (
+        merchant &&
+        (purpose === "reset"
+          ? !!merchant.emailVerifiedAt
+          : !merchant.emailVerifiedAt)
+      ) {
+        const token = issueIdentityToken(store, merchant.id, purpose, email);
+        try {
+          await deliverIdentityEmail(email, token, purpose);
+        } catch {
+          return json({ error: "Account email delivery is unavailable." }, 503);
+        }
+      }
+      return json({
+        message: "If this account is eligible, an email has been sent.",
+      });
+    }
+    if (isPost && route === "account-link") {
+      if (!identityLimit(store, "consume", 60))
+        return json({ error: "Try again later." }, 429);
+      try {
+        const merchant = consumeIdentityToken(
+          store,
+          String(body.token ?? ""),
+          String(body.password ?? ""),
+        );
+        return json({ ready: Boolean(merchant.destination) }, 200, {
+          "Set-Cookie": accountHeader(store.session(merchant.id)),
+        });
+      } catch {
+        return json(
+          {
+            error:
+              "This link expired, was used, or is unavailable. Request another email.",
+          },
+          400,
+        );
+      }
+    }
+
     if (
       route === "checkout" ||
       route === "prepare" ||
@@ -181,11 +268,62 @@ async function handle(request: Request) {
     }
     const merchant = store.authenticate(request);
     if (!merchant) return json({ error: "Sign in required" }, 401);
+    if (route === "change-email" && isPost) {
+      const email = text(body.email, 3, 254)?.toLowerCase();
+      const password = typeof body.password === "string" ? body.password : "";
+      if (
+        !email ||
+        !/^\S+@\S+\.\S+$/.test(email) ||
+        password.length > 128 ||
+        !reauthenticated(store, merchant.id, password)
+      )
+        return json(
+          { error: "Check the new email and current password." },
+          400,
+        );
+      if (!emailConfigured())
+        return json({ error: "Account email delivery is unavailable." }, 503);
+      if (
+        !identityLimit(store, "global", 30) ||
+        !identityLimit(store, merchant.id + ":email")
+      )
+        return json({ error: "Try again in fifteen minutes." }, 429);
+      if (!emailMerchant(store, email)) {
+        const token = issueIdentityToken(store, merchant.id, "email", email);
+        try {
+          await deliverIdentityEmail(email, token, "email");
+        } catch {
+          return json({ error: "Account email delivery is unavailable." }, 503);
+        }
+      }
+      return json({
+        message:
+          "If the new email is available, a verification link has been sent. Your current email remains active until verification.",
+      });
+    }
+    if (route === "fulfillment" && isPost) {
+      const checkout = store.checkout(String(body.id ?? ""));
+      if (
+        !checkout ||
+        checkout.merchantId !== merchant.id ||
+        checkout.status !== "confirmed" ||
+        !["pending", "fulfilled", "failed"].includes(String(body.state))
+      )
+        return json(
+          { error: "Confirmed payment and valid fulfillment state required." },
+          400,
+        );
+      store.db
+        .prepare("UPDATE checkouts SET fulfillment=? WHERE id=?")
+        .run(String(body.state), checkout.id);
+      return json({ ok: true });
+    }
     if (route === "me" && !isPost)
       return json({
         merchant: {
           name: merchant.name,
           email: merchant.email,
+          emailVerified: true,
           ready: Boolean(merchant.destination),
           setupPending: merchant.wallet === "provisioning",
           refundPolicy: merchant.refundPolicy,

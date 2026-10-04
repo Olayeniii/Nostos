@@ -310,9 +310,12 @@ export default function Merchant() {
           </div>
           {loading && <StateLabel state="loading" text="Checking payments" />}
           <div className="ledger-columns" aria-hidden="true">
-            <span>Payment</span>
+            <span>Order</span>
             <span>Amount</span>
-            <span>Status</span>
+            <span>Payment</span>
+            <span>Fulfillment</span>
+            <span>Refund</span>
+            <span>Date</span>
           </div>
           {records.length === 0 && !loading ? (
             <div className="empty-state">
@@ -344,7 +347,6 @@ export default function Merchant() {
               >
                 <span>
                   <strong>{r.description || r.orderReference}</strong>
-                  <small>{date(r.createdAt)}</small>
                 </span>
                 <span className="ledger-amount">
                   {zec(r.paymentAmountZat)} <small>ZEC</small>
@@ -352,8 +354,15 @@ export default function Merchant() {
                 <span
                   className={`status-chip ${r.paymentStatus === "confirmed" ? "success" : ""}`}
                 >
-                  {status(r)}
+                  {r.paymentStatus}
                 </span>
+                <span className="status-chip">
+                  {r.fulfillment ?? "pending"}
+                </span>
+                <span className="status-chip">
+                  {r.refundAmountZat > 0 ? status(r) : "No refund"}
+                </span>
+                <span className="ledger-date">{date(r.createdAt)}</span>
               </button>
             ))
           )}
@@ -409,6 +418,44 @@ export default function Merchant() {
                 <dd>{date(current.createdAt)}</dd>
               </div>
             </dl>
+            {current.paymentStatus === "confirmed" && (
+              <section className="fulfillment-panel">
+                <h3>Fulfillment</h3>
+                <p>
+                  Merchant-reported state: {current.fulfillment ?? "pending"}. A
+                  failed fulfillment does not send a refund automatically.
+                </p>
+                <div className="home-actions">
+                  {(["pending", "fulfilled", "failed"] as const).map(
+                    (state) => (
+                      <button
+                        key={state}
+                        className="secondary"
+                        disabled={!safe || current.fulfillment === state}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await post("fulfillment", {
+                              id: current.id,
+                              state,
+                            });
+                            void refresh();
+                          } catch {
+                            setError(
+                              "Could not confirm fulfillment update. Refresh before trying again.",
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Mark {state}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </section>
+            )}
             {current.canRecoverRoute && (
               <div className="info-panel">
                 <h3>Restore remaining refund capability</h3>
@@ -448,6 +495,21 @@ export default function Merchant() {
                 onRefresh={() => void refresh()}
               />
             ))}
+            {current.payment?.canRefund && (
+              <p>
+                NOSTOS uses the refund route supplied with this payment. No
+                customer address is needed.{" "}
+                <button
+                  className="text-button"
+                  disabled={!safe}
+                  onClick={() =>
+                    setDraft(String(current.payment!.availableZat / 1e8))
+                  }
+                >
+                  Use full remaining amount
+                </button>
+              </p>
+            )}
             {current.payment?.canRefund ? (
               <form
                 onSubmit={(e) => {
@@ -471,7 +533,7 @@ export default function Merchant() {
                 }}
               >
                 <label>
-                  Refund amount in ZEC
+                  Full or partial refund in ZEC
                   <input
                     type="text"
                     inputMode="decimal"

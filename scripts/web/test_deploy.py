@@ -20,7 +20,7 @@ class DeployTests(unittest.TestCase):
 
     def base(self, repo):
         return {'Config': {'Image': 'node:24-bookworm-slim', 'User': '1001:1001',
-                           'Env': ['NOSTOS_WEB_TRUSTED_ORIGINS=https://nostos.iyforge.xyz',
+                           'Env': ['NOSTOS_EMAIL_API_KEY=placeholder', 'NOSTOS_EMAIL_FROM=accounts@example.com', 'NOSTOS_WEB_TRUSTED_ORIGINS=https://nostos.iyforge.xyz',
                                    'NOSTOS_WEB_TOKEN=private-placeholder',
                                    'NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE=/wallet/merchant/.cookie'],
                            'Cmd': ['old-command'], 'WorkingDir': '/app'},
@@ -44,6 +44,18 @@ class DeployTests(unittest.TestCase):
             self.assertIn(str(Path(root)/'release')+':/app:ro', result['HostConfig']['Binds'])
             self.assertEqual(result['Cmd'][-1], '3001')
             self.assertEqual(result['User'], '1001:1001')
+
+    def test_missing_mail_holds_release_before_any_mutation(self):
+        with tempfile.TemporaryDirectory() as root:
+            repo = Path(root)/'repo'
+            (repo/'scripts/web').mkdir(parents=True)
+            base = self.base(repo)
+            base['Config']['Env'] = [entry for entry in base['Config']['Env'] if not entry.startswith('NOSTOS_EMAIL_')]
+            with patch.object(deploy, '__file__', str(repo/'scripts/web/deploy.py')), patch.object(deploy, 'docker', return_value=base) as docker:
+                with self.assertRaisesRegex(RuntimeError, 'operator mail configuration'):
+                    deploy.run()
+            self.assertEqual(docker.call_count,1)
+            self.assertFalse((Path(root)/'releases').exists())
 
     def test_failed_final_health_restores_previous_container(self):
         with tempfile.TemporaryDirectory() as root:

@@ -96,6 +96,19 @@ def run():
     base = docker('GET', '/containers/nostos-web/json')
     if base['HostConfig']['NetworkMode'] != 'host':
         raise RuntimeError('Expected host network; original left running.')
+    # Fail before building or switching when verification email is unavailable.
+    email_env = dict(v.split('=', 1) for v in base['Config']['Env'] if '=' in v)
+    email_file = repo.parent / 'email.env'
+    if email_file.exists():
+        mode = email_file.stat()
+        if mode.st_uid != 0 or mode.st_mode & 0o077:
+            raise RuntimeError('Mail configuration must be root-owned with mode 600. Original left running.')
+        for line in email_file.read_text().splitlines():
+            key, separator, value = line.partition('=')
+            if separator and key in ('NOSTOS_EMAIL_API_KEY', 'NOSTOS_EMAIL_FROM'):
+                email_env[key] = value
+    if not email_env.get('NOSTOS_EMAIL_API_KEY') or not email_env.get('NOSTOS_EMAIL_FROM'):
+        raise RuntimeError('Verified merchant email requires operator mail configuration. Run sudo python3 scripts/web/configure-email.py. Original left running.')
     revision = subprocess.check_output(git_command(repo, 'rev-parse', 'HEAD'), cwd=repo, text=True).strip()
     if not re.fullmatch(r'[a-f0-9]{40}', revision):
         raise RuntimeError('Invalid source revision.')
@@ -129,6 +142,7 @@ def run():
         if state['ExitCode'] != 0:
             raise RuntimeError('Build failed. Original left running. Check: docker logs --tail 40 '+builder)
         env = dict(v.split('=', 1) for v in base['Config']['Env'] if '=' in v)
+        env.update({key: email_env[key] for key in ('NOSTOS_EMAIL_API_KEY', 'NOSTOS_EMAIL_FROM')})
         key_path = root / 'product-data.key'
         saved = key_path.read_text().strip() if key_path.exists() else ''
         existing = env.get('NOSTOS_PRODUCT_DATA_KEY', '')
