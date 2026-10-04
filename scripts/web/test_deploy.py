@@ -13,6 +13,11 @@ spec.loader.exec_module(deploy)
 
 
 class DeployTests(unittest.TestCase):
+    def test_git_trust_is_scoped_to_exact_checkout(self):
+        repo = Path('/home/ubuntu/nostos/repo')
+        self.assertEqual(deploy.git_command(repo, 'archive', 'HEAD'),
+                         ['git', '-c', 'safe.directory=/home/ubuntu/nostos/repo', 'archive', 'HEAD'])
+
     def base(self, repo):
         return {'Config': {'Image': 'node:24-bookworm-slim', 'User': '1001:1001',
                            'Env': ['NOSTOS_WEB_TRUSTED_ORIGINS=https://nostos.iyforge.xyz',

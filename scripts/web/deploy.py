@@ -85,12 +85,18 @@ def start_config(base, release, data, env, port):
     return config
 
 
+def git_command(repo, *arguments):
+    # The operator intentionally deploys this checkout as root. Scope trust to
+    # this exact path for each call, never to all repositories or global config.
+    return ['git', '-c', 'safe.directory='+str(repo.resolve()), *arguments]
+
+
 def run():
     repo = Path(__file__).resolve().parents[2]
     base = docker('GET', '/containers/nostos-web/json')
     if base['HostConfig']['NetworkMode'] != 'host':
         raise RuntimeError('Expected host network; original left running.')
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip()
+    revision = subprocess.check_output(git_command(repo, 'rev-parse', 'HEAD'), cwd=repo, text=True).strip()
     if not re.fullmatch(r'[a-f0-9]{40}', revision):
         raise RuntimeError('Invalid source revision.')
     root = repo.parent
@@ -101,7 +107,7 @@ def run():
         release = root / 'releases' / (revision[:12]+'-'+suffix)
         release.mkdir(parents=True)
         with tempfile.TemporaryFile() as archive:
-            subprocess.run(['git', 'archive', 'HEAD'], cwd=repo, stdout=archive, check=True)
+            subprocess.run(git_command(repo, 'archive', 'HEAD'), cwd=repo, stdout=archive, check=True)
             archive.seek(0)
             with tarfile.open(fileobj=archive) as files:
                 files.extractall(release, filter='data')
