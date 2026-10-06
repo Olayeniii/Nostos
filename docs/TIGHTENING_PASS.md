@@ -57,3 +57,18 @@ The customer checkout uses a single-recipient `zcash:` ZIP 321 URI with an eight
 Noir's current adapter README describes a WalletConnect reference path that is mainnet-only and transparent-funded. That particular path cannot satisfy NOSTOS's shielded testnet invariant. The injected-provider path is described separately; neither description proves mobile ZIP 321 handling. No adapter, wallet connection, transparent fallback or new dependency was added. Automatic mobile handoff remains unresolved pending evidence of the installed wallet's request parsing.
 
 Sources checked October 6, 2026: https://zips.z.cash/zip-0321 and https://github.com/NoirWallet/zcash-wallet-adapter/blob/main/README.md.
+
+## Read-only live refund checkpoint
+
+Inspect the existing Item21 checkout without decoding any sensitive field or contacting a wallet. After this commit is present in the VPS repository, the helper can run on stdin inside the healthy live container without deploying or restarting it:
+
+```bash
+cd ~/nostos/repo
+sudo docker exec -i nostos-web node --input-type=module - 27f5da23-15d3-4c5d-8d1f-3f253872cc5a < scripts/web/inspect-refund-lifecycle.mjs
+```
+
+The helper opens both SQLite databases read-only and reports the actual refund record IDs, transaction IDs, amounts, confirmation state stored by the application, expiry, open-request count and route-presence booleans. It reads no route body, memo, receipt capability, account email, keys or wallet data. It does not migrate, reconcile, send, purge or trigger retention. It reads the additive refund ledger where present, otherwise the legacy single-refund table, and never counts both. Fixed failure output omits SQLite exceptions and configured paths. Each database has its own snapshot; concurrent updates can make the snapshots differ. Recheck an inconsistent result after activity settles.
+
+`retired` proves the current route columns are empty at observation time, not why they became empty. `due` identifies a full-repayment/expiry condition with route material still present, subject to concurrent state. `retained` identifies remaining capability or a retry/open-request safeguard. `retention_config_enabled` reports configuration, not a running or successful timer. Do not purge the live partial-refund fixture to make the check pass. Wallet confirmation counts require separate wallet evidence; refund rows store confirmation state, not a count.
+
+Noir source review: the browser adapter detects `window.noirwallet.zcash`, reports an optional injected extension version and requests `zcash_requestAccounts` separately from `zcash_sendTransaction`. Its configured testnet option does not itself prove the wallet network. A new direct-send path therefore needs the installed extension's network and shielded/memo support established first. No provider request was made and no wallet transaction was initiated during this review.

@@ -36,7 +36,7 @@ The previous release removes a route even after a partial refund. Such records k
 
 For a remaining balance, the authenticated owning merchant can select **Check original payment route**. This action reads the original transaction, requires one matching incoming shielded note, parses the original order and return route, validates Orchard-only capability, and matches the route against the preserved keyed fingerprint. Only that original route can be restored. An explicitly expired or fully repaid record cannot be revived. Recovery itself does not send funds, create a payment or change a transaction. Interrupted recovery can be completed by repeating the same checks.
 
-The known Item21 payment remains the live fixture. No production database, wallet, node or release was changed during implementation. Its receipt confirmation is user-reported; independent receipt of the 0.018 ZEC refund in Noir remains a separate live verification step. Automatic Noir handoff remains unproved and is not fixed by this change.
+The known Item21 payment remains the live fixture. No production database, wallet, node or release was changed during implementation. Its receipt confirmation is user-reported; the customer explicitly confirmed receiving the 0.018 ZEC refund in Noir on October 6, 2026. The screenshot was unavailable to the inspecting workspace; this is customer-reported evidence. Automatic Noir handoff remains unproved and is not fixed by this change.
 
 ## Validation and rollout
 
