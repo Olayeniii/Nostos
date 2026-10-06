@@ -1,6 +1,6 @@
 # Web verification and phone runbook
 
-Continue from main 5bc257b998bc07daab123286c98cb3be7bc0ff33. No wallet, node, scanner, or refund-core changes are needed for this patch.
+Historical verification record. Current product and deployment instructions are linked below.
 
 ## Trusted origins
 
@@ -16,15 +16,18 @@ Refund POST expires after 130 seconds, beyond the wallet adapter's existing 120-
 
 Review and submission use the same exact integer zatoshi amount and payment ID. Decimal input is parsed without floating point multiplication. The send guard rechecks that input still matches the reviewed instruction.
 
-## VPS update
+## Current deployment path
 
-Run in Termius. This preserves the existing web container configuration and credentials. The rebuild uses the same Node image and pnpm version as the previous successful deployment.
+The earlier shared-mount build/restart procedure is superseded. Use the checked
+isolated-release automatic deployment in [AUTO_DEPLOY.md](AUTO_DEPLOY.md).
+Do not restart the healthy web container to load a build. A candidate must pass
+its checks and health probe before traffic switches; the prior release remains
+available for rollback. Do not restart wallets or Zebra.
 
-```bash
-cd ~/nostos/repo && git pull --ff-only origin main && docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e NEXT_TELEMETRY_DISABLED=1 -v "$PWD:/app" -w /app node:24-bookworm-slim sh -c 'npx --yes pnpm@11.25.0 install --frozen-lockfile && npx --yes pnpm@11.25.0 --filter @nostos/web build' && docker restart nostos-web
-```
-
-Do not recreate the wallet services, Zebra, koko-memory, or disk guard. No new token or wallet identity is required. If an existing origin environment override is present, it must include the chosen tunnel origin; defaults apply only when that variable is absent.
+The checks below are historical evidence from the earlier single-payment UI,
+not current acceptance instructions. For the current product review and real
+Item21 evidence, use [DEMO.md](DEMO.md) and
+[TIGHTENING_PASS.md](TIGHTENING_PASS.md).
 
 ## Controlled phone checks before another payment
 

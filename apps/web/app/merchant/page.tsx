@@ -7,6 +7,7 @@ import { StateLabel } from "../../src/status-label.js";
 import { useRecord } from "../../src/use-record.js";
 import { requestJson, parseZec } from "../../src/requests.js";
 import { zec, date, type ReceiptData } from "../../src/receipt-card.js";
+import { paymentSummary } from "../../src/payment-summary.js";
 import { MerchantRefundRequest } from "../../src/merchant-refund-request.js";
 import type { PaymentView } from "../../../api/src/index.js";
 type RecordData = ReceiptData & {
@@ -52,18 +53,7 @@ export default function Merchant() {
   const submitting = useRef(false);
   const records = data?.records ?? [];
   const current = records.find((r) => r.id === selected);
-  const paid = records.filter((r) => r.payment);
-  const received = paid.reduce((a, r) => a + r.paymentAmountZat, 0);
-  const refunded = paid.reduce(
-    (a, r) =>
-      a +
-      (r.confirmedRefundAmountZat ??
-        (r.status === "confirmed" ? r.refundAmountZat : 0)),
-    0,
-  );
-  const refundable = paid
-    .filter((r) => r.payment?.canRefund)
-    .reduce((a, r) => a + (r.payment?.availableZat ?? 0), 0);
+  const summary = paymentSummary(records);
   const safe =
     !warning && !data?.syncWarning && !loading && !busy && !uncertain;
   async function post<T>(action: string, body: unknown) {
@@ -138,32 +128,23 @@ export default function Merchant() {
         <article>
           <span>Received</span>
           <strong>
-            {zec(received)} <small>ZEC</small>
+            {zec(summary.receivedZat)} <small>ZEC</small>
           </strong>
-          <p>{paid.length} confirmed payments</p>
+          <p>{summary.confirmedPayments} confirmed payments</p>
         </article>
         <article>
           <span>Available to refund</span>
           <strong>
-            {zec(refundable)} <small>ZEC</small>
+            {zec(summary.availableZat)} <small>ZEC</small>
           </strong>
-          <p>Payments with no refund instruction</p>
+          <p>Remaining value eligible for refund</p>
         </article>
         <article>
           <span>Refunded</span>
           <strong>
-            {zec(refunded)} <small>ZEC</small>
+            {zec(summary.refundedZat)} <small>ZEC</small>
           </strong>
-          <p>
-            {records.reduce(
-              (sum, r) =>
-                sum +
-                (r.refunds?.filter((f) => f.status === "confirmed").length ??
-                  (r.status === "confirmed" ? 1 : 0)),
-              0,
-            )}{" "}
-            confirmed refunds
-          </p>
+          <p>{summary.confirmedRefunds} confirmed refunds</p>
         </article>
       </section>
       {(warning || data?.syncWarning) && (
@@ -408,9 +389,13 @@ export default function Merchant() {
                 <dd>{zec(current.payment?.availableZat ?? 0)} ZEC</dd>
               </div>
               <div>
-                <dt>Return route</dt>
-                <dd className="mono">
-                  {current.payment?.destination || "Waiting for payment"}
+                <dt>Refund capability</dt>
+                <dd>
+                  {current.payment?.canRefund
+                    ? "Route supplied with this payment"
+                    : current.payment
+                      ? "See refund status below"
+                      : "Waiting for payment"}
                 </dd>
               </div>
               <div>
@@ -559,8 +544,8 @@ export default function Merchant() {
                     <h3>Review private refund</h3>
                     <strong>{zec(review.amountZat)} ZEC</strong>
                     <p>
-                      To {current.payment.destination}. The complete destination
-                      stays inside the trusted service.
+                      To the refund route supplied with this payment. No new
+                      customer address is needed.
                     </p>
                     <button
                       type="button"

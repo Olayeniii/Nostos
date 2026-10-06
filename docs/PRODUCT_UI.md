@@ -1,4 +1,10 @@
-# Product interface and private receipt access
+# Historical product interface and private receipt access
+
+This records an earlier implementation. Its shared-password setup, single-refund
+limit and restart helper are superseded. Do not run the old setup procedure on
+the current deployment. See [TIGHTENING_PASS.md](TIGHTENING_PASS.md) for current
+authentication/refund behavior, [AUTO_DEPLOY.md](AUTO_DEPLOY.md) for deployment,
+and [DEMO.md](DEMO.md) for the current evidence and judge path.
 
 This replaces the shared demo role switch. It does not restart the project or change the shielded payment/refund core.
 
