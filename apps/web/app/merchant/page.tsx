@@ -481,7 +481,7 @@ export default function Merchant() {
               />
             ))}
             {current.payment?.canRefund && (
-              <p>
+              <p className="refund-instructions">
                 NOSTOS uses the refund route supplied with this payment. No
                 customer address is needed.{" "}
                 <button
@@ -528,7 +528,7 @@ export default function Merchant() {
                       setReview(undefined);
                     }}
                     disabled={busy || !!review || uncertain}
-                    placeholder="0.003"
+                    placeholder="Enter refund amount"
                   />
                 </label>
                 {!review && (

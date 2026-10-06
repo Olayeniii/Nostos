@@ -90,3 +90,25 @@ transaction, and confirm the fresh isolated candidate is healthy. Keep public
 landing copy and evidence distinct from claims about deployed code. Final video
 length and submission fields must be checked against the organizer's current
 requirements before publishing; this document does not invent those requirements.
+
+## Subsequent deployment and phone evidence
+
+The operator reported `nostos-web` running release
+`5158586eca56-1791319512`, with local sign-in HTTP 200. This matches the pushed
+`5158586eca561a5f28fdab8083b67baf28053fd3` snapshot at that checkpoint, not any
+later revision. The phone screenshots independently show the updated dashboard
+wording and refund-capability explanation.
+
+The supplied Android screenshots cover merchant totals, Item21 detail,
+fulfillment/refund controls, receipt payment/refund amounts, expanded transaction
+references and the customer refund-request form. In those views amounts are
+readable, references wrap and no horizontal clipping is visible. They establish
+appearance in this phone/browser, not every viewport or successful form
+submission. The original payment is confirmed, 0.018 ZEC is confirmed refunded
+and 0.002 ZEC remains. No return address is displayed in these views.
+
+The follow-up polish replaces the fixed `0.003` refund placeholder with
+“Enter refund amount” and reduces mobile fulfillment/control spacing while
+keeping 44-pixel action targets. This candidate still needs deployed visual
+confirmation. It changes no refund authorization, retry rules, payment state or
+stored route. Real automatic Noir handoff remains unproved.
