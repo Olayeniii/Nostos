@@ -35,6 +35,7 @@ export type ReceiptData = {
   canRecoverRoute?: boolean;
   refundPolicy?: string;
   refundExpiresAt?: string | null;
+  refundWindowDays?: number | null;
   routeClosedReason?: string | null;
 };
 export const zec = (amount: number) =>
@@ -173,6 +174,20 @@ export function ReceiptCard({
               : "The merchant can refund to the route supplied in the shielded memo of this payment if a refund is due."}
           </p>
         )}
+        {receipt.refundExpiresAt ? (
+          <p className="privacy">
+            Refund request window ends {date(receipt.refundExpiresAt)}.
+          </p>
+        ) : receipt.refundWindowDays ? (
+          <p className="privacy">
+            Refund request window: {receipt.refundWindowDays} days from payment
+            confirmation.
+          </p>
+        ) : receipt.refundWindowDays === null ? (
+          <p className="privacy">
+            No refund deadline was set for this payment.
+          </p>
+        ) : null}
       </section>
       {receipt.confirmedRefundAmountZat !== undefined &&
         receipt.refundAmountZat > 0 && (

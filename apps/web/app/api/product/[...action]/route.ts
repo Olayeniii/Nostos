@@ -1,3 +1,4 @@
+import { validRefundWindow } from "../../../../src/refund-policy.js";
 import {
   validAccountEmail,
   validAccountPassword,
@@ -191,7 +192,10 @@ async function handle(request: Request) {
         }
       }
       return json({
-        message: "If this account is eligible, an email has been sent.",
+        message:
+          purpose === "verify"
+            ? "Check your inbox. If this email needs verification, you will receive a link. Check spam too."
+            : "Check your inbox. If this email belongs to a verified account, you will receive a reset link. Check spam too.",
       });
     }
     if (isPost && route === "account-link") {
@@ -341,20 +345,10 @@ async function handle(request: Request) {
     if (route === "policy" && isPost) {
       const policy = text(body.policy, 3, 1000);
       const days = body.windowDays;
-      if (
-        !policy ||
-        !(
-          days === null ||
-          (typeof days === "number" &&
-            Number.isInteger(days) &&
-            days >= 1 &&
-            days <= 365)
-        )
-      )
+      if (!policy || !validRefundWindow(days))
         return json(
           {
-            error:
-              "Enter a policy and a window from 1 to 365 days, or no deadline.",
+            error: "Enter a policy and a window from 1 to 365 days.",
           },
           400,
         );

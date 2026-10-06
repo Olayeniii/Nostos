@@ -1,3 +1,7 @@
+import {
+  DEFAULT_REFUND_WINDOW_DAYS,
+  validRefundWindow,
+} from "./refund-policy.js";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, openSync, closeSync, chmodSync } from "node:fs";
 import { dirname } from "node:path";
@@ -337,7 +341,11 @@ export class ProductStore {
       .prepare(
         "UPDATE checkouts SET refund_policy=?,refund_window_days=? WHERE id=?",
       )
-      .run(this.encrypt(merchant.refundPolicy), merchant.refundWindowDays, id);
+      .run(
+        this.encrypt(merchant.refundPolicy),
+        merchant.refundWindowDays ?? DEFAULT_REFUND_WINDOW_DAYS,
+        id,
+      );
     return { checkout: this.checkout(id)!, token };
   }
   receiptToken(id: string, merchantId: string) {
@@ -385,12 +393,8 @@ export class ProductStore {
       )
       .run(paidAt, expires, id);
   }
-  setRefundPolicy(merchantId: string, policy: string, days: number | null) {
-    if (
-      !policy.trim() ||
-      policy.length > 1000 ||
-      (days !== null && (!Number.isInteger(days) || days < 1 || days > 365))
-    )
+  setRefundPolicy(merchantId: string, policy: string, days: number) {
+    if (!policy.trim() || policy.length > 1000 || !validRefundWindow(days))
       throw new Error("Invalid refund policy.");
     this.db
       .prepare(

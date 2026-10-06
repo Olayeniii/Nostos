@@ -394,6 +394,52 @@ describe("customer requests and merchant decisions", () => {
 });
 
 describe("remaining value and retention", () => {
+  it("preserves legacy null windows and applies a finite default only to new requests", async () => {
+    const { m, c } = await paid();
+    store.db
+      .prepare(
+        "UPDATE checkouts SET refund_window_days=NULL,refund_expires_at=NULL WHERE id=?",
+      )
+      .run(c.id);
+    store.setRefundPolicy(m.id, "Future returns", 7);
+    store.paid(c.id);
+    expect(store.checkout(c.id)).toMatchObject({
+      refundWindowDays: null,
+      refundExpiresAt: null,
+      route,
+    });
+    const next = newRequest(
+      store,
+      store.merchant(m.id)!,
+      "Next order",
+      2000000,
+    );
+    expect(store.checkout(next.id)?.refundWindowDays).toBe(7);
+    const { retireExpiredProductRoutes } = await import("./retention.js");
+    expect(retireExpiredProductRoutes(store, core)).toBe(0);
+    expect(store.checkout(c.id)?.route).toBe(route);
+  });
+  it.each([null, undefined, 0, 366, 1.5, "30"])(
+    "rejects an unbounded or invalid new policy window: %s",
+    async (days) => {
+      const m = merchant();
+      expect(() =>
+        store.setRefundPolicy(m.id, "Returns", days as number),
+      ).toThrow();
+      const cookie = accountHeader(store.session(m.id)).split(";")[0]!;
+      const response = await POST(
+        post(
+          "policy",
+          { policy: "Returns", windowDays: days },
+          undefined,
+          cookie,
+        ),
+      );
+      expect(response.status).toBe(400);
+      expect(store.merchant(m.id)?.refundWindowDays).toBeNull();
+    },
+  );
+
   it("retains the route after a partial refund, then settles another request and retires only at full repayment", async () => {
     const { m, c, incoming } = await paid();
     const first = randomUUID();
@@ -501,7 +547,13 @@ describe("remaining value and retention", () => {
   it("snapshots a policy for new requests without changing older payments, and retires an expired route", async () => {
     const { m, c } = await paid();
     store.setRefundPolicy(m.id, "Returns within seven days.", 7);
-    expect(store.checkout(c.id)?.refundExpiresAt).toBeNull();
+    const originalExpiry = store.checkout(c.id)?.refundExpiresAt;
+    expect(originalExpiry).toBeTruthy();
+    expect(store.checkout(c.id)?.refundWindowDays).toBe(30);
+    expect(Date.parse(originalExpiry!) - Date.parse(c.paidAt!)).toBe(
+      30 * 86400000,
+    );
+    expect(store.checkout(c.id)?.refundExpiresAt).toBe(originalExpiry);
     const future = newRequest(
       store,
       store.merchant(m.id)!,

@@ -62,6 +62,13 @@ export default function Checkout() {
               <p className="preserve-lines">{r.refundPolicy}</p>
             </div>
           )}
+          {!!r?.refundWindowDays && (
+            <p className="privacy">
+              Refund request window: {r.refundWindowDays} days from payment
+              confirmation. The route is retained through any open request or
+              unresolved refund.
+            </p>
+          )}
           <div className="checkout-assurance">
             <strong>A private route back.</strong>
             <p>

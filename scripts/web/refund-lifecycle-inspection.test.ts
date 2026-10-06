@@ -50,10 +50,10 @@ describe.each([true, false])(
           const sensitive = "private-route-memo-receipt-email";
           const p = new DatabaseSync(product);
           p.exec(`CREATE TABLE checkouts(id TEXT,amount_zat INTEGER,status TEXT,payment_txid TEXT,
-        refund_expires_at TEXT,route_closed_reason TEXT,route TEXT,receipt_token TEXT);
+        refund_expires_at TEXT,refund_window_days INTEGER,route_closed_reason TEXT,route TEXT,receipt_token TEXT);
         CREATE TABLE refund_requests(checkout_id TEXT,status TEXT,reason TEXT);`);
           p.prepare(
-            "INSERT INTO checkouts VALUES(?,2000000,'confirmed',?,?,NULL,?,?)",
+            "INSERT INTO checkouts VALUES(?,2000000,'confirmed',?,?,30,NULL,?,?)",
           ).run(
             checkoutId,
             "a".repeat(64),

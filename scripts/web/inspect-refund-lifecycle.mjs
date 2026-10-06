@@ -16,7 +16,7 @@ try {
   const checkout = product
     .prepare(
       `SELECT id, amount_zat, status, payment_txid,
-    refund_expires_at, route_closed_reason, route<>'' AS route_present
+    refund_expires_at, refund_window_days, route_closed_reason, route<>'' AS route_present
     FROM checkouts WHERE id=?`,
     )
     .get(checkoutId);
@@ -92,9 +92,10 @@ try {
     available_refund_value_zat: checkout.amount_zat - confirmed - reserved,
     open_request_count: openRequests,
     refund_expires_at: checkout.refund_expires_at,
+    refund_window_days: checkout.refund_window_days,
     product_route_present: !!checkout.route_present,
     core_route_present: !!payment.route_present,
-    route_closed_reason: ["refunded", "expired"].includes(
+    route_closed_reason: ["fully_refunded", "expired"].includes(
       checkout.route_closed_reason,
     )
       ? checkout.route_closed_reason

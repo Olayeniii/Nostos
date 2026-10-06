@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_REFUND_WINDOW_DAYS } from "../../../src/refund-policy.js";
 import { ChangeEmail } from "../../../src/change-email.js";
 import { useState } from "react";
 import { requestJson } from "../../../src/requests.js";
@@ -119,7 +120,7 @@ export default function Settings() {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         policy: String(form.get("policy")),
-                        windowDays: days ? Number(days) : null,
+                        windowDays: Number(days),
                       }),
                     },
                     15000,
@@ -153,14 +154,18 @@ export default function Settings() {
                   type="number"
                   min={1}
                   max={365}
-                  defaultValue={data.merchant.refundWindowDays ?? ""}
+                  defaultValue={
+                    data.merchant.refundWindowDays ?? DEFAULT_REFUND_WINDOW_DAYS
+                  }
+                  required
                   disabled={busy}
                 />
               </label>
               <p className="privacy">
-                The window begins when payment confirms. Leave it blank for no
-                deadline. Open requests and unconfirmed refunds keep their route
-                until resolved.
+                Choose 1 to 365 days for new requests. The default is 30 days,
+                beginning when payment confirms. Existing requests keep their
+                original terms. Open requests and unresolved refunds keep their
+                route until resolved.
               </p>
               <button className="primary" disabled={busy}>
                 {busy ? "Saving policy" : "Save refund policy"}

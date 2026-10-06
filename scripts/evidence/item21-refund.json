@@ -13,8 +13,8 @@
     "source": "Explicit customer confirmation in the work session",
     "screenshotIndependentlyRead": false
   },
-  "refundTxid": null,
-  "refundRecordId": null,
+  "refundTxid": "ad7ff94e16ba2793d2831166d9dcfe6ebaf045856db2aa56808db55134965272",
+  "refundRecordId": "refund_6f692f8c99d355f9a1d3ddf99a76df1cdaf3f81bbc07a14d",
   "custody": "Hosted merchant Zallet spending authority; merchant-controlled custody is not implemented.",
   "automaticWalletHandoff": "Unresolved; payment used manual address, amount and memo entry.",
   "storageInspection": {
@@ -26,5 +26,26 @@
     "unprotectedOrInvalid": 0,
     "scope": "Current route/memo columns only; not logs, wallet history, WAL or backups."
   },
-  "retention": "Partial refund retains capability for the remaining value during the refund window. Live full-refund/expiry deletion has not been demonstrated by this fixture."
+  "retention": "Both current route copies remain and no expiry is recorded. This is a partial refund with remaining capability; the original snapshotted window still needs read-only inspection. No deadline was imposed on this fixture and live expiry/full-refund deletion remains unproved.",
+  "liveDatabaseCheckpoint": {
+    "date": "2026-10-06",
+    "source": "Operator supplied read-only lifecycle inspector output",
+    "paymentConfirmationsStored": 2973,
+    "refundStatus": "confirmed",
+    "refundCreatedAt": "2026-10-04T09:50:21.287Z",
+    "refundUpdatedAt": "2026-10-04T09:51:30.581Z",
+    "retryCount": 0,
+    "reservedRefundZat": 0,
+    "openRequestCount": 0,
+    "refundExpiresAt": null,
+    "productRoutePresent": true,
+    "coreRoutePresent": true,
+    "retentionConfigEnabled": true,
+    "timerExecutionProven": false
+  },
+  "deployedReleaseObservation": {
+    "source": "Operator supplied running container mount",
+    "release": "19fded2b2fec-1791315685",
+    "state": "running"
+  }
 }

@@ -280,6 +280,7 @@ export function checkoutView(
       !refundWindowExpired(checkout),
     refundPolicy: checkout.refundPolicy,
     refundExpiresAt: checkout.refundExpiresAt,
+    refundWindowDays: checkout.refundWindowDays,
     routeClosedReason: checkout.routeClosedReason,
     status: refund?.status ?? "no_refund",
     refundTxid: refund?.txid,
