@@ -48,5 +48,19 @@
     "source": "Operator supplied running container mount",
     "release": "19fded2b2fec-1791315685",
     "state": "running"
+  },
+  "liveUiReview": {
+    "date": "2026-10-06",
+    "source": "Agent inspected authenticated merchant dashboard, existing paid checkout and private receipt using the cloud browser",
+    "paymentAmountZat": 2000000,
+    "confirmedRefundAmountZat": 1800000,
+    "remainingPaymentValueZat": 200000,
+    "merchantFulfillment": "pending",
+    "receiptRefundStatus": "confirmed",
+    "paidCheckoutOffersReceiptWithoutAnotherPayment": true,
+    "receiptRequestNeedsNewAddress": false,
+    "submittedPaymentRefundRequestOrFulfillmentChange": false,
+    "mobileRenderingVerified": false,
+    "exactDeployedCommitVerified": false
   }
 }

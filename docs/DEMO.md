@@ -69,11 +69,19 @@ to count confirmed incoming payments separately from detected/unconfirmed value,
 and count confirmed refunds only when a refund occurred. Refund review explains
 the supplied route without displaying its masked fingerprint.
 
-The browser session is not signed in to the merchant workspace and has no Item21
-receipt capability. Live private-screen review is therefore pending. Mobile CSS
-breakpoints exist, but this browser exposes no viewport resize capability; source
-inspection is not mobile rendering proof. Exact live release/main equality is
-unknown from this browser. The last operator-provided release was
+After secure merchant sign-in, the live JaraBot dashboard and Item21 detail were
+reviewed. They showed 0.02 ZEC received, 0.018 ZEC refunded and 0.002 ZEC available,
+with merchant-reported fulfillment still pending. The existing payment link led
+to a confirmed checkout with only a receipt action. The same private receipt
+showed the confirmed partial refund, remaining value, original unset deadline
+and a refund-request form requiring no new address. No request, refund or
+fulfillment change was submitted. Private capabilities were omitted from output.
+
+The live dashboard still displayed the older summary wording at observation
+time; the newly pushed UI change is not yet live-verified. Mobile CSS breakpoints
+exist, but this browser exposes no viewport resize capability; source inspection
+is not mobile rendering proof. Exact live release/main equality is unknown from
+this browser. The last operator-provided release was
 `19fded2b2fec-1791315685`; do not label it current after later auto-deploys.
 
 Before the final recording: visually review the merchant detail and existing
