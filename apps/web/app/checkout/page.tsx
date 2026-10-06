@@ -1,6 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import {
+  injectedNoir,
+  NoirHandoff,
+  NoirHandoffError,
+} from "../../src/noir-handoff.js";
 import { AppHeader, AppFooter } from "../../src/shell.js";
 import { StateLabel } from "../../src/status-label.js";
 import { requestJson } from "../../src/requests.js";
@@ -20,6 +25,17 @@ export default function Checkout() {
   const [copyStatus, setCopyStatus] = useState("");
   const [prepared, setPrepared] = useState<Prepared>();
   const [qr, setQr] = useState("");
+  const [noirAvailable, setNoirAvailable] = useState(false);
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletMessage, setWalletMessage] = useState("");
+  const [walletRequested, setWalletRequested] = useState(false);
+  const handoff = useRef(new NoirHandoff());
+  useEffect(() => {
+    const detect = () => setNoirAvailable(!!injectedNoir(window));
+    detect();
+    window.addEventListener("noirwallet#initialized", detect);
+    return () => window.removeEventListener("noirwallet#initialized", detect);
+  }, []);
   const { data, loading, warning, refresh } = useRecord<{
     receipt: ReceiptData;
     syncWarning: boolean;
@@ -192,21 +208,112 @@ export default function Checkout() {
               ) : (
                 <>
                   <div className="wallet-payment">
-                    <img
-                      width={248}
-                      height={248}
-                      src={qr}
-                      alt="Zcash payment request QR code, including amount and memo"
-                    />
-                    <a className="primary" href={prepared.uri}>
-                      Try opening your wallet
-                    </a>
-                    <button
-                      className="secondary"
-                      onClick={() => void copy(prepared.uri, "Payment request")}
-                    >
-                      Copy complete payment request
-                    </button>
+                    {!walletRequested && !walletBusy && (
+                      <img
+                        width={248}
+                        height={248}
+                        src={qr}
+                        alt="Zcash payment request QR code, including amount and memo"
+                      />
+                    )}
+                    {noirAvailable && (
+                      <button
+                        className="primary"
+                        disabled={
+                          walletBusy ||
+                          walletRequested ||
+                          !!warning ||
+                          data?.syncWarning ||
+                          r.paymentStatus !== "unpaid"
+                        }
+                        onClick={async () => {
+                          if (
+                            walletBusy ||
+                            walletRequested ||
+                            handoff.current.paymentRequested ||
+                            handoff.current.busy
+                          )
+                            return;
+                          const provider = injectedNoir(window);
+                          if (!provider) {
+                            setWalletMessage(
+                              "Noir is unavailable. Use the manual payment instructions.",
+                            );
+                            return;
+                          }
+                          setWalletBusy(true);
+                          setWalletMessage(
+                            "Review the address, amount and memo in Noir before approving. Use shielded testnet funds.",
+                          );
+                          try {
+                            await handoff.current.send(
+                              provider,
+                              prepared,
+                              async () => {
+                                const latest = await requestJson<{
+                                  receipt: ReceiptData;
+                                  syncWarning: boolean;
+                                }>(
+                                  "/api/product/checkout",
+                                  {
+                                    headers: {
+                                      Authorization: `Bearer ${token}`,
+                                    },
+                                  },
+                                  15000,
+                                );
+                                if (
+                                  latest.syncWarning ||
+                                  latest.receipt.id !== r.id ||
+                                  latest.receipt.paymentStatus !== "unpaid" ||
+                                  latest.receipt.paymentAmountZat !==
+                                    prepared.amountZat
+                                ) {
+                                  void refresh();
+                                  throw new Error();
+                                }
+                              },
+                            );
+                            setWalletMessage(
+                              "Noir reported a transaction ID. Waiting for the merchant wallet to confirm your payment. Do not send again.",
+                            );
+                            void refresh();
+                          } catch (error) {
+                            setWalletMessage(
+                              error instanceof NoirHandoffError
+                                ? error.message
+                                : "Check your wallet and receipt before sending again.",
+                            );
+                          } finally {
+                            setWalletRequested(
+                              handoff.current.paymentRequested,
+                            );
+                            setWalletBusy(false);
+                          }
+                        }}
+                      >
+                        {walletBusy
+                          ? "Review in Noir"
+                          : walletRequested
+                            ? "Payment requested"
+                            : "Pay with Noir extension"}
+                      </button>
+                    )}
+                    {!walletRequested && !walletBusy && (
+                      <a className="primary" href={prepared.uri}>
+                        Try opening your wallet
+                      </a>
+                    )}
+                    {!walletRequested && !walletBusy && (
+                      <button
+                        className="secondary"
+                        onClick={() =>
+                          void copy(prepared.uri, "Payment request")
+                        }
+                      >
+                        Copy complete payment request
+                      </button>
+                    )}
                   </div>
                   <p className="privacy">
                     Check that your wallet includes the exact amount and memo
@@ -214,59 +321,68 @@ export default function Checkout() {
                     fields, use manual entry below. QR and URI support varies by
                     wallet.
                   </p>
-                  <details className="manual-payment" open>
-                    <summary>Enter payment details manually</summary>
-                    <p>
-                      Send a shielded payment. Copy all three fields; the memo
-                      is required for the refund route.
+                  {walletMessage && (
+                    <p className="privacy" role="status">
+                      {walletMessage}
                     </p>
-                    <label>
-                      Merchant payment address
-                      <textarea
-                        aria-label="Merchant payment address"
-                        readOnly
-                        value={prepared.destination}
-                      />
-                    </label>
-                    <button
-                      className="text-button"
-                      onClick={() => void copy(prepared.destination, "Address")}
-                    >
-                      Copy address
-                    </button>
-                    <label>
-                      Amount
-                      <input
-                        readOnly
-                        value={`${zec(prepared.amountZat)} ZEC`}
-                      />
-                    </label>
-                    <button
-                      className="text-button"
-                      onClick={() =>
-                        void copy(
-                          (prepared.amountZat / 1e8).toFixed(8),
-                          "Amount",
-                        )
-                      }
-                    >
-                      Copy amount
-                    </button>
-                    <label>
-                      Payment memo
-                      <textarea
-                        aria-label="Payment memo"
-                        readOnly
-                        value={prepared.memo}
-                      />
-                    </label>
-                    <button
-                      className="text-button"
-                      onClick={() => void copy(prepared.memo, "Memo")}
-                    >
-                      Copy memo
-                    </button>
-                  </details>
+                  )}
+                  {!walletRequested && !walletBusy && (
+                    <details className="manual-payment" open>
+                      <summary>Enter payment details manually</summary>
+                      <p>
+                        Send a shielded payment. Copy all three fields; the memo
+                        is required for the refund route.
+                      </p>
+                      <label>
+                        Merchant payment address
+                        <textarea
+                          aria-label="Merchant payment address"
+                          readOnly
+                          value={prepared.destination}
+                        />
+                      </label>
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          void copy(prepared.destination, "Address")
+                        }
+                      >
+                        Copy address
+                      </button>
+                      <label>
+                        Amount
+                        <input
+                          readOnly
+                          value={`${zec(prepared.amountZat)} ZEC`}
+                        />
+                      </label>
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          void copy(
+                            (prepared.amountZat / 1e8).toFixed(8),
+                            "Amount",
+                          )
+                        }
+                      >
+                        Copy amount
+                      </button>
+                      <label>
+                        Payment memo
+                        <textarea
+                          aria-label="Payment memo"
+                          readOnly
+                          value={prepared.memo}
+                        />
+                      </label>
+                      <button
+                        className="text-button"
+                        onClick={() => void copy(prepared.memo, "Memo")}
+                      >
+                        Copy memo
+                      </button>
+                    </details>
+                  )}
                   <aside className="info-panel">
                     <strong>Sent from your wallet?</strong>
                     <p>

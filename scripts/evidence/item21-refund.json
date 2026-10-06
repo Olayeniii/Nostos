@@ -26,7 +26,7 @@
     "unprotectedOrInvalid": 0,
     "scope": "Current route/memo columns only; not logs, wallet history, WAL or backups."
   },
-  "retention": "Both current route copies remain and no expiry is recorded. This is a partial refund with remaining capability; the original snapshotted window still needs read-only inspection. No deadline was imposed on this fixture and live expiry/full-refund deletion remains unproved.",
+  "retention": "Read-only output confirmed both current route copies remain, the saved refund window is null and 0.002 ZEC remains refundable. This legacy payment keeps its original terms. No timer failure is inferred, no deadline was imposed and live full-refund/expiry deletion remains unproved.",
   "liveDatabaseCheckpoint": {
     "date": "2026-10-06",
     "source": "Operator supplied read-only lifecycle inspector output",
@@ -41,7 +41,8 @@
     "productRoutePresent": true,
     "coreRoutePresent": true,
     "retentionConfigEnabled": true,
-    "timerExecutionProven": false
+    "timerExecutionProven": false,
+    "refundWindowDays": null
   },
   "deployedReleaseObservation": {
     "source": "Operator supplied running container mount",
