@@ -17,6 +17,7 @@ export default function Checkout() {
   const [initialized, setInitialized] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
   const [prepared, setPrepared] = useState<Prepared>();
   const [qr, setQr] = useState("");
   const { data, loading, warning, refresh } = useRecord<{
@@ -30,12 +31,13 @@ export default function Checkout() {
   }, []);
   const r = data?.receipt;
   const paid = (r?.paymentConfirmations ?? 0) > 0;
-  async function copy(value: string) {
+  async function copy(value: string, label: string) {
+    setCopyStatus("");
     try {
       await navigator.clipboard.writeText(value);
-      setError("Copied.");
+      setCopyStatus(`${label} copied.`);
     } catch {
-      setError("Select and copy the value shown.");
+      setCopyStatus("Could not copy. Select and copy the value shown.");
     }
   }
   return (
@@ -190,20 +192,22 @@ export default function Checkout() {
                       alt="Zcash payment request QR code, including amount and memo"
                     />
                     <a className="primary" href={prepared.uri}>
-                      Open in your wallet
+                      Try opening your wallet
                     </a>
                     <button
                       className="secondary"
-                      onClick={() => void copy(prepared.uri)}
+                      onClick={() => void copy(prepared.uri, "Payment request")}
                     >
                       Copy complete payment request
                     </button>
                   </div>
                   <p className="privacy">
                     Check that your wallet includes the exact amount and memo
-                    before sending. QR and URI support varies by wallet.
+                    before sending. If the wallet does not fill all three
+                    fields, use manual entry below. QR and URI support varies by
+                    wallet.
                   </p>
-                  <details className="manual-payment">
+                  <details className="manual-payment" open>
                     <summary>Enter payment details manually</summary>
                     <p>
                       Send a shielded payment. Copy all three fields; the memo
@@ -219,7 +223,7 @@ export default function Checkout() {
                     </label>
                     <button
                       className="text-button"
-                      onClick={() => void copy(prepared.destination)}
+                      onClick={() => void copy(prepared.destination, "Address")}
                     >
                       Copy address
                     </button>
@@ -230,6 +234,17 @@ export default function Checkout() {
                         value={`${zec(prepared.amountZat)} ZEC`}
                       />
                     </label>
+                    <button
+                      className="text-button"
+                      onClick={() =>
+                        void copy(
+                          (prepared.amountZat / 1e8).toFixed(8),
+                          "Amount",
+                        )
+                      }
+                    >
+                      Copy amount
+                    </button>
                     <label>
                       Payment memo
                       <textarea
@@ -240,7 +255,7 @@ export default function Checkout() {
                     </label>
                     <button
                       className="text-button"
-                      onClick={() => void copy(prepared.memo)}
+                      onClick={() => void copy(prepared.memo, "Memo")}
                     >
                       Copy memo
                     </button>
@@ -277,6 +292,11 @@ export default function Checkout() {
             <p className="warning" role="alert">
               {warning ||
                 "Wallet sync is temporarily unavailable. Do not repeat a payment that you already sent."}
+            </p>
+          )}
+          {copyStatus && (
+            <p className="privacy" role="status" aria-live="polite">
+              {copyStatus}
             </p>
           )}
           {error && (

@@ -401,6 +401,45 @@ it("puts only the Orchard receiver from a combined shielded UA in the paying mem
   ).rejects.toThrow();
 });
 
+it.each([1, 2000000, 123456789])(
+  "preserves the exact payment amount and memo in the ZIP 321 request: %s zat",
+  async (amountZat) => {
+    const m = merchant();
+    const created = newRequest(store, m, "URI preservation", amountZat);
+    const prepared = await preparePayment(
+      store,
+      store.checkout(created.id)!,
+      route,
+      rpc,
+    );
+    const uri = new URL(prepared.uri);
+    expect(uri.protocol).toBe("zcash:");
+    expect(uri.pathname).toBe(destination);
+    const amount = uri.searchParams.get("amount")!;
+    expect(amount).toMatch(/^\d+\.\d{8}$/);
+    const [whole, fractional] = amount.split(".");
+    expect(BigInt(whole!) * BigInt(100000000) + BigInt(fractional!)).toBe(
+      BigInt(amountZat),
+    );
+    const memo = uri.searchParams.get("memo")!;
+    expect(memo).toMatch(/^[A-Za-z0-9_-]+$/);
+    const decoded = Buffer.from(memo, "base64url");
+    expect(decoded.length).toBeLessThanOrEqual(512);
+    expect(decoded.toString("hex")).toBe(
+      encodeMemo(store.checkout(created.id)!.order, route),
+    );
+    expect(decoded.toString("utf8")).toBe(prepared.memo);
+    expect(JSON.parse(prepared.memo)).toEqual({
+      p: "nostos",
+      v: 1,
+      o: store.checkout(created.id)!.order,
+      r: route,
+    });
+    expect([...uri.searchParams.keys()]).toEqual(["amount", "memo"]);
+    expect(uri.hash).toBe("");
+  },
+);
+
 describe("live wallet note representation", () => {
   it.each([false, true])(
     "matches equivalent Orchard receivers with unspent direction absent, reject=%s",

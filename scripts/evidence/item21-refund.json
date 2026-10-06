@@ -1,0 +1,30 @@
+{
+  "network": "testnet",
+  "fixture": "JaraBot / Item21",
+  "paymentAmountZat": 2000000,
+  "paymentTxid": "6f692f8c99d355f9a1d3ddf99a76df1cdaf3f81bbc07a14db7d460c838f9c91e",
+  "refundAmountZat": 1800000,
+  "remainingPaymentValueZat": 200000,
+  "paymentMemoValidation": "Operator supplied read-only wallet evidence: expected NOSTOS v1 memo/order, matching stored canonical route, Orchard-only usable receiver.",
+  "merchantRefundObservation": "Operator reported confirmed on the existing private receipt.",
+  "customerRefundObservation": {
+    "date": "2026-10-06",
+    "wallet": "Noir",
+    "source": "Explicit customer confirmation in the work session",
+    "screenshotIndependentlyRead": false
+  },
+  "refundTxid": null,
+  "refundRecordId": null,
+  "custody": "Hosted merchant Zallet spending authority; merchant-controlled custody is not implemented.",
+  "automaticWalletHandoff": "Unresolved; payment used manual address, amount and memo entry.",
+  "storageInspection": {
+    "date": "2026-10-06",
+    "readOnly": true,
+    "productProtectedRoutes": 2,
+    "coreProtectedRefundAddresses": 1,
+    "empty": 0,
+    "unprotectedOrInvalid": 0,
+    "scope": "Current route/memo columns only; not logs, wallet history, WAL or backups."
+  },
+  "retention": "Partial refund retains capability for the remaining value during the refund window. Live full-refund/expiry deletion has not been demonstrated by this fixture."
+}
