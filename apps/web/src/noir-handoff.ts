@@ -75,11 +75,23 @@ export class NoirHandoff {
     try {
       let account: unknown;
       try {
-        account = await provider.request({ method: "zcash_requestAccounts" });
+        account = await provider.request({ method: "zcash_getAccounts" });
       } catch {
         throw new NoirHandoffError(
-          "Noir could not connect. Use its testnet extension or enter the payment details manually.",
+          "Noir could not read its connection state. No payment was requested.",
         );
+      }
+      // Noir returns null when this origin has no authorization. Reuse an
+      // existing account instead of reopening Connect before every payment.
+      // Errors or malformed accounts must not be treated as disconnected.
+      if (account === null) {
+        try {
+          account = await provider.request({ method: "zcash_requestAccounts" });
+        } catch {
+          throw new NoirHandoffError(
+            "Noir could not connect. No payment was requested.",
+          );
+        }
       }
       const address = (account as { shielded?: unknown } | null)?.shielded;
       // A configured adapter network is not wallet network evidence. Require

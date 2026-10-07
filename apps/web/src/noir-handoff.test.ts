@@ -17,7 +17,8 @@ function provider(
 ) {
   return {
     request: vi.fn(async ({ method }: { method: string }) => {
-      if (method === "zcash_requestAccounts") return account;
+      if (method === "zcash_getAccounts" || method === "zcash_requestAccounts")
+        return account;
       if (outcome instanceof Error) throw outcome;
       return outcome;
     }),
@@ -45,7 +46,7 @@ describe("Noir injected handoff", () => {
       h = new NoirHandoff();
     expect(await h.send(rpc, payment)).toBe("c".repeat(64));
     expect(rpc.request.mock.calls).toEqual([
-      [{ method: "zcash_requestAccounts" }],
+      [{ method: "zcash_getAccounts" }],
       [
         {
           method: "zcash_sendTransaction",
@@ -75,7 +76,7 @@ describe("Noir injected handoff", () => {
     expect(rpc.request).toHaveBeenCalledTimes(1);
   });
   it.each([
-    null,
+    undefined,
     {},
     { shielded: "u1mainnet" },
     { transparent: "tmtestnet" },
@@ -85,6 +86,7 @@ describe("Noir injected handoff", () => {
     async (account) => {
       const rpc = provider(account),
         h = new NoirHandoff();
+      rpc.request.mockResolvedValueOnce(account);
       await expect(h.send(rpc, payment)).rejects.toThrow(
         "No payment was requested",
       );
@@ -92,6 +94,46 @@ describe("Noir injected handoff", () => {
       expect(h.paymentRequested).toBe(false);
     },
   );
+  it("connects only when silent account lookup explicitly reports no authorization", async () => {
+    const rpc = provider();
+    rpc.request.mockImplementationOnce(async () => null);
+    expect(await new NoirHandoff().send(rpc, payment)).toBe("c".repeat(64));
+    expect(rpc.request.mock.calls.map(([args]) => args.method)).toEqual([
+      "zcash_getAccounts",
+      "zcash_requestAccounts",
+      "zcash_sendTransaction",
+    ]);
+  });
+  it("does not prompt or send after a silent account lookup error", async () => {
+    const rpc = provider(),
+      h = new NoirHandoff();
+    rpc.request.mockRejectedValueOnce(new Error("private wallet details"));
+    await expect(h.send(rpc, payment)).rejects.toThrow("connection state");
+    expect(rpc.request).toHaveBeenCalledTimes(1);
+    expect(h.paymentRequested).toBe(false);
+    expect(h.busy).toBe(false);
+  });
+  it("sanitizes a failed connection and does not request spending", async () => {
+    const rpc = provider(),
+      h = new NoirHandoff();
+    rpc.request
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("private wallet details"));
+    await expect(h.send(rpc, payment)).rejects.toThrow(
+      "Noir could not connect. No payment was requested.",
+    );
+    expect(rpc.request).toHaveBeenCalledTimes(2);
+    expect(h.paymentRequested).toBe(false);
+  });
+  it("does not send if Connect returns no selected account", async () => {
+    const rpc = provider(null),
+      h = new NoirHandoff();
+    await expect(h.send(rpc, payment)).rejects.toThrow(
+      "No payment was requested",
+    );
+    expect(rpc.request).toHaveBeenCalledTimes(2);
+    expect(h.paymentRequested).toBe(false);
+  });
   it.each([new Error("private-route-spending-error"), null, "not-a-txid"])(
     "holds an unknown send outcome without leaking or retrying",
     async (outcome) => {

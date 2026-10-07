@@ -112,3 +112,11 @@ The follow-up polish replaces the fixed `0.003` refund placeholder with
 keeping 44-pixel action targets. This candidate still needs deployed visual
 confirmation. It changes no refund authorization, retry rules, payment state or
 stored route. Real automatic Noir handoff remains unproved.
+
+On October 7, the desktop Noir 1.0.38 test opened Connect but did not reach
+transaction approval. A separate read-only `zcash_getAccounts` check subsequently
+returned an authorized shielded testnet account, while the payment button still
+reopened Connect. The handoff now reads existing authorization first and requests
+Connect only when that lookup returns null. Lookup errors and unsuitable accounts
+stop before spending. Regression tests cover both connection paths; real approval,
+broadcast and receipt of this separate test payment still require live verification.
