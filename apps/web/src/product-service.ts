@@ -27,6 +27,7 @@ export type ProductWallet = Pick<
   | "listUnspent"
   | "viewTransaction"
   | "sendFromAccount"
+  | "spendableShieldedBalanceZat"
 >;
 export function coreStore(store: ProductStore) {
   const path = process.env.NOSTOS_PRODUCT_CORE_DATABASE_PATH;

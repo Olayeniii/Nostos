@@ -46,6 +46,7 @@ beforeEach(() => {
       confirmations: 2,
       outputs: [],
     })),
+    spendableShieldedBalanceZat: vi.fn(async () => 10000000),
     sendFromAccount: vi.fn(async () => refundTxid),
   };
 });

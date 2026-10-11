@@ -1,3 +1,4 @@
+import { RefundFundingError } from "../../../../worker/src/refund.js";
 import { submitRefund } from "../../../../api/src/refund-request.js";
 import { SqlitePaymentStore } from "../../../../../packages/database/src/index.js";
 import { ZalletRpcClient } from "../../../../../packages/zcash-adapter/src/index.js";
@@ -55,7 +56,9 @@ export async function POST(request: Request) {
       merchantAccountUuid: account,
     });
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (error) {
+    if (error instanceof RefundFundingError)
+      return Response.json({ error: error.message }, { status: 409 });
     // Never return raw wallet errors, which may contain destinations or memos.
     return Response.json(
       {

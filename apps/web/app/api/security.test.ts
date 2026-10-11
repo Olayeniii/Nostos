@@ -38,6 +38,10 @@ beforeEach(() => {
     ZalletRpcClient.prototype,
     "decodeUnifiedAddress",
   ).mockImplementation(async (address) => ({ orchard: address }));
+  vi.spyOn(
+    ZalletRpcClient.prototype,
+    "spendableShieldedBalanceZat",
+  ).mockResolvedValue(10000000);
   send = vi
     .spyOn(ZalletRpcClient.prototype, "sendFromAccount")
     .mockRejectedValue(new Error(`fixture failure ${destination}`));

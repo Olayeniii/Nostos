@@ -2,12 +2,21 @@ import type { SqlitePaymentStore } from "../../../packages/database/src/index.js
 import { orchardRefundReceiver } from "../../../packages/zcash-adapter/src/refund-route.js";
 
 export interface RefundBroadcaster {
+  spendableShieldedBalanceZat(account: string): Promise<number>;
   decodeUnifiedAddress?(address: string): Promise<Record<string, string>>;
   sendFromAccount(
     account: string,
     pool: "orchard" | "sapling",
     recipients: Array<{ address: string; amount: number }>,
   ): Promise<string>;
+}
+
+export class RefundFundingError extends Error {
+  constructor() {
+    super(
+      "The merchant wallet cannot cover this refund plus its transaction fee. No refund was sent. Fund the merchant wallet before trying again.",
+    );
+  }
 }
 
 export async function executePartialRefund(options: {
@@ -51,6 +60,14 @@ export async function executePartialRefund(options: {
     decodeUnifiedAddress: (address) =>
       options.broadcaster.decodeUnifiedAddress!(address),
   });
+  const balance = await options.broadcaster.spendableShieldedBalanceZat(
+    options.merchantAccountUuid,
+  );
+  if (!Number.isSafeInteger(balance) || balance < 0)
+    throw new Error("Wallet balance is unavailable.");
+  // This rules out a known funding shortfall. It is not a fee quote: even a
+  // larger balance may be insufficient for the transaction selected by Zallet.
+  if (balance <= options.amountZat) throw new RefundFundingError();
   options.authorizeBeforePrepare?.();
 
   const prepared = options.store.prepareRefund(

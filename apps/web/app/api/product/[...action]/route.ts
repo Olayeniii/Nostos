@@ -1,3 +1,4 @@
+import { RefundFundingError } from "../../../../../worker/src/refund.js";
 import { validRefundWindow } from "../../../../src/refund-policy.js";
 import {
   validAccountEmail,
@@ -485,7 +486,9 @@ async function handle(request: Request) {
       );
     }
     return json({ error: "Not found" }, 404);
-  } catch {
+  } catch (error) {
+    if (error instanceof RefundFundingError)
+      return json({ error: error.message }, 409);
     // Raw wallet/SQLite errors can contain private memos, destinations or identities.
     return json(
       {

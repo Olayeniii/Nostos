@@ -44,6 +44,7 @@ beforeEach(() => {
     decodeUnifiedAddress: vi.fn(async (address) => ({ orchard: address })),
     listUnspent: vi.fn(async () => []),
     viewTransaction: vi.fn(),
+    spendableShieldedBalanceZat: vi.fn(async () => 10000000),
     sendFromAccount: vi.fn(async () => "d".repeat(64)),
   };
 });
@@ -366,6 +367,10 @@ describe("customer requests and merchant decisions", () => {
       ZalletRpcClient.prototype,
       "decodeUnifiedAddress",
     ).mockImplementation(async (address) => ({ orchard: address }));
+    vi.spyOn(
+      ZalletRpcClient.prototype,
+      "spendableShieldedBalanceZat",
+    ).mockResolvedValue(10000000);
     vi.spyOn(ZalletRpcClient.prototype, "sendFromAccount").mockRejectedValue(
       new Error(`private memo ${route}`),
     );
@@ -735,4 +740,38 @@ it("background expiry preserves a refund with an unknown broadcast outcome", asy
     .run("2020-01-01T00:00:00.000Z", c.id);
   expect(retireExpiredProductRoutes(store, core)).toBe(0);
   expect(store.checkout(c.id)?.route).toBe(route);
+});
+
+it("returns a fixed funding error in the merchant API without creating an uncertain refund", async () => {
+  const { m, c } = await paid();
+  vi.spyOn(
+    ZalletRpcClient.prototype,
+    "decodeUnifiedAddress",
+  ).mockImplementation(async (address) => ({ orchard: address }));
+  vi.spyOn(
+    ZalletRpcClient.prototype,
+    "spendableShieldedBalanceZat",
+  ).mockResolvedValue(190000);
+  const send = vi.spyOn(ZalletRpcClient.prototype, "sendFromAccount");
+  vi.stubEnv("NOSTOS_MERCHANT_WALLET_RPC_URL", "http://127.0.0.1:1");
+  vi.stubEnv("NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE", "/fixture");
+  const cookie = accountHeader(store.session(m.id)).split(";")[0]!;
+  const result = await POST(
+    post(
+      "refund",
+      { id: c.id, amountZat: 200000, instructionId: randomUUID() },
+      undefined,
+      cookie,
+    ),
+  );
+  expect(result.status).toBe(409);
+  const body = await result.text();
+  expect(body).toContain("cannot cover this refund");
+  expect(body).not.toContain(route);
+  expect(body).not.toContain("190000");
+  expect(core.listRefundsByPayment(paymentTxid)).toEqual([]);
+  expect(send).not.toHaveBeenCalled();
+  expect(
+    checkoutView(store, core, store.checkout(c.id)!).remainingAmountZat,
+  ).toBe(2000000);
 });

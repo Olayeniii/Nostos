@@ -32,6 +32,7 @@ describe("partial refund execution", () => {
     );
     const options = {
       broadcaster: {
+        spendableShieldedBalanceZat: vi.fn(async () => 10000000),
         sendFromAccount,
         decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
       },
@@ -55,6 +56,7 @@ describe("partial refund execution", () => {
     const sendFromAccount = vi.fn(async () => "c".repeat(64));
     const options = {
       broadcaster: {
+        spendableShieldedBalanceZat: vi.fn(async () => 10000000),
         sendFromAccount,
         decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
       },
@@ -75,6 +77,9 @@ describe("partial refund execution", () => {
     });
     expect(sendFromAccount).toHaveBeenCalledTimes(1);
     expect(store.findRefundByPayment(payment.id)?.retryCount).toBe(1);
+    expect(
+      options.broadcaster.spendableShieldedBalanceZat,
+    ).toHaveBeenCalledTimes(1);
     store.close();
   });
 
@@ -85,6 +90,7 @@ describe("partial refund execution", () => {
     });
     const options = {
       broadcaster: {
+        spendableShieldedBalanceZat: vi.fn(async () => 10000000),
         sendFromAccount,
         decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
       },
@@ -108,6 +114,7 @@ describe("partial refund execution", () => {
     await expect(
       executePartialRefund({
         broadcaster: {
+          spendableShieldedBalanceZat: vi.fn(async () => 10000000),
           sendFromAccount: vi.fn(),
           decodeUnifiedAddress: async (address: string) => ({
             orchard: address,
@@ -135,6 +142,7 @@ it("blocks unusable receiver before any instruction or broadcast", async () => {
       amountZat: 500000,
       idempotencyKey: "test_refund",
       broadcaster: {
+        spendableShieldedBalanceZat: vi.fn(async () => 10000000),
         sendFromAccount,
         decodeUnifiedAddress: async () => ({ sapling: "zs1fake" }),
       },
@@ -142,5 +150,66 @@ it("blocks unusable receiver before any instruction or broadcast", async () => {
   ).rejects.toThrow("Orchard-only");
   expect(store.findRefundByPayment(payment.id)).toBeUndefined();
   expect(sendFromAccount).not.toHaveBeenCalled();
+  store.close();
+});
+
+it.each([190000, 200000, 0])(
+  "rejects a known funding shortfall before reservation or spending: %s",
+  async (balance) => {
+    const store = storeWithPayment();
+    const broadcaster = {
+      spendableShieldedBalanceZat: vi.fn(async () => balance),
+      decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
+      sendFromAccount: vi.fn(),
+    };
+    await expect(
+      executePartialRefund({
+        store,
+        broadcaster,
+        merchantAccountUuid: "merchant-account",
+        paymentTxid: payment.paymentTxId,
+        amountZat: 200000,
+        idempotencyKey: "funding-check",
+      }),
+    ).rejects.toThrow("cannot cover");
+    expect(broadcaster.spendableShieldedBalanceZat).toHaveBeenCalledWith(
+      "merchant-account",
+    );
+    expect(store.listRefundsByPayment(payment.id)).toEqual([]);
+    expect(broadcaster.sendFromAccount).not.toHaveBeenCalled();
+    store.close();
+  },
+);
+
+it("fails before reservation when the balance lookup fails, and leaves an unknown send blocked", async () => {
+  const store = storeWithPayment();
+  const broadcaster = {
+    spendableShieldedBalanceZat: vi.fn(async (): Promise<number> => {
+      throw new Error("balance unavailable");
+    }),
+    decodeUnifiedAddress: async (address: string) => ({ orchard: address }),
+    sendFromAccount: vi.fn(),
+  };
+  const options = {
+    store,
+    broadcaster,
+    merchantAccountUuid: "merchant-account",
+    paymentTxid: payment.paymentTxId,
+    amountZat: 200000,
+    idempotencyKey: "funding-check",
+  };
+  await expect(executePartialRefund(options)).rejects.toThrow(
+    "balance unavailable",
+  );
+  expect(store.listRefundsByPayment(payment.id)).toEqual([]);
+  broadcaster.spendableShieldedBalanceZat.mockResolvedValue(10000000);
+  broadcaster.sendFromAccount.mockRejectedValue(new Error("transport failed"));
+  await expect(executePartialRefund(options)).rejects.toThrow(
+    "transport failed",
+  );
+  broadcaster.spendableShieldedBalanceZat.mockClear();
+  await expect(executePartialRefund(options)).rejects.toThrow("unknown");
+  expect(broadcaster.spendableShieldedBalanceZat).not.toHaveBeenCalled();
+  expect(broadcaster.sendFromAccount).toHaveBeenCalledTimes(1);
   store.close();
 });

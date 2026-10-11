@@ -53,6 +53,7 @@ const diagnosticMethods = new Set([
   "z_listunspent",
   "z_viewtransaction",
   "z_sendfromaccount",
+  "z_getbalanceforaccount",
 ]);
 
 async function authorization(config: ZalletRpcConfig): Promise<string> {
@@ -236,6 +237,38 @@ export class ZalletRpcClient {
           : 0,
       outputs: transaction.outputs as ShieldedNote[],
     };
+  }
+
+  async spendableShieldedBalanceZat(account: string): Promise<number> {
+    const result = await this.call<unknown>("z_getbalanceforaccount", [
+      account,
+      1,
+    ]);
+    if (!result || typeof result !== "object" || Array.isArray(result))
+      throw new Error("Wallet balance is unavailable.");
+    const pools = (result as Record<string, unknown>).pools;
+    if (!pools || typeof pools !== "object" || Array.isArray(pools))
+      throw new Error("Wallet balance is unavailable.");
+    let total = 0;
+    // Orchard funding uses the current Orchard/Ironwood shielded pool family.
+    // Never count transparent or Sapling funds toward an Orchard refund.
+    for (const name of ["orchard", "ironwood"]) {
+      const pool = (pools as Record<string, unknown>)[name];
+      if (pool === undefined) continue;
+      if (!pool || typeof pool !== "object" || Array.isArray(pool))
+        throw new Error("Wallet balance is unavailable.");
+      const value = (pool as Record<string, unknown>).valueZat;
+      if (
+        typeof value !== "number" ||
+        !Number.isSafeInteger(value) ||
+        value < 0
+      )
+        throw new Error("Wallet balance is unavailable.");
+      total += value;
+      if (!Number.isSafeInteger(total))
+        throw new Error("Wallet balance is unavailable.");
+    }
+    return total;
   }
 
   async sendFromAccount(

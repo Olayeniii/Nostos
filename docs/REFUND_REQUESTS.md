@@ -45,3 +45,27 @@ Tests cover capability scope, merchant ownership, encrypted request/decision tex
 The isolated deployment preview disables the background retention pass (`NOSTOS_RETENTION_ENABLED=0`) so preview startup cannot retire live routes.
 
 Use `scripts/web/deploy.py` for an isolated build, candidate health checks, retained previous container and automatic failed-switch recovery. Do not restart Zebra or either wallet. Keep current source changes and runtime files intact. After deployment, verify the actual release mount, the existing Item21 receipt, and customer request/decision controls. Verify runtime logs and Noir independently before describing this as live verified.
+
+## Merchant funding check
+
+Before a new refund instruction is reserved, the application reads the named
+merchant account's spendable balance at one confirmation through the existing
+loopback wallet RPC client. Only Orchard/Ironwood value counts toward Orchard
+funding; transparent and Sapling balances are excluded. An unavailable or invalid
+balance stops before reservation and spending. A balance at or below the refund
+amount produces a fixed funding error: the merchant must fund the wallet rather
+than reduce the customer's refund automatically. Fees remain additional merchant
+spending; remaining payment value is accounting, not a wallet balance.
+
+This is a necessary funding check, not an exact transaction fee quote. A balance
+above the refund amount does not guarantee it covers the selected transaction's
+fee, and another spend can race the check. Any failure after the actual send
+request retains the existing unknown-outcome reservation. Recorded broadcast or
+confirmed instructions return their existing transaction on replay without a
+fresh balance check. Unknown instructions remain blocked without a new send.
+
+The October 11 Item21 attempt for 200000 zat was already recorded as unknown
+before this check existed. Its observed merchant account balance was 190000 zat.
+The new check does not change that record or prove it never broadcast. Its routes
+and reservation remain intact pending independent wallet evidence. No additional
+payment, refund, database mutation or wallet restart is authorized by this fix.

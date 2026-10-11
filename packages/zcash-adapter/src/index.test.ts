@@ -329,3 +329,51 @@ describe("ZalletRpcClient", () => {
     });
   });
 });
+
+describe("refund funding balance", () => {
+  it("reads only the named account's confirmed Orchard-family value, excluding other pools", async () => {
+    const client = new ZalletRpcClient({
+      url: "http://127.0.0.1:1",
+      user: "fixture",
+      password: "fixture",
+    });
+    const call = vi.spyOn(client, "call").mockResolvedValue({
+      pools: {
+        orchard: { valueZat: 10000 },
+        ironwood: { valueZat: 190000 },
+        sapling: { valueZat: 5000000 },
+        transparent: { valueZat: 5000000 },
+      },
+    });
+    expect(await client.spendableShieldedBalanceZat("merchant-account")).toBe(
+      200000,
+    );
+    expect(call).toHaveBeenCalledWith("z_getbalanceforaccount", [
+      "merchant-account",
+      1,
+    ]);
+  });
+  it.each([
+    null,
+    {},
+    { pools: [] },
+    { pools: { ironwood: { valueZat: -1 } } },
+    { pools: { ironwood: { valueZat: "190000" } } },
+    { pools: { ironwood: { valueZat: 1.5 } } },
+    {
+      pools: {
+        orchard: { valueZat: Number.MAX_SAFE_INTEGER },
+        ironwood: { valueZat: 1 },
+      },
+    },
+  ])(
+    "rejects unavailable or malformed balances without exposing their data",
+    async (value) => {
+      const client = new ZalletRpcClient({ url: "http://127.0.0.1:1" });
+      vi.spyOn(client, "call").mockResolvedValue(value);
+      await expect(
+        client.spendableShieldedBalanceZat("merchant-account"),
+      ).rejects.toThrow("Wallet balance is unavailable.");
+    },
+  );
+});
