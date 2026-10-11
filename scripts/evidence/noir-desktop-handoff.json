@@ -1,0 +1,21 @@
+{
+  "network": "testnet",
+  "wallet": "Noir desktop extension",
+  "versionAtApproval": "1.0.38",
+  "evidenceSource": "Customer reports in the work session; no independent chain lookup",
+  "approvalObservedOn": "2026-10-07",
+  "testnetApprovalReported": true,
+  "separateMainnetWindowReported": true,
+  "walletReportedTransactionId": "52c7722b889f955971b29730a94a8ac0633f8a623d978d054668b8a756e14445",
+  "walletActivityReported": "failed",
+  "nostosReceiptReported": "awaiting payment",
+  "latestRejectionReportedOn": "2026-10-11",
+  "latestRejection": "transaction uses an incorrect consensus branch id",
+  "resyncResolvedRejection": false,
+  "actualTransactionBranchObtained": false,
+  "serverBranchMetadataObtained": false,
+  "faultyComponentEstablished": false,
+  "automaticPaymentCompleted": false,
+  "replacementPaymentOrRefundCreatedByThisReview": false,
+  "scope": "Approval and rejection reported by customer. Not proof of network acceptance, confirmed payment, funding-source enforcement or a completed automatic payment/refund loop."
+}

@@ -34,16 +34,16 @@ must be reconciled before another send. Never substitute staged database records
 
 ## Evidence boundaries
 
-| Claim                   | Evidence and limit                                                                                                                                                                                                    |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Real shielded payment   | Operator supplied matched merchant wallet note/memo evidence for Item21; expected NOSTOS v1/order and canonical Orchard-only route matched. Incoming note pool was Ironwood.                                          |
-| Real partial refund     | Read-only database checkpoint records a confirmed 1,800,000 zat refund, zero retries and the transaction below. The operator also observed confirmation on the private receipt.                                       |
-| Customer received funds | Customer explicitly confirmed Noir received the refund after reimport/sync on October 6. The attached screenshot was not independently read by the agent.                                                             |
-| Automatic handoff       | New injected Noir extension path has synthetic-provider regression coverage. Real extension execution, shielded funding enforcement and mobile handoff remain unproved. Item21 used manual address/amount/memo entry. |
-| Current storage         | Operator read-only inspection reported two protected product routes and one protected core address, with zero unprotected/invalid values. This scope excludes logs, wallet history, WAL and backups.                  |
-| Retention               | Item21 has an original unset deadline and remaining refundable value. Both protected routes are retained. New requests have finite windows; live full-refund/expiry retirement remains unproved.                      |
-| Custody                 | Hosted merchant Zallet holds spending authority. The application coordinates merchant-authorized spending; Zallet constructs/signs/broadcasts. Merchant-controlled custody is not implemented.                        |
-| Route meaning           | A route supplied with this payment. No proof of payer identity, receiver control or ongoing possession is claimed. Authenticated Reply Addresses is draft prior art, not an implemented standard.                     |
+| Claim                   | Evidence and limit                                                                                                                                                                                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Real shielded payment   | Operator supplied matched merchant wallet note/memo evidence for Item21; expected NOSTOS v1/order and canonical Orchard-only route matched. Incoming note pool was Ironwood.                                                                                                |
+| Real partial refund     | Read-only database checkpoint records a confirmed 1,800,000 zat refund, zero retries and the transaction below. The operator also observed confirmation on the private receipt.                                                                                             |
+| Customer received funds | Customer explicitly confirmed Noir received the refund after reimport/sync on October 6. The attached screenshot was not independently read by the agent.                                                                                                                   |
+| Automatic handoff       | Desktop Noir 1.0.38 reached transaction approval after the connection fix. The separate payment failed consensus validation and its receipt remained unpaid. Automatic payment completion and mobile handoff remain unproved. Item21 used manual address/amount/memo entry. |
+| Current storage         | Operator read-only inspection reported two protected product routes and one protected core address, with zero unprotected/invalid values. This scope excludes logs, wallet history, WAL and backups.                                                                        |
+| Retention               | Item21 has an original unset deadline and remaining refundable value. Both protected routes are retained. New requests have finite windows; live full-refund/expiry retirement remains unproved.                                                                            |
+| Custody                 | Hosted merchant Zallet holds spending authority. The application coordinates merchant-authorized spending; Zallet constructs/signs/broadcasts. Merchant-controlled custody is not implemented.                                                                              |
+| Route meaning           | A route supplied with this payment. No proof of payer identity, receiver control or ongoing possession is claimed. Authenticated Reply Addresses is draft prior art, not an implemented standard.                                                                           |
 
 Payment transaction:
 `6f692f8c99d355f9a1d3ddf99a76df1cdaf3f81bbc07a14db7d460c838f9c91e`
@@ -120,3 +120,44 @@ reopened Connect. The handoff now reads existing authorization first and request
 Connect only when that lookup returns null. Lookup errors and unsuitable accounts
 stop before spending. Regression tests cover both connection paths; real approval,
 broadcast and receipt of this separate test payment still require live verification.
+
+## Desktop handoff checkpoint, October 11
+
+The customer reported a real testnet approval screen on October 7 after the
+connection fix. A separate mainnet extension window also opened; this is not
+proof of two testnet sends. The customer approved the testnet request only.
+The wallet subsequently reported an incorrect consensus branch ID and later
+marked the activity failed. The associated NOSTOS receipt remained awaiting
+payment. Wallet-reported transaction reference:
+`52c7722b889f955971b29730a94a8ac0633f8a623d978d054668b8a756e14445`.
+This reference is not independent chain evidence.
+
+On October 11, the customer reported incomplete spendability metadata, ran
+resync, then reported the same consensus branch rejection again. Neither the
+wallet builder's actual branch ID nor the server's accepted branch was obtained.
+Do not assign the fault conclusively to either component or claim resync fixed it.
+Public server probes were blocked by HTTP 403 or browser CORS; those failures
+provide no branch metadata. Do not repeat those probes as a recovery step.
+
+The manual Item21 payment/refund evidence remains valid. Record the direct Noir
+path as approval observed, payment completion blocked. Do not submit another
+payment or substitute a staged result for this failed attempt. A maintainer
+comparison of the signed transaction and current testnet validation rules is
+needed to identify that mismatch. Any other wallet must satisfy the same memo
+and Orchard return-route rules before a separate test is proposed.
+
+## Remaining submission checks
+
+- Confirm the current deployed SHA from the running release, independently of
+  GitHub main. The October 6 release observation is historical.
+- Inspect current route columns and the retention worker on the deployed release.
+  Item21 has remaining refund value and no original deadline; preserve its route.
+- Verify deletion on a genuinely eligible full-refund or expired record if one
+  already exists. If none exists, report local coverage and leave live deletion
+  unproved. Never alter Item21 or create a transaction to manufacture that proof.
+- Complete the separately scoped wallet history, WAL, backup and full repository
+  history review before claiming all sensitive material is removed or publishing
+  the repository. Current-column encryption is narrower evidence.
+- Record the existing receipt and merchant views privately, redact capabilities,
+  and keep the supported fulfillment-failure explanation separate from Item21's
+  actual pending fulfillment history.
