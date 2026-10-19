@@ -1,4 +1,6 @@
 import hashlib
+import contextlib
+import io
 import importlib.util
 import json
 import os
@@ -33,7 +35,8 @@ class ArtifactScope(unittest.TestCase):
             struct.pack_into('<H',header,18,183)
             binary.write_bytes(header)
             (root/'wallet.db').write_text('private fixture never include')
-            MODULE.package(binary,root/'output')
+            with contextlib.redirect_stdout(io.StringIO()):
+                MODULE.package(binary,root/'output')
             with tarfile.open(root/'output/nostos-observer-arm64.tar.gz') as archive:
                 self.assertEqual(archive.getnames(),['zallet-zaino','provenance.json'])
                 self.assertEqual(archive.extractfile('zallet-zaino').read(),header)
@@ -41,6 +44,19 @@ class ArtifactScope(unittest.TestCase):
             self.assertEqual(metadata['binary_sha256'],hashlib.sha256(header).hexdigest())
             self.assertFalse(metadata['wallet_files_included'])
             self.assertEqual(metadata['sends_requested'],0)
+            verify_spec = importlib.util.spec_from_file_location('observer_verify', Path(__file__).with_name('verify-artifact.py'))
+            checker = importlib.util.module_from_spec(verify_spec)
+            verify_spec.loader.exec_module(checker)
+            archive_path = root/'output/nostos-observer-arm64.tar.gz'
+            digest = hashlib.sha256(archive_path.read_bytes()).hexdigest()
+            self.assertTrue(checker.verify(archive_path,digest,'a'*40,'123')['artifact_verified'])
+            with self.assertRaises(ValueError):
+                checker.verify(archive_path,'0'*64,'a'*40,'123')
+            with self.assertRaises(ValueError):
+                checker.verify(archive_path,digest,'b'*40,'123')
+            with self.assertRaises(ValueError):
+                checker.verify(archive_path,digest,'a'*40,'124')
+            self.assertFalse((root/'zallet-zaino').exists())
 
     def test_refuses_overwriting_existing_output(self):
         with tempfile.TemporaryDirectory() as directory:

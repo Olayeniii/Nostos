@@ -74,3 +74,16 @@ and repository revision as well. No VPS Rust or dependency download is required
 for this route. Runtime library compatibility and actual observer sync remain
 separate checks. Do not install the toolchain merely because Cargo was absent
 from the interactive shell.
+
+Validate the downloaded inner archive before any installation, using the checksum,
+revision and run ID independently obtained from the reviewed successful build:
+
+```bash
+python3 scripts/observer/verify-artifact.py /path/to/nostos-observer-arm64.tar.gz \
+  --sha256 <reviewed-archive-sha256> --revision <build-source-commit> --run-id <build-run-id>
+```
+
+This reads and hashes the archive without extracting or executing the binary. It
+rejects unexpected paths/links, wrong build provenance, incorrect checksums and
+non-ARM64 executables. It neither installs a toolchain nor touches wallet files
+or services. A failed validation must not be bypassed.
