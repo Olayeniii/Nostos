@@ -196,3 +196,33 @@ describe("Noir injected handoff", () => {
     expect(rpc.request).not.toHaveBeenCalled();
   });
 });
+
+describe("mainnet handoff network boundary", () => {
+  it("requires the wallet account and paying memo on the declared mainnet", async () => {
+    const main = "u1" + "a".repeat(60);
+    const payment = {
+      network: "mainnet" as const,
+      destination: main,
+      amountZat: 20000,
+      memo: JSON.stringify({
+        p: "nostos",
+        v: 1,
+        o: "n_" + "b".repeat(32),
+        r: main,
+      }),
+    };
+    const correct = provider({ shielded: main });
+    await expect(new NoirHandoff().send(correct, payment)).resolves.toBe(
+      "c".repeat(64),
+    );
+    const wrong = provider({ shielded: address });
+    await expect(new NoirHandoff().send(wrong, payment)).rejects.toThrow(
+      "payment network",
+    );
+    expect(
+      wrong.request.mock.calls.some(
+        ([a]) => a.method === "zcash_sendTransaction",
+      ),
+    ).toBe(false);
+  });
+});

@@ -16,15 +16,14 @@ The merchant product now has account creation, store setup, payment requests, ch
 
 Build started: `2026-09-29T00:01:43Z`
 
-## October 19 refund reconciliation candidate
+## October 19 refund reconciliation
 
-The operator supplied a fully synced merchant wallet with only the known Item21
-payment and confirmed 0.018 ZEC refund in the matching account. The later 0.002 ZEC
-attempt remains reserved until the audited operator recovery tool is applied.
-See [closeout evidence and dry-run/apply instructions](docs/CLOSEOUT.md). The
-candidate preserves the old instruction, earlier settlement and both routes; it
-does not send another refund. Runtime deployment and application remain separate
-checks, and broader privacy/submission work is still open.
+The operator supplied successful guarded apply output at 11:15:50 UTC. The later
+0.002 ZEC instruction is closed as failed, with zero reserved, both routes retained
+and no new send. The earlier 0.018 ZEC refund remains confirmed. Remaining accounting
+value is not wallet funding; the previously observed 190000 zat balance was short
+of 200000 zat plus fees. The old instruction cannot be retried. See
+[closeout evidence](docs/CLOSEOUT.md). Broader privacy and submission work remains open.
 
 ## Privacy audit status
 
@@ -95,3 +94,17 @@ The repository remains private during the build window and will be made public f
 ## External protocol review
 
 See [the October 2 protocol review](docs/PROTOCOL_REVIEW.md) for the verified source baseline, information flow, custody and prior-work comparison. The follow-up patch validates Orchard-only return routes before intake and refund signing, tightens the 512-byte memo schema, and removes both product route copies after confirmed full repayment. It does not prove route ownership, freshness outside NOSTOS, production deployment, backup erasure or an independent current wallet loop. Customer requests, merchant decisions, cumulative partial refunds, policy snapshots, expiry cleanup and original-memo recovery are documented in [Refund requests](docs/REFUND_REQUESTS.md). These changes are verified locally; deployment and the independent Noir refund observation remain separate checks. The broader privacy release gate remains open.
+
+## Merchant funds and separate mainnet support candidate
+
+The merchant Funds page supports password-confirmed shielded withdrawal of released
+earnings, with remaining refund principal and a fee allowance reserved. A wallet
+proposal supplies the actual withdrawal fee before review. Atomic spending guards
+block competing refunds and withdrawals; uncertain outcomes cannot be retried.
+Item21 retains its original deadline and route terms.
+
+Explicit mainnet configuration uses separate wallet/node RPCs, keys, databases,
+network-bound stores and a separate isolated deployment. The existing auto-deployer
+continues to serve testnet. No mainnet transaction, live withdrawal or production
+custody readiness is claimed by this source candidate. Configuration and verification
+steps are in [MERCHANT_FUNDS.md](docs/MERCHANT_FUNDS.md).

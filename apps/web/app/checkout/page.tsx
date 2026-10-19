@@ -1,4 +1,5 @@
 "use client";
+import { useNetwork } from "../../src/network-context.js";
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
@@ -12,12 +13,14 @@ import { requestJson } from "../../src/requests.js";
 import { useRecord } from "../../src/use-record.js";
 import { zec, type ReceiptData } from "../../src/receipt-card.js";
 type Prepared = {
+  network: "testnet" | "mainnet";
   uri: string;
   destination: string;
   memo: string;
   amountZat: number;
 };
 export default function Checkout() {
+  const network = useNetwork();
   const [token, setToken] = useState("");
   const [initialized, setInitialized] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -94,9 +97,9 @@ export default function Checkout() {
             </p>
           </div>
           <p className="privacy">
-            Zcash testnet only. Pay from a wallet that supports shielded testnet
-            payments and custom memos. The website does not hold your customer
-            wallet keys.
+            Pay on {network ?? "the stated network"} from a wallet that supports
+            shielded payments and custom memos. The website does not hold your
+            customer wallet keys.
           </p>
         </aside>
         <section className="checkout-card panel">
@@ -131,8 +134,9 @@ export default function Checkout() {
             <>
               <h2>Pay with shielded ZEC</h2>
               <p>
-                Supply a fresh shielded testnet address from a wallet that you
-                control. NOSTOS uses its Orchard receiver for the refund route.
+                Supply a fresh shielded address on this network from a wallet
+                that you control. NOSTOS uses its Orchard receiver for the
+                refund route.
               </p>
               {!prepared ? (
                 <form
@@ -165,7 +169,7 @@ export default function Checkout() {
                       );
                     } catch {
                       setError(
-                        "Could not prepare the payment. Check the testnet address and connection. Once attached, the return address cannot be changed.",
+                        "Could not prepare the payment. Check the address network and connection. Once attached, the return address cannot be changed.",
                       );
                     } finally {
                       setBusy(false);
@@ -181,7 +185,9 @@ export default function Checkout() {
                       spellCheck={false}
                       minLength={26}
                       maxLength={506}
-                      placeholder="utest1..."
+                      placeholder={
+                        network === "mainnet" ? "u1..." : "utest1..."
+                      }
                       required
                       disabled={busy}
                     />
@@ -243,7 +249,7 @@ export default function Checkout() {
                           }
                           setWalletBusy(true);
                           setWalletMessage(
-                            "Review the address, amount and memo in Noir before approving. Use shielded testnet funds.",
+                            "Review the address, amount and memo in Noir before approving. Use shielded funds on the displayed network.",
                           );
                           try {
                             await handoff.current.send(

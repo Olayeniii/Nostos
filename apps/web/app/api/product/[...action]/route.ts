@@ -1,3 +1,11 @@
+import { runtimeNetwork } from "../../../../../../packages/network/src/index.js";
+import { chainWallet } from "../../../../src/wallet-runtime.js";
+import {
+  FundsError,
+  merchantFunds,
+  quoteWithdrawal,
+  confirmWithdrawal,
+} from "../../../../src/merchant-funds.js";
 import { RefundFundingError } from "../../../../../worker/src/refund.js";
 import { validRefundWindow } from "../../../../src/refund-policy.js";
 import {
@@ -72,6 +80,8 @@ async function handle(request: Request) {
   let store: ProductStore | undefined;
   let core: ReturnType<typeof coreStore> | undefined;
   try {
+    if (action(request) === "network" && request.method === "GET")
+      return json({ network: runtimeNetwork() });
     store = new ProductStore();
     core = coreStore(store);
     const route = action(request);
@@ -262,7 +272,10 @@ async function handle(request: Request) {
       if (route === "prepare" && isPost) {
         const route = text(body.route, 20, 506);
         if (!route)
-          return json({ error: "Enter a fresh testnet refund address" }, 400);
+          return json(
+            { error: "Enter a fresh refund address on this network" },
+            400,
+          );
         return json(await preparePayment(store, checkout, route, wallet()));
       }
       if (route === "checkout" && !isPost) {
@@ -281,6 +294,70 @@ async function handle(request: Request) {
     }
     const merchant = store.authenticate(request);
     if (!merchant) return json({ error: "Sign in required" }, 401);
+    if (route === "funds" && !isPost)
+      return json(
+        await merchantFunds(
+          store,
+          core,
+          merchant,
+          wallet(15000),
+          chainWallet(),
+        ),
+      );
+    if (
+      ["withdrawal-quote", "withdrawal-confirm"].includes(route ?? "") &&
+      isPost
+    ) {
+      const password = typeof body.password === "string" ? body.password : "";
+      if (
+        password.length > 128 ||
+        !identityLimit(store, merchant.id + ":withdraw", 10) ||
+        !reauthenticated(store, merchant.id, password)
+      )
+        return json(
+          { error: "Check your current password or try again later." },
+          403,
+        );
+      if (route === "withdrawal-quote") {
+        const destination = text(body.destination, 20, 506),
+          value = amount(body.amountZat);
+        if (
+          !destination ||
+          !value ||
+          Object.keys(body).some(
+            (k) => !["destination", "amountZat", "password"].includes(k),
+          )
+        )
+          return json(
+            { error: "Enter a shielded withdrawal address and amount." },
+            400,
+          );
+        return json(
+          await quoteWithdrawal(
+            store,
+            core,
+            merchant,
+            destination,
+            value,
+            wallet(30000),
+            chainWallet(),
+          ),
+        );
+      }
+      const id = text(body.id, 36, 36);
+      if (!id || Object.keys(body).some((k) => !["id", "password"].includes(k)))
+        return json({ error: "Review a new withdrawal first." }, 400);
+      return json(
+        await confirmWithdrawal(
+          store,
+          core,
+          merchant,
+          id,
+          wallet(120000),
+          chainWallet(),
+        ),
+      );
+    }
     if (route === "change-email" && isPost) {
       const email = text(body.email, 3, 254)?.toLowerCase();
       const password = typeof body.password === "string" ? body.password : "";
@@ -417,7 +494,7 @@ async function handle(request: Request) {
       const value = amount(body.amountZat);
       if (!description || !value)
         return json(
-          { error: "Enter a description and an amount up to 1 testnet ZEC" },
+          { error: "Enter a description and an amount up to 1 ZEC" },
           400,
         );
       return json(newRequest(store, merchant, description, value));
@@ -487,7 +564,7 @@ async function handle(request: Request) {
     }
     return json({ error: "Not found" }, 404);
   } catch (error) {
-    if (error instanceof RefundFundingError)
+    if (error instanceof RefundFundingError || error instanceof FundsError)
       return json({ error: error.message }, 409);
     // Raw wallet/SQLite errors can contain private memos, destinations or identities.
     return json(

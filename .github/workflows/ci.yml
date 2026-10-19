@@ -23,4 +23,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm --filter @nostos/web build
-      - run: python3 -m unittest scripts/web/test_deploy.py scripts/web/test_auto_deploy.py
+      - run: python3 -m unittest discover -s scripts/web -p 'test_*.py'

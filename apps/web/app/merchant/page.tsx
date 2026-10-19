@@ -89,6 +89,7 @@ export default function Merchant() {
         <Link aria-current="page" href="/merchant">
           Payments
         </Link>
+        <Link href="/merchant/funds">Funds</Link>
         <Link href="/merchant/settings">Store settings</Link>
         <button
           className="text-button"
@@ -181,7 +182,7 @@ export default function Merchant() {
               const form = new FormData(e.currentTarget);
               const amountZat = parseZec(String(form.get("amount")));
               if (!amountZat || amountZat > 1e8) {
-                setError("Enter an amount from 0.00000001 to 1 testnet ZEC.");
+                setError("Enter an amount from 0.00000001 to 1 ZEC.");
                 return;
               }
               setBusy(true);

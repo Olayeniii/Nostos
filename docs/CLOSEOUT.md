@@ -83,7 +83,7 @@ This script deliberately has no resolution or mutation command.
 | Merchant refund  | 1800000 zat confirmed with recorded txid and zero retries                                 | Partial refund, separate from the later unknown instruction              |
 | Customer receipt | Customer confirmed funds received in Noir after sync                                      | Manual payment path; automatic payment failed consensus validation       |
 | Receipt/UI       | Existing merchant and customer phone views showed readable amounts and wrapped references | Historical views; no new recording performed here                        |
-| Final amount     | 200000 zat attempt reconciled as failed; zero reserved, routes retained                  | Available accounting value is not wallet funding; no full-refund claim   |
+| Final amount     | 200000 zat attempt reconciled as failed; zero reserved, routes retained                   | Available accounting value is not wallet funding; no full-refund claim   |
 
 Preserve the existing transaction references and provenance in
 `scripts/evidence/item21-refund.json`. Do not invent a fulfillment failure or claim

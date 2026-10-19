@@ -113,6 +113,14 @@ export class SqlitePaymentStore {
         "ALTER TABLE refunds ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
       );
     }
+    this.#database.exec(`CREATE TABLE IF NOT EXISTS merchant_withdrawals (
+      id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL, network TEXT NOT NULL,
+      destination TEXT NOT NULL, amount_zat INTEGER NOT NULL CHECK(amount_zat>0),
+      fee_zat INTEGER NOT NULL CHECK(fee_zat>0), pczt TEXT NOT NULL,
+      status TEXT NOT NULL, txid TEXT UNIQUE, expires_at INTEGER NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    ); CREATE UNIQUE INDEX IF NOT EXISTS one_merchant_withdrawal_spend ON merchant_withdrawals(merchant_id)
+      WHERE status IN ('broadcasting','broadcast_unknown','broadcast');`);
     // Additive ledger: keep the first real refund in the legacy table so older
     // releases still see an instruction and cannot create a second first send.
     this.#database.exec(`CREATE TABLE IF NOT EXISTS refund_events (
@@ -241,6 +249,50 @@ export class SqlitePaymentStore {
     };
   }
 
+  // SQL state checks share the same writer lock as refund reservation.
+  merchantRefundInProgress(merchantId: string): boolean {
+    return !!this.#database
+      .prepare(
+        "SELECT 1 FROM refund_events r JOIN payments p ON p.id=r.payment_id WHERE p.merchant_id=? AND r.status NOT IN ('confirmed','failed') LIMIT 1",
+      )
+      .get(merchantId);
+  }
+  merchantWithdrawalInProgress(merchantId: string): boolean {
+    return !!this.#database
+      .prepare(
+        "SELECT 1 FROM merchant_withdrawals WHERE merchant_id=? AND status IN ('broadcasting','broadcast_unknown','broadcast') LIMIT 1",
+      )
+      .get(merchantId);
+  }
+  withdrawalDatabase() {
+    return this.#database;
+  }
+  bindNetwork(network: "testnet" | "mainnet") {
+    this.#database.exec(
+      "CREATE TABLE IF NOT EXISTS core_environment(id INTEGER PRIMARY KEY CHECK(id=1),network TEXT NOT NULL)",
+    );
+    const bound = this.#database
+      .prepare("SELECT network FROM core_environment WHERE id=1")
+      .get();
+    if (
+      !bound &&
+      network === "mainnet" &&
+      Number(
+        this.#database.prepare("SELECT COUNT(*) AS n FROM payments").get()!.n,
+      )
+    )
+      throw new Error("Existing ledger cannot be adopted as mainnet.");
+    this.#database
+      .prepare("INSERT OR IGNORE INTO core_environment VALUES(1,?)")
+      .run(network);
+    if (
+      this.#database
+        .prepare("SELECT network FROM core_environment WHERE id=1")
+        .get()!.network !== network
+    )
+      throw new Error("Ledger network does not match.");
+  }
+
   prepareRefund(
     paymentTxid: string,
     intent: RefundIntent,
@@ -263,6 +315,10 @@ export class SqlitePaymentStore {
         this.#database.exec("COMMIT");
         return { created: false, refund: existing };
       }
+      if (this.merchantWithdrawalInProgress(payment.merchantId))
+        throw new Error(
+          "A withdrawal requires reconciliation before another spend.",
+        );
       const valid = parseRefundIntent(intent, payment);
       const records = this.listRefundsByPayment(payment.id);
       if (
@@ -364,6 +420,16 @@ export class SqlitePaymentStore {
       );
     }
     if (refund.status !== "pending") return refund;
+    const payment = this.#database
+      .prepare("SELECT merchant_id FROM payments WHERE id=?")
+      .get(paymentId);
+    if (
+      !payment ||
+      this.merchantWithdrawalInProgress(String(payment.merchant_id))
+    )
+      throw new Error(
+        "A withdrawal requires reconciliation before another spend.",
+      );
     const claim = this.#database
       .prepare(
         `UPDATE refund_events SET status = 'broadcasting', updated_at = ?

@@ -1,4 +1,5 @@
 "use client";
+import { NetworkLabel } from "../../../src/network-context.js";
 import { DEFAULT_REFUND_WINDOW_DAYS } from "../../../src/refund-policy.js";
 import { ChangeEmail } from "../../../src/change-email.js";
 import { useState } from "react";
@@ -68,7 +69,9 @@ export default function Settings() {
             <dl>
               <div>
                 <dt>Network</dt>
-                <dd>Zcash testnet</dd>
+                <dd>
+                  <NetworkLabel />
+                </dd>
               </div>
               <div>
                 <dt>Custody</dt>

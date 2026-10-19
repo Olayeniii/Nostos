@@ -1,3 +1,4 @@
+import { NetworkProvider } from "../src/network-context.js";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -55,7 +56,9 @@ export default function Layout({ children }: { children: ReactNode }) {
         <a className="skip-link" href="#content">
           Skip to content
         </a>
-        <div id="content">{children}</div>
+        <NetworkProvider>
+          <div id="content">{children}</div>
+        </NetworkProvider>
       </body>
     </html>
   );

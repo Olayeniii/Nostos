@@ -1,3 +1,4 @@
+import { productConfiguration } from "../../../packages/network/src/index.js";
 import {
   DEFAULT_REFUND_WINDOW_DAYS,
   validRefundWindow,
@@ -88,8 +89,8 @@ export class ProductStore {
   readonly db: DatabaseSync;
   readonly key: Buffer;
   constructor(
-    path = process.env.NOSTOS_PRODUCT_DATABASE_PATH,
-    key = process.env.NOSTOS_PRODUCT_DATA_KEY,
+    path = productConfiguration().path,
+    key = productConfiguration().key,
   ) {
     if (!path || !key || !/^[a-f0-9]{64}$/.test(key))
       throw new Error("Product service is not configured");
@@ -108,6 +109,33 @@ export class ProductStore {
   CREATE TABLE IF NOT EXISTS account_sessions(token_hash TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES merchants(id),expires_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS checkouts(id TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES merchants(id),description TEXT NOT NULL,order_ref TEXT NOT NULL,amount_zat INTEGER NOT NULL CHECK(amount_zat>0),token_hash TEXT NOT NULL UNIQUE,receipt_token TEXT NOT NULL,route TEXT NOT NULL DEFAULT '',route_hash TEXT UNIQUE,status TEXT NOT NULL DEFAULT 'unpaid',payment_txid TEXT UNIQUE,created_at TEXT NOT NULL,paid_at TEXT);
 `);
+    const network = productConfiguration().network;
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS product_environment (id INTEGER PRIMARY KEY CHECK(id=1),network TEXT NOT NULL)",
+    );
+    const bound = this.db
+      .prepare("SELECT network FROM product_environment WHERE id=1")
+      .get();
+    // Existing stores are always testnet. Never relabel existing merchants.
+    if (
+      !bound &&
+      network === "mainnet" &&
+      Number(this.db.prepare("SELECT COUNT(*) AS n FROM merchants").get()!.n)
+    ) {
+      this.db.close();
+      throw new Error("Existing store cannot be adopted as mainnet.");
+    }
+    this.db
+      .prepare("INSERT OR IGNORE INTO product_environment VALUES(1,?)")
+      .run(network);
+    if (
+      this.db
+        .prepare("SELECT network FROM product_environment WHERE id=1")
+        .get()!.network !== network
+    ) {
+      this.db.close();
+      throw new Error("Store network does not match.");
+    }
     const add = (table: string, name: string, definition: string) => {
       const columns = this.db.prepare(`PRAGMA table_info(${table})`).all();
       if (!columns.some((c) => c.name === name))

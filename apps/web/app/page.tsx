@@ -81,8 +81,8 @@ export default function Home() {
           </article>
         </div>
         <p className="home-note">
-          Built for Zcash testnet. Customers pay using a wallet that supports
-          shielded testnet payments and memos.
+          Customers pay using a wallet that supports shielded Zcash payments and
+          memos on the network displayed above.
         </p>
       </section>
       <AppFooter />

@@ -70,7 +70,7 @@ export default function Setup() {
             />
           </label>
           <aside className="info-panel">
-            <strong>Hosted testnet wallet</strong>
+            <strong>Hosted merchant wallet</strong>
             <p>
               NOSTOS creates a separate wallet account for your store. This
               service holds the signing keys and can see payment and refund

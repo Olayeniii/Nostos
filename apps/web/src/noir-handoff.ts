@@ -1,3 +1,7 @@
+import {
+  addressOnNetwork,
+  type Network,
+} from "../../../packages/network/src/index.js";
 // Minimal published Noir injected-provider interface. No WalletConnect transport.
 export type NoirProvider = {
   request(args: {
@@ -6,6 +10,7 @@ export type NoirProvider = {
   }): Promise<unknown>;
 };
 export type PreparedWalletPayment = {
+  network?: Network;
   destination: string;
   amountZat: number;
   memo: string;
@@ -44,7 +49,7 @@ export class NoirHandoff {
     // The server prepares and validates the receivers. These checks prevent a
     // malformed handoff from changing network, amount or private memo semantics.
     if (
-      !/^utest1[a-z0-9]{20,500}$/.test(payment.destination) ||
+      !addressOnNetwork(payment.destination, payment.network ?? "testnet") ||
       !Number.isSafeInteger(payment.amountZat) ||
       payment.amountZat <= 0 ||
       new TextEncoder().encode(payment.memo).length > 512
@@ -66,7 +71,7 @@ export class NoirHandoff {
       typeof memo.o !== "string" ||
       !/^n_[a-f0-9]{32}$/.test(memo.o) ||
       typeof memo.r !== "string" ||
-      !/^utest1[a-z0-9]{20,500}$/.test(memo.r)
+      !addressOnNetwork(memo.r, payment.network ?? "testnet")
     )
       throw new NoirHandoffError(
         "Payment instructions are unavailable. Refresh the payment page.",
@@ -98,10 +103,10 @@ export class NoirHandoff {
       // the selected wallet to return a shielded testnet address before sending.
       if (
         typeof address !== "string" ||
-        !/^utest1[a-z0-9]{20,500}$/.test(address)
+        !addressOnNetwork(address, payment.network ?? "testnet")
       )
         throw new NoirHandoffError(
-          "Noir did not return a shielded testnet account. No payment was requested.",
+          "Noir did not return a shielded account on the payment network. No payment was requested.",
         );
       if (beforeSend) {
         try {

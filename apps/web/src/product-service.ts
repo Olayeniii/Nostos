@@ -1,3 +1,14 @@
+import {
+  assertWalletReady,
+  assertWalletChainIdentity,
+  chainWallet,
+} from "./wallet-runtime.js";
+import {
+  runtimeNetwork,
+  runtimeValue,
+  addressOnNetwork,
+  productConfiguration,
+} from "../../../packages/network/src/index.js";
 import { randomUUID } from "node:crypto";
 import { ProductStore, type Checkout, type Merchant } from "./product-store.js";
 import { SqlitePaymentStore } from "../../../packages/database/src/index.js";
@@ -14,8 +25,8 @@ import {
 } from "../../../packages/zcash-adapter/src/refund-route.js";
 
 export function wallet(timeoutMs = 2500) {
-  const url = process.env.NOSTOS_MERCHANT_WALLET_RPC_URL;
-  const cookieFile = process.env.NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE;
+  const url = runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_URL");
+  const cookieFile = runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE");
   if (!url || !cookieFile) throw new Error("Wallet service unavailable");
   return new ZalletRpcClient({ url, cookieFile, timeoutMs });
 }
@@ -30,10 +41,17 @@ export type ProductWallet = Pick<
   | "spendableShieldedBalanceZat"
 >;
 export function coreStore(store: ProductStore) {
-  const path = process.env.NOSTOS_PRODUCT_CORE_DATABASE_PATH;
+  const path = productConfiguration().corePath;
   if (!path || path === process.env.NOSTOS_DATABASE_PATH)
     throw new Error("Separate product payment storage required");
-  return new SqlitePaymentStore(path, store);
+  const core = new SqlitePaymentStore(path, store);
+  try {
+    core.bindNetwork(runtimeNetwork());
+    return core;
+  } catch (e) {
+    core.close();
+    throw e;
+  }
 }
 export function matchesNote(
   note: ShieldedNote,
@@ -303,8 +321,8 @@ export async function preparePayment(
   route: string,
   rpc: ProductWallet,
 ) {
-  if (!/^utest1[a-z0-9]{20,500}$/.test(route))
-    throw new Error("Use a fresh testnet unified address");
+  if (!addressOnNetwork(route, runtimeNetwork()))
+    throw new Error("Use a fresh unified address on this network");
   if (checkout.status !== "unpaid")
     throw new Error("Payment is already recorded");
   route = await prepareOrchardRefundRoute(route, rpc);
@@ -316,7 +334,8 @@ export async function preparePayment(
   if (saved.route !== route)
     throw new Error("The return route is already attached");
   const destination = store.merchant(checkout.merchantId)!.destination;
-  if (!destination) throw new Error("Merchant is not ready to accept payment");
+  if (!addressOnNetwork(destination, runtimeNetwork()))
+    throw new Error("Merchant is not ready on this network");
   // ZIP 321 memo is base64url without padding. Never place this URI in a server URL/log.
   const uri = `zcash:${destination}?amount=${(checkout.amountZat / 1e8).toFixed(8)}&memo=${Buffer.from(memo, "hex").toString("base64url")}`;
   return {
@@ -324,6 +343,7 @@ export async function preparePayment(
     destination,
     memo: Buffer.from(memo, "hex").toString("utf8"),
     amountZat: checkout.amountZat,
+    network: runtimeNetwork(),
   };
 }
 export async function setupMerchant(
@@ -333,12 +353,19 @@ export async function setupMerchant(
   rpc: ProductWallet,
 ) {
   if (merchant.destination) return;
+  if (runtimeNetwork() === "mainnet")
+    await assertWalletChainIdentity(
+      rpc as ProductWallet & {
+        call: import("./wallet-runtime.js").WalletRpc["call"];
+      },
+      chainWallet(),
+    );
   if (!store.claimSetup(merchant.id))
     throw new Error("Store setup is being checked. Do not repeat it.");
   const account = await rpc.createAccount(`nostos-${merchant.id}`);
   const destination = await rpc.deriveOrchardAddress(account);
-  if (!/^utest1[a-z0-9]{20,}$/.test(destination))
-    throw new Error("Testnet address required");
+  if (!addressOnNetwork(destination, runtimeNetwork()))
+    throw new Error("Configured network address required");
   store.finishSetup(merchant.id, name, account, destination);
 }
 export function newRequest(
@@ -386,6 +413,19 @@ export async function refundPayment(
     throw new Error("Review the open request or refund window before sending.");
   if (requestId && store.refundRequest(requestId)?.status !== "approved")
     throw new Error("Merchant approval is required.");
+  if (runtimeNetwork() === "mainnet") {
+    if (
+      !addressOnNetwork(merchant.destination, "mainnet") ||
+      !addressOnNetwork(checkout.route, "mainnet")
+    )
+      throw new Error("Mainnet payment network mismatch.");
+    await assertWalletReady(
+      rpc as ProductWallet & {
+        call: import("./wallet-runtime.js").WalletRpc["call"];
+      },
+      chainWallet(),
+    );
+  }
   return submitRefund(
     {
       paymentTxid: payment.paymentTxId,

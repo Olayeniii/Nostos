@@ -26,7 +26,7 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
             return route that came with the payment.
           </p>
           <ul className="account-benefits">
-            <li>Shielded testnet payments</li>
+            <li>Shielded Zcash payments</li>
             <li>One encrypted return route per payment</li>
             <li>Payment and refund records in one workspace</li>
           </ul>
