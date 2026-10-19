@@ -33,7 +33,7 @@ jobs:
       - name: Install build dependencies on GitHub runner only
         run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler
       - run: rustup toolchain install 1.95.0 --profile minimal
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
@@ -53,11 +53,22 @@ jobs:
           assert hashlib.sha256(path.read_bytes()).hexdigest() == 'a5df373ea4406af55cc203487a8f5eb2f70c5cac3a2c498428b2f6a96c7b26f2'
           PY
       - name: Build ARM64 Zaino backend
+        id: backend
         working-directory: zallet
         run: cargo +1.95.0 build --locked --release --manifest-path backends/zaino/Cargo.toml
+      - uses: actions/cache/save@v4
+        if: steps.backend.outcome == 'success'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/backends/zaino/target
+          key: observer-arm64-release-v1-${{ hashFiles('nostos/scripts/observer/zallet-ufvk.patch') }}
       - name: Run Orchard key checks on ARM64
         working-directory: zallet
-        run: cargo +1.95.0 test --locked --release --manifest-path backends/zaino/Cargo.toml -p zallet-core --lib nostos_
+        env:
+          CARGO_TARGET_DIR: backends/zaino/target
+        run: cargo +1.95.0 test --locked --release --manifest-path Cargo.toml -p zallet-core --lib nostos_
       - name: Check binary version and native linkage
         run: |
           zallet/backends/zaino/target/release/zallet-zaino --version
