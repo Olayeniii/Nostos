@@ -40,6 +40,17 @@
     },
     "requiredCustody": "merchant_controlled_signing_keys",
     "hostedMerchantMainnetOperationsBlocked": true,
-    "merchantWalletConnectionImplemented": false
+    "merchantWalletConnectionImplemented": false,
+    "observerConnectionCandidate": {
+      "applicationPreviewImplemented": true,
+      "encryptedConsentAndKeyClaim": true,
+      "merchantSigningImplemented": false,
+      "observerExtensionPinnedSource": "987382f67e622915228686e9f956c6a9c9a7514c",
+      "observerExtensionInstalledOnVps": false,
+      "realViewingKeyImportedByAgent": false,
+      "liveConnectionVerified": false,
+      "paymentsEnabled": false,
+      "syncVerified": false
+    }
   }
 }

@@ -1,4 +1,5 @@
 "use client";
+import { MerchantWalletConnection } from "../../src/merchant-wallet-connection.js";
 import { useNetwork } from "../../src/network-context.js";
 import { useEffect, useState } from "react";
 import { AppHeader, AppFooter } from "../../src/shell.js";
@@ -33,6 +34,7 @@ export default function Setup() {
         <p className="eyebrow">STORE SETUP</p>
         <h1>Your store, ready for ZEC.</h1>
         <p>Customers see this name when they open your payment link.</p>
+        {network === "mainnet" && <MerchantWalletConnection />}
         <form
           onSubmit={async (e) => {
             e.preventDefault();

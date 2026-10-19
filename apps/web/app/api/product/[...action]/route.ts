@@ -1,3 +1,9 @@
+import {
+  ObserverError,
+  observerWallet,
+  observerConnection,
+  connectObserver,
+} from "../../../../src/merchant-observer.js";
 import { MerchantCustodyError } from "../../../../src/custody-policy.js";
 import { runtimeNetwork } from "../../../../../../packages/network/src/index.js";
 import { chainWallet } from "../../../../src/wallet-runtime.js";
@@ -409,6 +415,26 @@ async function handle(request: Request) {
         .run(String(body.state), checkout.id);
       return json({ ok: true });
     }
+    if (route === "wallet-connection") {
+      if (!isPost)
+        return json({ connection: observerConnection(store, merchant.id) });
+      if (!identityLimit(store, "observer:" + merchant.id, 6))
+        return json({ error: "Too many wallet connection attempts." }, 429);
+      return json({
+        connection: await connectObserver(
+          store,
+          merchant.id,
+          {
+            password: body.password,
+            viewingKey: body.viewingKey,
+            birthday: body.birthday,
+            consent: body.consent,
+          },
+          observerWallet(),
+          chainWallet(),
+        ),
+      });
+    }
     if (route === "me" && !isPost)
       return json({
         merchant: {
@@ -568,7 +594,8 @@ async function handle(request: Request) {
     if (
       error instanceof RefundFundingError ||
       error instanceof FundsError ||
-      error instanceof MerchantCustodyError
+      error instanceof MerchantCustodyError ||
+      error instanceof ObserverError
     )
       return json({ error: error.message }, 409);
     // Raw wallet/SQLite errors can contain private memos, destinations or identities.
