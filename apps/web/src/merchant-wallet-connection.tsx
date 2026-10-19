@@ -107,7 +107,7 @@ export function MerchantWalletConnection() {
             disabled={busy}
           />
         </label>
-        <label>
+        <label className="consent-field">
           <input name="consent" type="checkbox" required disabled={busy} /> I
           grant NOSTOS view access to this dedicated business account and
           understand that account activity and memos are visible to its

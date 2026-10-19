@@ -55,7 +55,7 @@ export default function FundsPage() {
     );
   }
   return (
-    <main className="product-app dashboard-app">
+    <main className="product-app dashboard-app funds-app">
       <AppHeader role="Merchant" />
       <nav className="workspace-nav">
         <Link href="/merchant">Payments</Link>
@@ -107,6 +107,7 @@ export default function FundsPage() {
             </p>
           )}
           <form
+            className="funds-withdrawal panel"
             onSubmit={async (e) => {
               e.preventDefault();
               if (!ready || sending.current) return;
@@ -174,7 +175,10 @@ export default function FundsPage() {
             </button>
           </form>
           {review && (
-            <section aria-label="Withdrawal review">
+            <section
+              className="funds-review panel"
+              aria-label="Withdrawal review"
+            >
               <h2>Confirm withdrawal</h2>
               <p>
                 {zec(review.amountZat)} ZEC on {review.network}
@@ -234,7 +238,7 @@ export default function FundsPage() {
             <p>No withdrawals recorded.</p>
           ) : (
             data.history.map((w) => (
-              <article key={w.id}>
+              <article className="withdrawal-record panel" key={w.id}>
                 <strong>{zec(w.amountZat)} ZEC</strong>
                 <p>
                   {w.status === "review" && w.expiresAt <= Date.now()

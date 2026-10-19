@@ -44,3 +44,21 @@ deployment/auto-deployment tests also passed. After the evidence update, format
 and diff checks passed again and the secret scan passed across 165 files. These
 are local repository checks,
 not current live deletion, deployment equality or wallet interoperability proof.
+
+## October 19 merchant interface pass
+
+Source changes contain ledger overflow, stack checkout/account columns below
+900px, and give scrollbars a visible dark treatment. Merchant tabs, payment
+totals, selected ledger rows, Funds balances and withdrawal reviews now share
+clearer styling. Consent checkboxes retain native behavior and compact sizing.
+No payment, refund, custody or mainnet enablement logic changed.
+
+Web type checking, formatting and 38 funds/observer/custody tests passed locally.
+Live homepage inspected before this pass; authenticated screens and narrow
+viewport visual verification remain outstanding. Source changes are not proof of
+deployment or a completed live merchant flow.
+
+The ARM backend compiled in run 39317239917, but its test command targeted the
+wrong workspace and no artifact was uploaded. Revision 5d4b52c corrects the
+command and saves build cache after compilation. Replacement run 39321077735
+is pending verification. No VPS Rust installation or service change was made.

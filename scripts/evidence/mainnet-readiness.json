@@ -60,8 +60,8 @@
       "armObserverBuildVerified": false
     },
     "hostedArmBuild": {
-      "workflowRunId": 39317239917,
-      "sourceRevision": "64c64fad8de386cb1f2b21a42d0fb52c0ecdf142",
+      "workflowRunId": 39321077735,
+      "sourceRevision": "5d4b52c0b7c398ef454ff351ea46ca16aae291f6",
       "state": "running",
       "artifactVerified": false,
       "vpsRustInstallRequired": false,
@@ -70,7 +70,13 @@
         "cargoAvailableInShell": false,
         "freeDiskGiB": 16
       },
-      "scope": "Operator searches did not locate Cargo in checked host paths. This does not establish whether the existing binary was built inside a container or elsewhere. Native ARM GitHub build and checksum/provenance validation replace the VPS compile path. No VPS service or wallet was changed."
+      "scope": "Operator searches did not locate Cargo in checked host paths. This does not establish whether the existing binary was built inside a container or elsewhere. Native ARM GitHub build and checksum/provenance validation replace the VPS compile path. No VPS service or wallet was changed.",
+      "previousRun": {
+        "workflowRunId": 39317239917,
+        "binaryCompilationPassed": true,
+        "artifactUploaded": false,
+        "failure": "Core tests targeted backend workspace, where zallet-core is not a workspace member."
+      }
     }
   }
 }
