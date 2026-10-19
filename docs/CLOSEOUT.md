@@ -113,3 +113,28 @@ transaction byte order, unmined candidates, unavailable schemas, missing-file
 noncreation, malformed IDs, no raw-data output and unchanged DB content. These
 tests are local fixtures and cannot establish the live wallet outcome. Full
 application tests/builds and live inspection are separate evidence.
+
+## Wallet database observation, 19 October
+
+The operator supplied the new inspector result: Zallet 0.1.0-beta.3, one open
+wallet database, ten transactions, both known transaction matches present, eight
+other records and zero other unmined records. All ten have stored raw transaction
+records. DB group/other permissions are absent; WAL and SHM files were absent in
+that observation. This is all-account metadata, not proof that eight additional
+refunds occurred, that unknown sends cannot exist, or that backups/logs are clean.
+
+The next inspector revision identifies an account only if exactly one account was
+credited by the known payment and debited by the confirmed refund. It reports that
+account's transaction counts and any nonchange 200000 zat Orchard-family sends,
+without emitting its UUID, destinations or raw transactions. No match is assigned
+from amount alone. Unavailable/ambiguous account views stay unavailable.
+
+The upstream beta.3 source extracts and stores a transaction before broadcasting:
+https://github.com/zcash/zallet/blob/v0.1.0-beta.3/zallet-core/src/components/json_rpc/methods/z_send_from_account.rs
+and
+https://github.com/zcash/zallet/blob/v0.1.0-beta.3/zallet-core/src/components/json_rpc/methods/pczt_extract.rs.
+The reported version is consistent with that source tag, but is not a verified
+binary hash or evidence of wallet database continuity. Exact-account correlation
+and whether the wallet database was restored/recreated since the attempt are
+material before a no-send verdict. Do not clear or retry the unknown record from
+the all-account counts. No production state has been mutated by these inspectors.

@@ -91,5 +91,24 @@
       "freshAgentVpsVerification": false
     },
     "scope": "Supersedes historical availability/deployment observations above. Does not prove non-broadcast, current sync, timer execution, log/WAL/backup hygiene or live deletion."
+  },
+  "walletDatabaseObservation20261019": {
+    "source": "Operator pasted read-only running-wallet inspection output on 19 October",
+    "walletVersion": "0.1.0-beta.3",
+    "databaseCount": 1,
+    "databaseGroupOrOtherPermissions": false,
+    "walPresent": false,
+    "shmPresent": false,
+    "transactionCount": 10,
+    "knownPaymentMatches": 1,
+    "knownConfirmedRefundMatches": 1,
+    "otherTransactionCount": 8,
+    "otherUnminedCount": 0,
+    "otherExpiryHeightMin": 4428370,
+    "otherExpiryHeightMax": 4430932,
+    "rawTransactionRecordCount": 10,
+    "accountScope": "All accounts; exact-account correlation not yet run",
+    "safeToRetry": false,
+    "scope": "Confirms metadata in this database snapshot, not absence of broadcast, current sync, database continuity, log or backup hygiene. The eight other records are not automatically the unknown refund."
   }
 }
