@@ -55,3 +55,22 @@ Orchard full/incoming/wrong-network/Sapling key checks. Application commit
 311 application tests and 31 web deployment/inspection Python tests. The local
 isolated-builder suite also passed four safety tests. None of these results
 proves an ARM build or live observer import/sync.
+
+## Hosted ARM64 build
+
+When Rust/Cargo is unavailable on the VPS, prefer the private GitHub Actions
+`Build ARM64 observer binary` workflow. It builds the pinned patched Zaino backend
+on an Ubuntu 24.04 ARM runner, runs the key checks natively, checks binary version
+and linkage, and stores a seven-day private artifact. It does not publish a
+release or touch any VPS service. Standard private-repository Actions minutes and
+artifact storage apply; no larger runner is selected.
+
+The artifact contains the compressed binary, source/patch/build provenance and
+SHA-256 checksum. No wallet directory, keys, cookie, provider URL or memo is read
+or included. Download only a successful run for the reviewed source revision and
+compare its checksums before isolated installation. A checksum inside a downloaded
+bundle alone is not independent authentication; confirm the trusted workflow/run
+and repository revision as well. No VPS Rust or dependency download is required
+for this route. Runtime library compatibility and actual observer sync remain
+separate checks. Do not install the toolchain merely because Cargo was absent
+from the interactive shell.

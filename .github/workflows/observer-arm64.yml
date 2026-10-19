@@ -1,0 +1,73 @@
+name: Build ARM64 observer binary
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/observer/zallet-ufvk.patch
+      - scripts/observer/package-arm64.py
+      - .github/workflows/observer-arm64.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_RELEASE_DEBUG: 0
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16
+      CARGO_PROFILE_RELEASE_STRIP: debuginfo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: nostos
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zcash/zallet
+          ref: 987382f67e622915228686e9f956c6a9c9a7514c
+          path: zallet
+          persist-credentials: false
+      - name: Install build dependencies on GitHub runner only
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/backends/zaino/target
+          key: observer-arm64-release-v1-${{ hashFiles('nostos/scripts/observer/zallet-ufvk.patch') }}
+      - name: Verify pinned source and observer patch
+        working-directory: zallet
+        run: |
+          test "$(git rev-parse HEAD)" = 987382f67e622915228686e9f956c6a9c9a7514c
+          git apply --check ../nostos/scripts/observer/zallet-ufvk.patch
+          git apply ../nostos/scripts/observer/zallet-ufvk.patch
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          path = Path('zallet-core/src/components/json_rpc/methods/import_viewing_key.rs')
+          assert hashlib.sha256(path.read_bytes()).hexdigest() == 'a5df373ea4406af55cc203487a8f5eb2f70c5cac3a2c498428b2f6a96c7b26f2'
+          PY
+      - name: Build ARM64 Zaino backend
+        working-directory: zallet
+        run: cargo +1.95.0 build --locked --release --manifest-path backends/zaino/Cargo.toml
+      - name: Run Orchard key checks on ARM64
+        working-directory: zallet
+        run: cargo +1.95.0 test --locked --release --manifest-path backends/zaino/Cargo.toml -p zallet-core --lib nostos_
+      - name: Check binary version and native linkage
+        run: |
+          zallet/backends/zaino/target/release/zallet-zaino --version
+          ldd zallet/backends/zaino/target/release/zallet-zaino
+      - name: Package binary and provenance without wallet files
+        run: python3 nostos/scripts/observer/package-arm64.py zallet/backends/zaino/target/release/zallet-zaino bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nostos-observer-ubuntu24-arm64-${{ github.sha }}
+          path: bundle/
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
