@@ -1,0 +1,144 @@
+--- a/zallet-core/src/components/json_rpc/methods/import_viewing_key.rs
++++ b/zallet-core/src/components/json_rpc/methods/import_viewing_key.rs
+@@ -27,6 +27,14 @@
+     /// The Sapling payment address corresponding to the imported viewing key
+     /// (the default address).
+     address: String,
++
++    /// NOSTOS extension version, present only for Orchard UFVK imports.
++    #[serde(skip_serializing_if = "Option::is_none")]
++    nostos_view_only_v1: Option<bool>,
++
++    /// Imported view-only account identifier, never a spending key.
++    #[serde(skip_serializing_if = "Option::is_none")]
++    account_uuid: Option<String>,
+ }
+ 
+ pub(super) const PARAM_VKEY_DESC: &str =
+@@ -84,6 +92,9 @@
+     rescan: Option<&str>,
+     start_height: Option<u64>,
+ ) -> Response {
++    if vkey.starts_with("uview") {
++        return import_unified(wallet, chain, vkey, rescan, start_height).await;
++    }
+     let rescan = RescanPolicy::parse(rescan)?;
+ 
+     // Parse start_height if provided, keeping it as Option so we can
+@@ -160,6 +171,89 @@
+     Ok(ResultType {
+         address_type: "sapling".to_string(),
+         address,
++        nostos_view_only_v1: None,
++        account_uuid: None,
++    })
++}
++
++// NOSTOS extension. No seed, spending key or key-store access is accepted here.
++fn decode_orchard_key<P: zcash_protocol::consensus::Parameters>(
++    params: &P,
++    encoded: &str,
++) -> RpcResult<UnifiedFullViewingKey> {
++    if encoded.len() > 4096 || encoded.trim() != encoded {
++        return Err(LegacyCode::InvalidParameter.with_static("Invalid unified viewing key"));
++    }
++    let key = UnifiedFullViewingKey::decode(params, encoded)
++        .map_err(|_| LegacyCode::InvalidParameter.with_static("Invalid unified viewing key"))?;
++    if key.orchard().is_none() {
++        return Err(LegacyCode::InvalidParameter.with_static("Orchard full viewing key required"));
++    }
++    Ok(key)
++}
++
++async fn import_unified<C: Chain>(
++    wallet: &mut DbConnection,
++    chain: C,
++    encoded: &str,
++    rescan: Option<&str>,
++    start_height: Option<u64>,
++) -> Response {
++    use zcash_client_backend::keys::{ReceiverRequirement, UnifiedAddressRequest};
++
++    // Explicit birthday and recovery scan are mandatory. Never silently import
++    // a key at the current tip and claim its earlier history is complete.
++    if rescan != Some("whenkeyisnew") {
++        return Err(LegacyCode::InvalidParameter.with_static("Use whenkeyisnew for unified viewing import"));
++    }
++    let height = start_height.and_then(|h| u32::try_from(h).ok())
++        .filter(|h| *h > 0)
++        .ok_or_else(|| LegacyCode::InvalidParameter.with_static("Explicit positive birthday required"))?;
++    let tip = wallet.chain_height()
++        .map_err(|_| LegacyCode::Database.with_static("Observer state unavailable"))?
++        .ok_or_else(|| LegacyCode::InWarmup.with_static("Observer chain tip required"))?;
++    if BlockHeight::from_u32(height) > tip {
++        return Err(LegacyCode::InvalidParameter.with_static("Birthday exceeds observer tip"));
++    }
++    let key = decode_orchard_key(wallet.params(), encoded)?;
++
++    // Refuse a mixed signing wallet. This observer must not have spending
++    // accounts; the legacy operator wallet must never be reused here.
++    for id in wallet.get_account_ids()
++        .map_err(|_| LegacyCode::Database.with_static("Observer state unavailable"))? {
++        let account = wallet.get_account(id)
++            .map_err(|_| LegacyCode::Database.with_static("Observer state unavailable"))?
++            .ok_or_else(|| LegacyCode::Wallet.with_static("Observer account unavailable"))?;
++        if !matches!(account.purpose(), AccountPurpose::ViewOnly) {
++            return Err(LegacyCode::Wallet.with_static("Separate view-only observer required"));
++        }
++    }
++    let account = match wallet.get_account_for_ufvk(&key)
++        .map_err(|_| LegacyCode::Database.with_static("Observer state unavailable"))? {
++        Some(account) => account,
++        None => {
++            let birthday = fetch_account_birthday(&chain, BlockHeight::from_u32(height)).await
++                .map_err(|_| LegacyCode::Wallet.with_static("Observer birthday unavailable"))?;
++            wallet.import_account_ufvk("NOSTOS view-only merchant", &key, &birthday,
++                AccountPurpose::ViewOnly, None)
++                .map_err(|_| LegacyCode::Wallet.with_static("Viewing account import failed"))?
++        }
++    };
++    if !matches!(account.purpose(), AccountPurpose::ViewOnly) {
++        return Err(LegacyCode::Wallet.with_static("View-only account required"));
++    }
++    let account_id = account.id();
++    let request = UnifiedAddressRequest::custom(
++        ReceiverRequirement::Require, ReceiverRequirement::Omit, ReceiverRequirement::Omit)
++        .map_err(|_| LegacyCode::Wallet.with_static("Orchard receiver required"))?;
++    let address = wallet.get_address_for_index(account_id, 0u32.into(), request)
++        .map_err(|_| LegacyCode::Wallet.with_static("Observer address unavailable"))?
++        .ok_or_else(|| LegacyCode::Wallet.with_static("Observer address unavailable"))?;
++    Ok(ResultType {
++        address_type: "unified".to_string(),
++        address: address.encode(wallet.params()),
++        nostos_view_only_v1: Some(true),
++        account_uuid: Some(account_id.expose_uuid().to_string()),
+     })
+ }
+ 
+@@ -191,6 +285,26 @@
+         )
+     }
+ 
++    #[test]
++    fn nostos_orchard_decode_accepts_only_full_key_on_matching_network() {
++        use zcash_keys::keys::UnifiedSpendingKey;
++        use zcash_protocol::consensus::{MAIN_NETWORK, TEST_NETWORK};
++        let full = UnifiedSpendingKey::from_seed(&MAIN_NETWORK, &[7; 32], zip32::AccountId::ZERO)
++            .unwrap().to_unified_full_viewing_key();
++        let encoded = full.encode(&MAIN_NETWORK);
++        assert!(decode_orchard_key(&MAIN_NETWORK, &encoded).is_ok());
++        assert!(decode_orchard_key(&TEST_NETWORK, &encoded).is_err());
++        assert!(decode_orchard_key(&MAIN_NETWORK, &format!(" {encoded}")).is_err());
++        assert!(decode_orchard_key(&MAIN_NETWORK, "not-a-key").is_err());
++        let incoming = full.to_unified_incoming_viewing_key().encode(&MAIN_NETWORK);
++        assert!(decode_orchard_key(&MAIN_NETWORK, &incoming).is_err());
++        let sapling = sapling::zip32::ExtendedSpendingKey::master(&[8; 32]);
++        #[allow(deprecated)]
++        let sapling_only = UnifiedFullViewingKey::from_sapling_extended_full_viewing_key(
++            sapling.to_extended_full_viewing_key()).unwrap().encode(&MAIN_NETWORK);
++        assert!(decode_orchard_key(&MAIN_NETWORK, &sapling_only).is_err());
++    }
++
+     // -- RescanPolicy::parse tests --
+ 
+     #[test]

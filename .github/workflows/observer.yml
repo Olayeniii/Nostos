@@ -1,0 +1,50 @@
+name: Orchard observer extension
+on:
+  push:
+    paths:
+      - scripts/observer/**
+      - .github/workflows/observer.yml
+  pull_request:
+    paths:
+      - scripts/observer/**
+      - .github/workflows/observer.yml
+permissions:
+  contents: read
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: nostos
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zcash/zallet
+          ref: 987382f67e622915228686e9f956c6a9c9a7514c
+          path: zallet
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/target
+          key: observer-${{ runner.os }}-987382f-${{ hashFiles('nostos/scripts/observer/zallet-ufvk.patch') }}
+      - name: Verify base and apply only the observer extension
+        working-directory: zallet
+        run: |
+          test "$(git rev-parse HEAD)" = 987382f67e622915228686e9f956c6a9c9a7514c
+          git apply --check ../nostos/scripts/observer/zallet-ufvk.patch
+          git apply ../nostos/scripts/observer/zallet-ufvk.patch
+      - name: Compile wallet RPC and run Orchard key validation tests
+        working-directory: zallet
+        run: cargo +1.95.0 test --locked -p zallet-core --lib nostos_
