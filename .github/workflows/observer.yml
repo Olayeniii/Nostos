@@ -24,6 +24,8 @@ jobs:
         with:
           path: nostos
           persist-credentials: false
+      - name: Check isolated build safety
+        run: python3 -m unittest discover -s nostos/scripts/observer -p "test_*.py"
       - uses: actions/checkout@v4
         with:
           repository: zcash/zallet

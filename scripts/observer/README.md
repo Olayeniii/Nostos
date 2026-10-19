@@ -23,3 +23,35 @@ The workflow checks out the pinned source, applies the patch and compiles/tests
 it. It does not deploy, initialize a wallet, import a real key or request a send.
 A separate isolated Zaino backend build and runtime import/sync proof are required
 before any VPS installation or funded proof. Keep the mainnet release hold.
+
+## Build a separate binary on the wallet host
+
+After the pinned-source Rust workflow passes, the normal `ubuntu` user can run:
+
+```bash
+cd ~/nostos/repo
+git pull --ff-only origin main
+python3 scripts/observer/build.py
+python3 scripts/observer/build.py --build
+```
+
+The first command prints build prerequisites without writes. The explicit build
+uses a new directory under `~/nostos/observer-builds`, verifies the pinned commit
+and exact patched file hash, and builds Zaino with two parallel jobs. It requires
+Cargo/Rust compatible with the pinned source and at least 12 GiB free disk before
+starting; actual compiler memory/disk demand can be higher. A failed or interrupted
+build preserves its source directory. It cannot overwrite the existing wallet
+binary, create a wallet, change services or send a transaction. This host build
+still needs to pass on ARM; the Rust workflow's x86 build is a separate check.
+
+Share only the final build metadata or compiler error. After the isolated build,
+prepare a separate view-only observer directory/service, with no mnemonic,
+merchant spending keys or fallback to the operator wallet. Do not start it by
+reusing either existing wallet service or the initialized operator mainnet wallet.
+
+Validation on 19 October: the pinned Rust workflow passed compilation and its
+Orchard full/incoming/wrong-network/Sapling key checks. Application commit
+`e141bdb339ec7dbbc89a2005a33fc189ac32ef52` passed GitHub production CI with
+311 application tests and 31 web deployment/inspection Python tests. The local
+isolated-builder suite also passed four safety tests. None of these results
+proves an ARM build or live observer import/sync.

@@ -50,7 +50,14 @@
       "realViewingKeyImportedByAgent": false,
       "liveConnectionVerified": false,
       "paymentsEnabled": false,
-      "syncVerified": false
+      "syncVerified": false,
+      "pinnedRustCoreBuildAndKeyValidationPassed": true,
+      "rustWorkflowRunId": 39276659560,
+      "applicationProductionCiPassedAt": "e141bdb339ec7dbbc89a2005a33fc189ac32ef52",
+      "applicationTestsPassed": 311,
+      "webPythonTestsPassed": 31,
+      "isolatedBuilderSafetyTestsPassed": 4,
+      "armObserverBuildVerified": false
     }
   }
 }
