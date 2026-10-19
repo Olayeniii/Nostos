@@ -62,5 +62,34 @@
     "submittedPaymentRefundRequestOrFulfillmentChange": false,
     "mobileRenderingVerified": false,
     "exactDeployedCommitVerified": false
+  },
+  "checkpointReviewed20261019": {
+    "source": "Previously supplied operator lifecycle, wallet balance/history and log-presence outputs; reviewed on 19 October, not newly read from VPS",
+    "confirmedRefundZat": 1800000,
+    "reservedRefundZat": 200000,
+    "remainingPaymentValueZat": 200000,
+    "availableRefundValueZat": 0,
+    "unknownRefund": {
+      "id": "refund_dbd484d2-f75c-43d8-a63f-5f3a6c3e0250",
+      "amountZat": 200000,
+      "status": "broadcast_unknown",
+      "txid": null,
+      "retryCount": 0,
+      "createdAt": "2026-10-11T15:39:25.385Z"
+    },
+    "productRoutePresent": true,
+    "coreRoutePresent": true,
+    "retentionReason": "unresolved_refund",
+    "merchantSpendableZatPreviouslyObserved": 190000,
+    "walletTransactionsPreviouslyObserved": 2,
+    "attemptLogCaptured": false,
+    "safeToRetry": false,
+    "deployment": {
+      "observedBy": "Operator on 14 October",
+      "release": "beda707aee2f-1791734300",
+      "state": "running",
+      "freshAgentVpsVerification": false
+    },
+    "scope": "Supersedes historical availability/deployment observations above. Does not prove non-broadcast, current sync, timer execution, log/WAL/backup hygiene or live deletion."
   }
 }
