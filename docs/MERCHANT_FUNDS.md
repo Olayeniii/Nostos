@@ -72,8 +72,13 @@ restart wallets or Zebra. Configure existing node access privately first:
 cd ~/nostos/repo
 git pull --ff-only origin main
 sudo python3 scripts/web/configure-funds.py
-sudo systemctl start --no-block nostos-auto-deploy.service
+sudo python3 scripts/web/deploy.py
 ```
+
+Wait for any active auto-deployment to finish before invoking the manual helper.
+It shares the deployment lock and leaves the live container running while building.
+Starting the auto-deploy service alone does not reload settings for a revision
+already marked healthy; the explicit deployment above incorporates the new file.
 
 The configuration tool asks for the actual loopback node RPC URL, its cookie path
 inside the container and the fee allowance. It writes root-only `funds.env` outside

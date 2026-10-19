@@ -60,8 +60,6 @@ class MainnetBoundary(unittest.TestCase):
             repo = Path(root)/'repo'
             (repo/'scripts/web').mkdir(parents=True)
             (repo/'source.txt').write_text('fixture')
-            (repo/'runtime').mkdir()
-            (repo/'runtime/testnet-evidence.txt').write_text('old fixture')
             subprocess.run(['git','init','-q',str(repo)],check=True)
             subprocess.run(['git','-C',str(repo),'add','.'],check=True)
             subprocess.run(['git','-C',str(repo),'-c','user.name=Fixture','-c','user.email=fixture@example.com','commit','-qm','fixture'],check=True)
@@ -83,6 +81,3 @@ class MainnetBoundary(unittest.TestCase):
             self.assertIn('NOSTOS_MAINNET_PRODUCT_DATA_KEY',env)
             self.assertNotIn('NOSTOS_PRODUCT_DATA_KEY',env)
             self.assertTrue(any(str(Path(root)/'mainnet/product-data')+':/nostos-product'==b for b in final['HostConfig']['Binds']))
-
-            self.assertFalse(any(str(repo/'runtime')+':/app/runtime'==b for b in final['HostConfig']['Binds']))
-            self.assertIn(str(Path(root)/'mainnet/runtime')+':/app/runtime',final['HostConfig']['Binds'])

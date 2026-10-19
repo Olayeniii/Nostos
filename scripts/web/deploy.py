@@ -70,16 +70,13 @@ def start_config(base, release, data, env, port):
     config['Env'] = [key+'='+value for key, value in env.items()]
     host = copy.deepcopy(base['HostConfig'])
     host['NetworkMode'] = 'host'
-    excluded = ('/app', '/nostos-product', '/app/runtime') if env.get('NOSTOS_NETWORK') == 'mainnet' else ('/app', '/nostos-product')
-    binds = [v for v in host.get('Binds', []) if v.split(':')[1] not in excluded]
+    binds = [v for v in host.get('Binds', []) if v.split(':')[1] not in ('/app', '/nostos-product')]
     original_app = next((m['Source'] for m in base['Mounts'] if m['Destination'] == '/app'), None)
     if not original_app:
         raise RuntimeError('Expected /app mount is missing; original left running.')
     # Preserve original runtime evidence/database paths when switching from a repo mount.
     old_runtime = Path(original_app) / 'runtime'
-    if env.get('NOSTOS_NETWORK') == 'mainnet':
-        binds.append(str(data.parent / 'runtime')+':/app/runtime')
-    elif old_runtime.is_dir() and not any(v.split(':')[1] == '/app/runtime' for v in binds):
+    if old_runtime.is_dir() and not any(v.split(':')[1] == '/app/runtime' for v in binds):
         binds.append(str(old_runtime)+':/app/runtime')
     binds += [str(release)+':/app:ro', str(data)+':/nostos-product']
     host['Binds'] = binds
@@ -190,10 +187,6 @@ def run(mainnet=False):
         data = root / 'product-data'
         data.mkdir(exist_ok=True, mode=0o700)
         os.chown(data, uid, gid)
-        if mainnet:
-            runtime = root / 'runtime'
-            runtime.mkdir(exist_ok=True, mode=0o700)
-            os.chown(runtime, uid, gid)
         env_prefix = 'NOSTOS_MAINNET_' if mainnet else 'NOSTOS_'
         env.update({env_prefix+'PRODUCT_DATA_KEY': key,
                     env_prefix+'PRODUCT_DATABASE_PATH': '/nostos-product/accounts.sqlite',
