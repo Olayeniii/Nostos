@@ -108,3 +108,11 @@ network-bound stores and a separate isolated deployment. The existing auto-deplo
 continues to serve testnet. No mainnet transaction, live withdrawal or production
 custody readiness is claimed by this source candidate. Configuration and verification
 steps are in [MERCHANT_FUNDS.md](docs/MERCHANT_FUNDS.md).
+
+### Hosted mainnet connection
+
+A self-hosted full node is optional. The preferred mainnet setup uses hosted Zebra
+JSON-RPC with a separate local Zallet wallet and signing keys. A read-only private
+endpoint probe and authenticated loopback HTTPS relay are prepared in source.
+No hosted endpoint, wallet sync or mainnet transaction has been verified yet.
+See [HOSTED_MAINNET.md](docs/HOSTED_MAINNET.md).

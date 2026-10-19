@@ -1,0 +1,29 @@
+{
+  "reviewDate": "2026-10-19",
+  "currentTestnet": {
+    "source": "Operator supplied deployed-health, mount and read-only runtime outputs in the work session",
+    "deployedRevision": "c4690541572ffb8d9dee6ba940119d9c6751b896",
+    "deploymentHealthy": true,
+    "previousReleaseRetained": true,
+    "network": "testnet",
+    "rpcConfigurationComplete": true,
+    "walletAndNodeSameFullySyncedTip": true,
+    "height": 4484792,
+    "sendsRequested": 0,
+    "fundsPageBalancesIndependentlyVerified": false
+  },
+  "mainnet": {
+    "approach": "hosted_zebra_json_rpc_and_separate_local_zallet_signing_wallet",
+    "selfHostedFullNodeRequired": false,
+    "providerCandidate": "GetBlock Zcash mainnet JSON-RPC, based on current provider and upstream wallet documentation",
+    "privateEndpointAvailableToAgent": false,
+    "liveProviderProbeExecuted": false,
+    "relayInstalledOnVps": false,
+    "relayBroadcastEnabledByDefault": false,
+    "walletInitializedOrSynced": false,
+    "webDeploymentVerified": false,
+    "paymentRefundWithdrawalProof": false,
+    "sendsRequested": 0,
+    "scope": "Source connector and offline tests only. Metadata probe, exact Zaino decoding, quota, wallet sync, privacy checks and explicit small mainnet proof remain required. No mainnet secrets or endpoint tokens are included."
+  }
+}

@@ -106,8 +106,11 @@ identity plus matching fully synced wallet/node hashes guard spends. Payment
 memos and Orchard-only refund policy are unchanged. Mainnet automatic Noir payment
 completion is not verified; manual wallet entry is still the proved interaction.
 
-The operator must first provision a separate, compatible mainnet node and merchant
-wallet using the upstream wallet/node instructions, with adequate disk and memory.
+Use the [hosted mainnet connection](HOSTED_MAINNET.md) as the preferred setup: a
+hosted Zebra endpoint supplies chain data, while a separate local Zallet keeps
+signing keys. A self-hosted mainnet node is optional. First verify the hosted RPC
+methods and provision a separate mainnet merchant wallet using the upstream
+wallet instructions.
 Do not convert, restart or repoint the current testnet services. Node/wallet sync,
 RPC access and the required PCZT methods must be checked independently. This
 repository's deployer intentionally does not provision wallet seeds or chain data.
