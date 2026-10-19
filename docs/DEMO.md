@@ -166,11 +166,11 @@ and Orchard return-route rules before a separate test is proposed.
 
 The operator supplied a fully synced wallet and matching-account history containing
 only the known payment and confirmed partial refund, plus a block anchor beyond
-the unknown attempt's standard validity window. The guarded Item21 recovery is
-prepared in source; deployment and operator apply output are still required. See
-[CLOSEOUT.md](CLOSEOUT.md). Until that output is captured, say “0.018 ZEC confirmed
-refunded; 0.002 ZEC reserved under an unresolved attempt.” After verified apply,
-say “0.018 ZEC confirmed refunded; the unsuccessful 0.002 ZEC attempt was closed
-after reconciliation, without sending another transaction.” Never describe the
-full 0.02 ZEC as refunded. Keep private receipts, routes and wallet data out of the
+the unknown attempt's standard validity window. The operator then supplied successful apply output at
+2026-10-19T11:15:50.498Z: failed instruction, zero reserved, 200000 zat available
+accounting value, both routes retained and no send. See [CLOSEOUT.md](CLOSEOUT.md).
+Current wording: "0.018 ZEC confirmed refunded; the unsuccessful 0.002 ZEC attempt
+was closed after reconciliation, without sending another transaction." Never
+describe the full 0.02 ZEC as refunded. The earlier wallet balance was short of the
+remaining amount plus fees; accounting availability is not spendable wallet funds. Keep private receipts, routes and wallet data out of the
 recording.

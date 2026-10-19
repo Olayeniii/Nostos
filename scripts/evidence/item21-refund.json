@@ -150,5 +150,41 @@
     "sendsRequested": 0,
     "safeToRetryOldInstruction": false,
     "scope": "Source candidate only. No live apply or deployment success is claimed. Releasing accounting reservation does not add wallet funds."
+  },
+  "liveReconciliation20261019": {
+    "source": "Operator pasted successful guarded dry run and apply output on 19 October; no direct agent VPS access",
+    "deployedSourceRevision": "ddb95670b3e6c34efa1ce46c09bd9a6c3c66ebf9",
+    "dryRun": {
+      "observedAt": "2026-10-19T11:15:23.235Z",
+      "nodeHeight": 4484615,
+      "fullySyncedHeight": 4484615,
+      "eligible": true,
+      "applied": false
+    },
+    "apply": {
+      "observedAt": "2026-10-19T11:15:50.498Z",
+      "nodeHeight": 4484617,
+      "fullySyncedHeight": 4484617,
+      "eligible": true,
+      "applied": true,
+      "alreadyReconciled": false,
+      "status": "failed",
+      "confirmedRefundZat": 1800000,
+      "reservedRefundZat": 0,
+      "availableRefundZat": 200000,
+      "routesRetained": true,
+      "sendsRequested": 0,
+      "safeToRetryOldInstruction": false
+    },
+    "matchingAccountTransactionCount": 2,
+    "otherMatchingAccountTransactions": 0,
+    "expiryAnchor": {
+      "height": 4475492,
+      "time": 1791819667
+    },
+    "standardExpiryUpperBound": 4475533,
+    "resolution": "no_settlement_after_expiry",
+    "repeatApplyResult": "Not supplied; a repeated command was shown without its result.",
+    "scope": "Supersedes the earlier unknown reservation checkpoint. Reconciliation releases an accounting reservation, not wallet funds. Exact historical RPC error is not recovered. No new refund, fresh spendable balance, withdrawal, mainnet, broader privacy cleanup or video/submission is proved."
   }
 }

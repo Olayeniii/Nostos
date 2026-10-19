@@ -4,13 +4,30 @@ Feature freeze: fix only proof, merchant-use or submission blockers. Baseline ma
 checked at `beda707aee2f0894dc4a0c3889827cd005d9ee99`. The matching running release
 was operator-reported on 14 October, not freshly inspected from this workspace.
 
-## First: resolve the unknown refund without another send
+## Current result: unknown instruction reconciled without another send
+
+Operator apply output at 2026-10-19T11:15:50.498Z reports `applied=true`,
+`status=failed`, 1800000 zat confirmed refunded, zero reserved and 200000 zat
+available accounting value. Both protected routes remain; sends requested is zero
+and the old instruction cannot be retried. The node and fully synced wallet were
+at height 4484617, with only the two known account transactions. The wrapper passed
+its matching deployed-revision guard for ddb9567. This is supplied operator evidence,
+not direct agent VPS access. A repeat command was pasted without its result; repeat
+idempotence is tested locally but has not yet been observed live.
+
+The earlier 190000 zat balance is still historical. Releasing the reservation adds
+no wallet funds; a new 200000 zat refund would need sufficient funds plus fees and
+separate merchant authorization. Live logs/storage/WAL/backups, merchant withdrawal,
+mainnet, final video and submission remain open.
+
+## Historical unknown checkpoint before reconciliation
 
 Item21 received 2000000 zat. Its earlier 1800000 zat refund is confirmed in supplied
 operator evidence; the customer confirmed receipt in Noir. The later instruction
-`refund_dbd484d2-f75c-43d8-a63f-5f3a6c3e0250` for 200000 zat remains
-`broadcast_unknown` with a null txid in the latest supplied lifecycle snapshot.
-Preserve its reservation and both encrypted routes. Available value is zero.
+`refund_dbd484d2-f75c-43d8-a63f-5f3a6c3e0250` for 200000 zat was
+`broadcast_unknown` with a null txid before reconciliation.
+At that checkpoint its reservation and both encrypted routes were preserved,
+and available value was zero. The current result above supersedes that state.
 
 The earlier account balance was 190000 zat and its transaction list contained only
 the payment and earlier refund. No log was captured for the attempt. These support
@@ -66,7 +83,7 @@ This script deliberately has no resolution or mutation command.
 | Merchant refund  | 1800000 zat confirmed with recorded txid and zero retries                                 | Partial refund, separate from the later unknown instruction              |
 | Customer receipt | Customer confirmed funds received in Noir after sync                                      | Manual payment path; automatic payment failed consensus validation       |
 | Receipt/UI       | Existing merchant and customer phone views showed readable amounts and wrapped references | Historical views; no new recording performed here                        |
-| Final amount     | 200000 zat reserved as unknown                                                            | Must resolve outcome before retry or full-refund claim                   |
+| Final amount     | 200000 zat attempt reconciled as failed; zero reserved, routes retained                  | Available accounting value is not wallet funding; no full-refund claim   |
 
 Preserve the existing transaction references and provenance in
 `scripts/evidence/item21-refund.json`. Do not invent a fulfillment failure or claim
@@ -198,10 +215,11 @@ mutation state and requires inspection, not an assumption that rollback occurred
 Do not restore an old database snapshot. Older releases fail closed on the new
 failed event; continue with a compatible release for correct accounting/display.
 
-Deployment and live apply are not proved by local tests or this document. Until
-operator apply output is received, the latest verified application state remains
-`broadcast_unknown` with 200000 zat reserved. Existing privacy, demo/video and
-submission gates remain open. No new payment or refund has been sent.
+Deployment and live apply are not proved by local tests alone. The subsequent
+operator apply result is recorded at the top of this document and in the evidence
+JSON. It supersedes the unknown reservation state. Existing privacy, merchant
+withdrawal/mainnet, demo/video and submission gates remain open. No new payment or
+refund was sent by reconciliation.
 
 Source references:
 
