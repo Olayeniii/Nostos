@@ -46,6 +46,10 @@ export async function executePartialRefund(options: {
         throw new Error("Broadcast refund has no transaction ID.");
       return { broadcast: false, txid: retried.txid };
     }
+    if (existing.status === "failed")
+      throw new Error(
+        "This refund instruction was closed without settlement. A new instruction requires fresh merchant authorization.",
+      );
     if (existing.status === "broadcast_unknown")
       throw new Error("Refund broadcast state is unknown; retry is blocked.");
     if (existing.status === "broadcasting")

@@ -265,13 +265,17 @@ export class SqlitePaymentStore {
       }
       const valid = parseRefundIntent(intent, payment);
       const records = this.listRefundsByPayment(payment.id);
-      if (records.some((r) => r.status !== "confirmed"))
+      if (
+        records.some((r) => r.status !== "confirmed" && r.status !== "failed")
+      )
         throw new Error("A refund is in progress or its broadcast is unknown.");
       if (records.length && !allowMultiple)
         throw new Error(
           "A conflicting refund already exists for this payment.",
         );
-      const refunded = records.reduce((sum, r) => sum + r.amountZat, 0);
+      const refunded = records
+        .filter((r) => r.status === "confirmed")
+        .reduce((sum, r) => sum + r.amountZat, 0);
       if (valid.amountZat > payment.amountZat - refunded)
         throw new Error("Refund cannot exceed the remaining payment amount.");
       const now = new Date().toISOString();
@@ -343,9 +347,11 @@ export class SqlitePaymentStore {
         .filter((r) => r.status === "confirmed")
         .reduce((sum, r) => sum + r.amountZat, 0),
       reservedZat: records
-        .filter((r) => r.status !== "confirmed")
+        .filter((r) => r.status !== "confirmed" && r.status !== "failed")
         .reduce((sum, r) => sum + r.amountZat, 0),
-      inProgress: records.some((r) => r.status !== "confirmed"),
+      inProgress: records.some(
+        (r) => r.status !== "confirmed" && r.status !== "failed",
+      ),
     };
   }
 
@@ -505,3 +511,6 @@ export class SqlitePaymentStore {
     this.#mirrorRefund(id);
   }
 }
+
+// Operator recovery tools must require this deployed capability before applying.
+export const refundReconciliationVersion = 1;

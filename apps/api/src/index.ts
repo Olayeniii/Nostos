@@ -27,7 +27,7 @@ export function paymentView(
     .filter((r) => r.status === "confirmed")
     .reduce((sum, r) => sum + r.amountZat, 0);
   const reservedZat = records
-    .filter((r) => r.status !== "confirmed")
+    .filter((r) => r.status !== "confirmed" && r.status !== "failed")
     .reduce((sum, r) => sum + r.amountZat, 0);
   return {
     id: payment.id,
@@ -43,7 +43,7 @@ export function paymentView(
     status: refund?.status ?? payment.status,
     canRefund:
       !!payment.refundAddress &&
-      !records.some((r) => r.status !== "confirmed") &&
+      !records.some((r) => r.status !== "confirmed" && r.status !== "failed") &&
       refundedZat < payment.amountZat &&
       payment.status === "confirmed" &&
       payment.confirmations > 0,

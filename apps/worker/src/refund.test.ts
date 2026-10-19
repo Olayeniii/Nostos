@@ -213,3 +213,33 @@ it("fails before reservation when the balance lookup fails, and leaves an unknow
   expect(broadcaster.sendFromAccount).toHaveBeenCalledTimes(1);
   store.close();
 });
+
+it("never resends a reconciled failed instruction key", async () => {
+  const store = storeWithPayment();
+  vi.spyOn(store, "findRefundByKey").mockReturnValue({
+    id: "closed",
+    paymentId: payment.id,
+    amountZat: 200000,
+    idempotencyKey: "closed",
+    status: "failed",
+    retryCount: 0,
+  });
+  const broadcaster = {
+    spendableShieldedBalanceZat: vi.fn(),
+    decodeUnifiedAddress: vi.fn(),
+    sendFromAccount: vi.fn(),
+  };
+  await expect(
+    executePartialRefund({
+      store,
+      broadcaster,
+      merchantAccountUuid: "merchant",
+      paymentTxid: payment.id,
+      amountZat: 200000,
+      idempotencyKey: "closed",
+    }),
+  ).rejects.toThrow("closed without settlement");
+  expect(broadcaster.sendFromAccount).not.toHaveBeenCalled();
+  expect(broadcaster.spendableShieldedBalanceZat).not.toHaveBeenCalled();
+  store.close();
+});

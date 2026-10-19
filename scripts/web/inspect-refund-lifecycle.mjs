@@ -51,11 +51,13 @@ try {
     .filter((r) => r.status === "confirmed")
     .reduce((sum, r) => sum + r.amount_zat, 0);
   const reserved = refunds
-    .filter((r) => r.status !== "confirmed")
+    .filter((r) => r.status !== "confirmed" && r.status !== "failed")
     .reduce((sum, r) => sum + r.amount_zat, 0);
   const expiry = Date.parse(checkout.refund_expires_at ?? "");
   const expired = Number.isFinite(expiry) && expiry <= Date.now();
-  const unresolved = refunds.some((r) => r.status !== "confirmed");
+  const unresolved = refunds.some(
+    (r) => r.status !== "confirmed" && r.status !== "failed",
+  );
   const reason = unresolved
     ? "unresolved_refund"
     : openRequests

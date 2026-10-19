@@ -49,3 +49,21 @@ describe("browser payment projection", () => {
     });
   });
 });
+
+it("does not count failed refunds as paid or reserved", () => {
+  const closed: RefundRecord = {
+    paymentId: refund.paymentId,
+    retryCount: 0,
+    id: "closed",
+    idempotencyKey: "closed",
+    amountZat: 700000,
+    status: "failed",
+  };
+  expect(paymentView(payment, closed, [refund, closed])).toMatchObject({
+    refundedZat: 300000,
+    reservedZat: 0,
+    availableZat: 700000,
+    canRefund: true,
+    status: "failed",
+  });
+});

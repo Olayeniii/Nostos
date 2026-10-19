@@ -138,3 +138,73 @@ binary hash or evidence of wallet database continuity. Exact-account correlation
 and whether the wallet database was restored/recreated since the attempt are
 material before a no-send verdict. Do not clear or retry the unknown record from
 the all-account counts. No production state has been mutated by these inspectors.
+
+## Audited recovery candidate
+
+The subsequent operator output identified the matching account with exactly the
+known payment and confirmed refund, zero other transactions, zero unmined records
+and zero nonchange 200000 zat Orchard-family sends. `getwalletstatus` then reported
+node, wallet and fully synced height 4484530, with `locked=false`. The following
+block query reported height 4475492/time 1791819667 after the attempt's following-day
+cutoff, and latest stored height 4484533.
+
+For this fixed 200000 zat direct Ironwood payment, the reviewed beta.3 send path
+uses the standard builder expiry of target + 40 and records the transaction before
+broadcast. The following-day block supplies a conservative target-height bound:
+4475492 + 41 = 4475533, already 9000 blocks behind the stored tip. The tool does not
+generalize that bound to ZIP 318 pool migrations, whose rolling expiry is longer.
+It rechecks that the original payment and confirmed refund use Ironwood, validates
+the original expected memo/order/route with the existing decoder, and fixes the
+attempt ID, amount and creation time. The attempted amount is below the reviewed
+canonical migration denomination floor of 0.01 ZEC. No expiry override exists in
+the inspected `z_sendfromaccount` pipeline. Host/chain clocks and the reported
+standard beta.3 implementation are trust assumptions; no claim of binary-hash
+attestation or recovery of the exact historical RPC error is made.
+
+The operator tool performs fresh live RPC and SQLite checks before any write:
+matching chain hashes/heights and full sync, exactly the two known account
+transactions, confirmed earlier refund with the same Orchard receiver, protected
+route equality across stores, the exact unchanged unknown ledger row, and a fresh
+expired-window snapshot. Unknown, unrecognized or changed evidence blocks it.
+
+After the isolated candidate is healthy and running the matching source revision:
+
+```bash
+cd ~/nostos/repo
+git pull --ff-only origin main
+sudo python3 scripts/web/reconcile-item21.py
+```
+
+Default operation is a read-only dry run. If eligible, explicit application is:
+
+```bash
+sudo python3 scripts/web/reconcile-item21.py --apply
+```
+
+Apply atomically appends a `refund_resolutions` evidence record and marks only the
+specified unknown instruction `failed`, with no transaction ID invented. This
+means unsuccessful settlement after reconciliation, not a recovered RPC rejection
+message or proof that no packet was ever broadcast. The original instruction,
+idempotency key, amount, creation time, retry count, earlier confirmed refund,
+legacy mirror and both encrypted routes remain. A repeat is idempotent. No send
+method exists in this recovery path; the old key cannot be resent. The 200000 zat
+reservation is released only after successful apply, restoring accounting value,
+not wallet funds. Fees remain extra merchant spending; any new instruction needs
+separate merchant authorization and the existing funding/receiver checks.
+
+The wrapper refuses a checkout/live release mismatch or a deployment without the
+new reconciliation capability. A timeout/error during apply reports unknown
+mutation state and requires inspection, not an assumption that rollback occurred.
+Do not restore an old database snapshot. Older releases fail closed on the new
+failed event; continue with a compatible release for correct accounting/display.
+
+Deployment and live apply are not proved by local tests or this document. Until
+operator apply output is received, the latest verified application state remains
+`broadcast_unknown` with 200000 zat reserved. Existing privacy, demo/video and
+submission gates remain open. No new payment or refund has been sent.
+
+Source references:
+
+- <https://github.com/zcash/zallet/blob/v0.1.0-beta.3/zallet-core/src/components/json_rpc/methods/pczt_create.rs>
+- <https://github.com/zcash/librustzcash/blob/1f6bb2072e7fcb142b0d90ff7b267a8699a84818/zcash_primitives/src/transaction/builder.rs>
+- <https://github.com/zcash/librustzcash/blob/1f6bb2072e7fcb142b0d90ff7b267a8699a84818/components/zcash_protocol/src/zip318.rs>

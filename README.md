@@ -16,6 +16,16 @@ The merchant product now has account creation, store setup, payment requests, ch
 
 Build started: `2026-09-29T00:01:43Z`
 
+## October 19 refund reconciliation candidate
+
+The operator supplied a fully synced merchant wallet with only the known Item21
+payment and confirmed 0.018 ZEC refund in the matching account. The later 0.002 ZEC
+attempt remains reserved until the audited operator recovery tool is applied.
+See [closeout evidence and dry-run/apply instructions](docs/CLOSEOUT.md). The
+candidate preserves the old instruction, earlier settlement and both routes; it
+does not send another refund. Runtime deployment and application remain separate
+checks, and broader privacy/submission work is still open.
+
 ## Privacy audit status
 
 Audit baseline: `f367b1180ee521ca574f3fed67ee9c0b5450bf07`, October 2, 2026. The adapter fixes below have isolated regression evidence; their presence in the running production release is not yet verified. PROVEN SAFE is scoped to the named boundary, not a whole-product certification. The privacy release gate remains open.

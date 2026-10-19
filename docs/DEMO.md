@@ -161,3 +161,16 @@ and Orchard return-route rules before a separate test is proposed.
 - Record the existing receipt and merchant views privately, redact capabilities,
   and keep the supported fulfillment-failure explanation separate from Item21's
   actual pending fulfillment history.
+
+## 19 October reconciliation gate
+
+The operator supplied a fully synced wallet and matching-account history containing
+only the known payment and confirmed partial refund, plus a block anchor beyond
+the unknown attempt's standard validity window. The guarded Item21 recovery is
+prepared in source; deployment and operator apply output are still required. See
+[CLOSEOUT.md](CLOSEOUT.md). Until that output is captured, say “0.018 ZEC confirmed
+refunded; 0.002 ZEC reserved under an unresolved attempt.” After verified apply,
+say “0.018 ZEC confirmed refunded; the unsuccessful 0.002 ZEC attempt was closed
+after reconciliation, without sending another transaction.” Never describe the
+full 0.02 ZEC as refunded. Keep private receipts, routes and wallet data out of the
+recording.

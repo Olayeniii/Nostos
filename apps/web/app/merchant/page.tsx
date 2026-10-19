@@ -21,6 +21,10 @@ type Dashboard = {
   syncWarning: boolean;
 };
 function status(r: RecordData) {
+  if (r.status === "failed")
+    return (r.confirmedRefundAmountZat ?? 0) > 0
+      ? "Partially refunded"
+      : "Refund attempt closed";
   return r.refundAmountZat > 0
     ? r.status === "confirmed"
       ? (r.remainingAmountZat ?? 0) > 0

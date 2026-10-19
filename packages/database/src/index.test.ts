@@ -1,3 +1,4 @@
+import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -177,4 +178,66 @@ it("reserves against the complete ledger across independent store connections an
   const restarted = new SqlitePaymentStore(path);
   expect(restarted.listRefundsByPayment(payment.id)).toHaveLength(2);
   restarted.close();
+});
+
+it("a reconciled failed attempt releases only its reservation and survives reopen", async () => {
+  const path = await databasePath();
+  const store = new SqlitePaymentStore(path);
+  store.insertPayment(payment);
+  store.prepareRefund(
+    payment.id,
+    {
+      id: "settled",
+      paymentId: payment.id,
+      idempotencyKey: "settled",
+      amountZat: 1800000,
+    },
+    true,
+  );
+  store.claimRefundBroadcast(payment.id, "settled");
+  store.recordRefundBroadcast(payment.id, "c".repeat(64), "settled");
+  store.confirmRefund(payment.id, "settled");
+  store.prepareRefund(
+    payment.id,
+    {
+      id: "closed",
+      paymentId: payment.id,
+      idempotencyKey: "closed",
+      amountZat: 200000,
+    },
+    true,
+  );
+  store.claimRefundBroadcast(payment.id, "closed");
+  store.markRefundBroadcastUnknown(payment.id, "closed");
+  store.close();
+  const raw = new DatabaseSync(path);
+  raw.exec("UPDATE refund_events SET status='failed' WHERE id='closed'");
+  raw.close();
+  const reopened = new SqlitePaymentStore(path);
+  expect(reopened.refundTotals(payment.id)).toEqual({
+    refundedZat: 1800000,
+    reservedZat: 0,
+    inProgress: false,
+  });
+  expect(reopened.retireConfirmedRefundRoute(payment.id)).toBe(false);
+  expect(reopened.findByTxid(payment.id)?.refundAddress).toBe(
+    payment.refundAddress,
+  );
+  expect(reopened.findRefundByKey("closed")?.status).toBe("failed");
+  reopened.prepareRefund(
+    payment.id,
+    {
+      id: "fresh",
+      paymentId: payment.id,
+      idempotencyKey: "fresh",
+      amountZat: 200000,
+    },
+    true,
+  );
+  expect(reopened.refundTotals(payment.id)).toEqual({
+    refundedZat: 1800000,
+    reservedZat: 200000,
+    inProgress: true,
+  });
+  reopened.close();
 });

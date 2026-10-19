@@ -107,8 +107,48 @@
     "otherExpiryHeightMin": 4428370,
     "otherExpiryHeightMax": 4430932,
     "rawTransactionRecordCount": 10,
-    "accountScope": "All accounts; exact-account correlation not yet run",
+    "accountScope": "All-account totals above; subsequent matching-account evidence is recorded separately below.",
     "safeToRetry": false,
     "scope": "Confirms metadata in this database snapshot, not absence of broadcast, current sync, database continuity, log or backup hygiene. The eight other records are not automatically the unknown refund."
+  },
+  "matchingAccountEvidence20261019": {
+    "source": "Operator pasted read-only running-wallet matching-account, sync and block-anchor outputs on 19 October; no direct agent VPS access",
+    "identifiedBy": "unique_common_account_credited_by_payment_and_debited_by_confirmed_refund",
+    "transactionCount": 2,
+    "knownPaymentMatches": 1,
+    "knownConfirmedRefundMatches": 1,
+    "otherTransactionCount": 0,
+    "otherUnminedCount": 0,
+    "invalidTxidCount": 0,
+    "nonchangeOrchardFamily200000ZatSendTransactionCount": 0,
+    "sync": {
+      "nodeHeight": 4484530,
+      "walletHeight": 4484530,
+      "fullySyncedHeight": 4484530,
+      "unscannedBlocks": null,
+      "locked": false
+    },
+    "blockAfterAttemptDay": {
+      "height": 4475492,
+      "time": 1791819667
+    },
+    "latestStoredBlock": 4484533,
+    "scope": "Account absence plus sync and expired standard-send window support guarded reconciliation. Not evidence of the original RPC error, complete log/backup hygiene or live application reconciliation."
+  },
+  "reconciliationCandidate20261019": {
+    "state": "prepared_not_live_applied",
+    "command": "sudo python3 scripts/web/reconcile-item21.py",
+    "applyOption": "--apply",
+    "requires": "Matching deployed revision and fresh independently checked account, sync, expiry, original memo, route and exact ledger state",
+    "proposedResolution": "no_settlement_after_expiry",
+    "proposedStatus": "failed",
+    "confirmedRefundZat": 1800000,
+    "reservedRefundZatUntilApplied": 200000,
+    "proposedReservedRefundZat": 0,
+    "proposedAvailableRefundZat": 200000,
+    "preservesBothEncryptedRoutes": true,
+    "sendsRequested": 0,
+    "safeToRetryOldInstruction": false,
+    "scope": "Source candidate only. No live apply or deployment success is claimed. Releasing accounting reservation does not add wallet funds."
   }
 }

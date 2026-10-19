@@ -67,15 +67,20 @@ export function ReceiptCard({
   const refundUnknown = ["broadcast_unknown", "broadcasting"].includes(
     receipt.status,
   );
-  const refundText = refundConfirmed
-    ? "Refund confirmed"
-    : refundUnknown
-      ? "Refund state being checked"
-      : receipt.status === "broadcast"
-        ? "Refund sent, awaiting confirmation"
-        : receipt.status === "pending"
-          ? "Refund being prepared"
-          : "No refund issued";
+  const refundFailed = receipt.status === "failed";
+  const refundText = refundFailed
+    ? hasRefund
+      ? "Partially refunded"
+      : "Refund attempt closed"
+    : refundConfirmed
+      ? "Refund confirmed"
+      : refundUnknown
+        ? "Refund state being checked"
+        : receipt.status === "broadcast"
+          ? "Refund sent, awaiting confirmation"
+          : receipt.status === "pending"
+            ? "Refund being prepared"
+            : "No refund issued";
   async function copy(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -160,11 +165,13 @@ export function ReceiptCard({
               {zec(receipt.refundAmountZat)} <span>ZEC</span>
             </p>
             <p>
-              {refundConfirmed
-                ? "The shielded refund transaction is confirmed. Your wallet can verify receipt."
-                : refundUnknown
-                  ? "Do not request another send while this transaction is being reconciled."
-                  : "Sent to the refund route supplied with this payment."}
+              {refundFailed
+                ? "The latest attempt was closed without settlement. This total includes earlier confirmed refunds only."
+                : refundConfirmed
+                  ? "The shielded refund transaction is confirmed. Your wallet can verify receipt."
+                  : refundUnknown
+                    ? "Do not request another send while this transaction is being reconciled."
+                    : "Sent to the refund route supplied with this payment."}
             </p>
           </>
         ) : (
@@ -242,7 +249,11 @@ export function ReceiptCard({
               <div key={r.id}>
                 <p>
                   {zec(r.amountZat)} ZEC,{" "}
-                  {r.status === "confirmed" ? "confirmed" : "being checked"}
+                  {r.status === "failed"
+                    ? "closed without payment"
+                    : r.status === "confirmed"
+                      ? "confirmed"
+                      : "being checked"}
                 </p>
                 {r.txid && <code>{r.txid}</code>}
               </div>

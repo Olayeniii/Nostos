@@ -28,6 +28,7 @@ export interface RefundIntent {
 }
 
 export const refundStatuses = [
+  "failed",
   "pending",
   "broadcasting",
   "broadcast_unknown",
