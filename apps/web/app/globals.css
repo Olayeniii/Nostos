@@ -311,6 +311,20 @@ textarea {
   padding: 24px 32px;
   min-height: 100svh;
 }
+/* Let panels shrink within grids; keep ledger scrolling inside its panel. */
+.product-app :where(section, article, aside, form, label, header, nav),
+.product-app :where(section, article, aside, form, header, nav) > * {
+  min-width: 0;
+}
+.product-app header,
+.header-context,
+.workspace-nav,
+.section-head {
+  flex-wrap: wrap;
+}
+.product-app :where(h1, h2, h3, p, dd, code, a) {
+  overflow-wrap: anywhere;
+}
 .product-app header {
   padding-bottom: 24px;
   border-bottom: 1px solid var(--border);
@@ -638,6 +652,8 @@ form .primary {
 }
 .ledger {
   padding: 0;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
 }
 .ledger > .section-head {
@@ -1149,11 +1165,11 @@ form .primary {
 @media (max-width: 900px) {
   .account-layout {
     gap: 35px;
-    grid-template-columns: 1fr 390px;
+    grid-template-columns: minmax(0, 1fr);
   }
   .checkout-layout {
     gap: 32px;
-    grid-template-columns: 1fr 420px;
+    grid-template-columns: minmax(0, 1fr);
   }
   .ledger-layout.has-selection {
     grid-template-columns: 1fr;
