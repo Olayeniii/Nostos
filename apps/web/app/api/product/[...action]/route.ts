@@ -1,3 +1,4 @@
+import { MerchantCustodyError } from "../../../../src/custody-policy.js";
 import { runtimeNetwork } from "../../../../../../packages/network/src/index.js";
 import { chainWallet } from "../../../../src/wallet-runtime.js";
 import {
@@ -564,7 +565,11 @@ async function handle(request: Request) {
     }
     return json({ error: "Not found" }, 404);
   } catch (error) {
-    if (error instanceof RefundFundingError || error instanceof FundsError)
+    if (
+      error instanceof RefundFundingError ||
+      error instanceof FundsError ||
+      error instanceof MerchantCustodyError
+    )
       return json({ error: error.message }, 409);
     // Raw wallet/SQLite errors can contain private memos, destinations or identities.
     return json(

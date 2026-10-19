@@ -38,7 +38,7 @@ export function NetworkNotice() {
   return (
     <>
       {n === "mainnet"
-        ? "Mainnet. Real ZEC. Hosted merchant custody."
+        ? "Mainnet connection preview. Merchant payments are disabled."
         : n === "testnet"
           ? "Testnet only. No real funds."
           : "Confirm the network before paying."}

@@ -1,3 +1,4 @@
+import { assertHostedMerchantOperationsAllowed } from "./custody-policy.js";
 import { randomUUID } from "node:crypto";
 import type { SqlitePaymentStore } from "../../../packages/database/src/index.js";
 import { orchardRefundReceiver } from "../../../packages/zcash-adapter/src/refund-route.js";
@@ -145,6 +146,7 @@ export async function merchantFunds(
   rpc: WalletRpc,
   node: Pick<WalletRpc, "call">,
 ) {
+  assertHostedMerchantOperationsAllowed();
   await validateAccount(m, rpc, node);
   // Reconcile only a recorded txid, never infer a send from an amount match.
   for (const w of withdrawals(store, core, m.id)) {
@@ -232,6 +234,7 @@ export async function quoteWithdrawal(
   rpc: WalletRpc,
   node: Pick<WalletRpc, "call">,
 ) {
+  assertHostedMerchantOperationsAllowed();
   guard(
     Number.isSafeInteger(amount) &&
       amount > 0 &&
@@ -309,6 +312,7 @@ export async function confirmWithdrawal(
   rpc: WalletRpc,
   node: Pick<WalletRpc, "call">,
 ) {
+  assertHostedMerchantOperationsAllowed();
   const w = withdrawals(store, core, m.id).find((w) => w.id === id);
   guard(w && w.network === runtimeNetwork());
   if (w.status === "broadcast" || w.status === "confirmed")

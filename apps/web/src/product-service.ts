@@ -1,3 +1,4 @@
+import { assertHostedMerchantOperationsAllowed } from "./custody-policy.js";
 import {
   assertWalletReady,
   assertWalletChainIdentity,
@@ -25,6 +26,7 @@ import {
 } from "../../../packages/zcash-adapter/src/refund-route.js";
 
 export function wallet(timeoutMs = 2500) {
+  assertHostedMerchantOperationsAllowed();
   const url = runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_URL");
   const cookieFile = runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE");
   if (!url || !cookieFile) throw new Error("Wallet service unavailable");
@@ -321,6 +323,7 @@ export async function preparePayment(
   route: string,
   rpc: ProductWallet,
 ) {
+  assertHostedMerchantOperationsAllowed();
   if (!addressOnNetwork(route, runtimeNetwork()))
     throw new Error("Use a fresh unified address on this network");
   if (checkout.status !== "unpaid")
@@ -352,6 +355,7 @@ export async function setupMerchant(
   name: string,
   rpc: ProductWallet,
 ) {
+  assertHostedMerchantOperationsAllowed();
   if (merchant.destination) return;
   if (runtimeNetwork() === "mainnet")
     await assertWalletChainIdentity(
@@ -374,6 +378,7 @@ export function newRequest(
   description: string,
   amountZat: number,
 ) {
+  assertHostedMerchantOperationsAllowed();
   if (!merchant.destination) throw new Error("Set up your store first");
   if (store.requests(merchant.id).length >= 100)
     throw new Error("Payment request limit reached");
@@ -395,6 +400,7 @@ export async function refundPayment(
   instructionId?: string,
   requestId?: string,
 ) {
+  assertHostedMerchantOperationsAllowed();
   const checkout = store.checkout(id);
   if (!checkout || checkout.merchantId !== merchant.id || !checkout.paymentTxid)
     throw new Error("Payment unavailable");

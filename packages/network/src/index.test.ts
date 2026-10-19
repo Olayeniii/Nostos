@@ -96,27 +96,27 @@ describe("explicit deployment network boundary", () => {
     vi.stubEnv("NOSTOS_NETWORK", "testnet");
     expect(() => new ProductStore(path, "b".repeat(64))).toThrow(/network/);
   });
-  it("prepares mainnet payment instructions while preserving memo and receiver policy", async () => {
+  it("holds hosted mainnet requests and payment instructions without modifying records", async () => {
     mainnetConfig();
     const s = new ProductStore();
     try {
-      const m = s.signup("main@example.com", "long-test-password"),
-        destination = "u1" + "a".repeat(60),
-        route = "u1" + "b".repeat(60);
-      s.finishSetup(m.id, "Main", "account", destination);
-      const c = s.checkout(
-        newRequest(s, s.merchant(m.id)!, "Order", 10000).id,
-      )!;
-      const rpc = {
-        decodeUnifiedAddress: async (a: string) => ({ orchard: a }),
-      } as unknown as Parameters<typeof preparePayment>[3];
-      const p = await preparePayment(s, c, route, rpc);
-      expect(p.network).toBe("mainnet");
-      expect(p.uri).toContain("zcash:u1");
-      expect(JSON.parse(p.memo)).toMatchObject({ p: "nostos", v: 1, r: route });
+      const m = s.signup("main@example.com", "long-test-password");
+      s.finishSetup(m.id, "Main", "account", "u1" + "a".repeat(60));
+      expect(() => newRequest(s, s.merchant(m.id)!, "Order", 10000)).toThrow(
+        /Merchant-controlled/,
+      );
+      expect(s.requests(m.id)).toHaveLength(0);
+      // Simulate an already existing draft; the gate must not attach a route.
+      const c = s.createRequest(m.id, "Order", "n_existing", 10000).checkout;
+      const decode = vi.fn(async (a: string) => ({ orchard: a }));
+      const rpc = { decodeUnifiedAddress: decode } as unknown as Parameters<
+        typeof preparePayment
+      >[3];
       await expect(
-        preparePayment(s, c, "utest1" + "b".repeat(60), rpc),
-      ).rejects.toThrow();
+        preparePayment(s, c, "u1" + "b".repeat(60), rpc),
+      ).rejects.toThrow(/Merchant-controlled/);
+      expect(s.checkout(c.id)!.route).toBe("");
+      expect(decode).not.toHaveBeenCalled();
     } finally {
       s.close();
     }

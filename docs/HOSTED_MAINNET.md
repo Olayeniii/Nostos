@@ -1,5 +1,10 @@
 # Mainnet through a hosted node
 
+**Custody decision update:** Follow [MERCHANT_CUSTODY.md](MERCHANT_CUSTODY.md).
+The operator wallet bring-up below is historical infrastructure preparation, not
+the approved merchant custody model. Keep that wallet unfunded and stopped.
+Hosted merchant operations on mainnet are now blocked in the application.
+
 NOSTOS does not require the operator to host a full node. The chosen first path
 keeps a separate mainnet Zallet wallet and signing keys locally, with hosted
 Zebra JSON-RPC supplying public chain data and accepting already-signed

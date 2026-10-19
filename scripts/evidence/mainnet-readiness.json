@@ -17,13 +17,29 @@
     "selfHostedFullNodeRequired": false,
     "providerCandidate": "GetBlock Zcash mainnet JSON-RPC, based on current provider and upstream wallet documentation",
     "privateEndpointAvailableToAgent": false,
-    "liveProviderProbeExecuted": false,
-    "relayInstalledOnVps": false,
+    "liveProviderProbeExecuted": true,
+    "relayInstalledOnVps": true,
     "relayBroadcastEnabledByDefault": false,
     "walletInitializedOrSynced": false,
     "webDeploymentVerified": false,
     "paymentRefundWithdrawalProof": false,
     "sendsRequested": 0,
-    "scope": "Source connector and offline tests only. Metadata probe, exact Zaino decoding, quota, wallet sync, privacy checks and explicit small mainnet proof remain required. No mainnet secrets or endpoint tokens are included."
+    "scope": "Operator reports metadata probe, relay installation/local read success and operator-wallet initialization with mnemonic backup confirmed. No direct VPS access by agent, complete backup, wallet sync, merchant-controlled connection, privacy certification or mainnet transaction proof. Operator wallet remains unfunded; hosted mainnet merchant operations are blocked.",
+    "operatorEvidence": {
+      "source": "Operator-supplied redacted command outputs on 19 October 2026",
+      "providerProbeHeight": 3523348,
+      "localRelayHeight": 3523350,
+      "localRelayPassed": true,
+      "broadcastEnabled": false,
+      "walletInitialized": true,
+      "mnemonicBackupConfirmed": true,
+      "completeWalletBackupVerified": false,
+      "walletServiceStarted": false,
+      "walletSyncVerified": false,
+      "sendsRequested": 0
+    },
+    "requiredCustody": "merchant_controlled_signing_keys",
+    "hostedMerchantMainnetOperationsBlocked": true,
+    "merchantWalletConnectionImplemented": false
   }
 }

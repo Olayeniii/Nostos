@@ -1,9 +1,12 @@
 "use client";
+import { useNetwork } from "../../src/network-context.js";
 import { useEffect, useState } from "react";
 import { AppHeader, AppFooter } from "../../src/shell.js";
 import { requestJson, RequestError } from "../../src/requests.js";
 import { StateLabel } from "../../src/status-label.js";
 export default function Setup() {
+  const network = useNetwork();
+  const hostedSetupAllowed = network === "testnet";
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
@@ -33,7 +36,7 @@ export default function Setup() {
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            if (busy || pending) return;
+            if (busy || pending || !hostedSetupAllowed) return;
             const name = new FormData(e.currentTarget).get("name");
             setBusy(true);
             setMessage("");
@@ -66,15 +69,19 @@ export default function Setup() {
               maxLength={80}
               required
               autoComplete="organization"
-              disabled={busy || pending}
+              disabled={busy || pending || !hostedSetupAllowed}
             />
           </label>
           <aside className="info-panel">
-            <strong>Hosted merchant wallet</strong>
+            <strong>
+              {network === "mainnet"
+                ? "Merchant wallet connection pending"
+                : "Hosted testnet wallet"}
+            </strong>
             <p>
-              NOSTOS creates a separate wallet account for your store. This
-              service holds the signing keys and can see payment and refund
-              details. Do not use real funds.
+              {network === "mainnet"
+                ? "Mainnet store setup is paused until you can connect a wallet whose signing keys you control. Do not enter a recovery phrase or spending key into NOSTOS."
+                : "The testnet demo creates an account in the operator wallet. NOSTOS holds its signing keys and can see payment and refund details. Use testnet funds only."}
             </p>
           </aside>
           {pending && (
@@ -88,7 +95,10 @@ export default function Setup() {
               {message}
             </p>
           )}
-          <button className="primary" disabled={busy || pending}>
+          <button
+            className="primary"
+            disabled={busy || pending || !hostedSetupAllowed}
+          >
             Create store
           </button>
           {busy && (

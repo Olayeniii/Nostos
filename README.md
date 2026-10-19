@@ -116,3 +116,7 @@ JSON-RPC with a separate local Zallet wallet and signing keys. A read-only priva
 endpoint probe and authenticated loopback HTTPS relay are prepared in source.
 No hosted endpoint, wallet sync or mainnet transaction has been verified yet.
 See [HOSTED_MAINNET.md](docs/HOSTED_MAINNET.md).
+
+Merchant custody decision: [merchant-controlled wallets](docs/MERCHANT_CUSTODY.md).
+The hosted testnet demonstration remains available; hosted merchant setup and
+spending on mainnet are held pending the merchant-controlled wallet integration.

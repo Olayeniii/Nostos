@@ -1,5 +1,10 @@
 # Merchant funds and mainnet candidate
 
+**Custody decision update:** [MERCHANT_CUSTODY.md](MERCHANT_CUSTODY.md) records the
+merchant-controlled wallet requirement. The hosted funds controls below remain
+the testnet demonstration. Mainnet hosted setup and spending are blocked pending
+the merchant-wallet observer and signing integration.
+
 This candidate adds merchant withdrawal of released earnings to an Orchard-only
 shielded destination. The existing hosted merchant Zallet remains the spending
 custodian. No swap, bank cash-out or merchant self-custody is claimed. Code and
