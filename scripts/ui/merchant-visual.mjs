@@ -173,6 +173,15 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await page.goto("http://127.0.0.1:3000/merchant");
   await page.getByRole("button", { name: /Studio commission/ }).waitFor();
   await capture("payments");
+  if (phase === "after" && width <= 900) {
+    assert.equal(
+      await page
+        .locator(".ledger")
+        .evaluate((el) => el.scrollWidth > el.clientWidth),
+      false,
+      "Compact ledger must not require horizontal scrolling",
+    );
+  }
   await page.getByRole("button", { name: /Studio commission/ }).click();
   await page
     .getByRole("heading", { name: "Studio commission", exact: true })

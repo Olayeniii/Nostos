@@ -2338,7 +2338,7 @@ form .primary {
     display: none;
   }
 }
-@media (max-width: 650px) {
+@media (max-width: 900px) {
   .product-app {
     padding: 18px 16px;
   }

@@ -36,8 +36,8 @@ Controls keep a 44px minimum height. Color transitions respect reduced motion.
 ## Workflow changes
 
 - Mobile summaries stack and long values can shrink within the grid.
-- Phone payment cards prioritize order and amount, with labeled secondary states.
-- Mobile selection replaces the workspace with a dedicated detail view.
+- Phone and tablet payment cards prioritize order and amount, with labeled secondary states.
+- Phone and tablet selection replaces the workspace with a dedicated detail view.
   Focus moves into details, Back restores the selected row, and Escape closes
   details when no action is busy.
 - Desktop keeps ledger columns. Selecting a row uses a compact list beside details.
@@ -62,7 +62,7 @@ fixtures, not live wallet evidence or a new payment proof.
 
 The PR workflow checks 320, 375, 390, 430, 768 and 1440px, captures baseline and
 updated payment, details, review, link, funds, checkout, receipt, registration,
-empty, loading and error screens, and rejects document overflow in the updated
+empty, loading and error screens, and rejects document overflow and compact-ledger horizontal scrolling in the updated
 screens. Baseline comes from the PR base SHA in a separate worktree. Images and
 JSON results are uploaded as the `merchant-ui-review` Actions artifact.
 
