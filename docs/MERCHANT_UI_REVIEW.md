@@ -1,3 +1,27 @@
+# Approved direction: checkpoint 1
+
+This checkpoint replaces the Payments presentation with the second approved concept:
+a narrow forest rail, warm paper canvas, editorial headings, flat transaction rows,
+and a vertical payment lifecycle in the desktop inspector. The existing NOSTOS
+mark and real application states remain. Phone layouts use a compact list and
+fixed bottom menu. Search and All / Awaiting / Confirmed filters operate on the
+loaded merchant records. No wallet, refund, auth, or backend behavior changes.
+
+Scope is the shared workspace component and Payments only. Funds, Settings,
+Overview, Refunds, and customer-facing refinements remain for later checkpoints.
+Links point only to existing screens; no placeholder destinations are presented.
+
+The browser job now saves exactly two images: 390px Payments and 1440px payment
+details. The existing baseline is retained in previous PR artifacts; it is not
+recaptured. Layout and workflow assertions still run at 320, 375, 390, 430, 768,
+and 1440px, including populated, empty, loading, error, and detail states. Search,
+filter reset, refund review, and unavailable-route guards are checked without
+sending a payment, refund, or withdrawal. Browser data is explicitly fixture data.
+
+The previous checkpoint report follows as historical context.
+
+---
+
 # Merchant interface review
 
 Source baseline: `c6940481ca238a1458176069a0135c0b8e4c9d5c` in `Olayeniii/Nostos`.

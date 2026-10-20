@@ -159,10 +159,15 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     await page.addStyleTag({
       content: "nextjs-portal { display: none !important; }",
     });
-    await page.screenshot({
-      path: `${out}/${width}-${name}.png`,
-      fullPage: true,
-    });
+    if (
+      (width === 1440 && name === "detail") ||
+      (width === 390 && name === "payments")
+    ) {
+      await page.screenshot({
+        path: `${out}/${width}-${name}.png`,
+        fullPage: true,
+      });
+    }
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,
     );
@@ -173,6 +178,23 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await page.goto("http://127.0.0.1:3000/merchant");
   await page.getByRole("button", { name: /Studio commission/ }).waitFor();
   await capture("payments");
+  if (phase === "after") {
+    const search = page.getByRole("searchbox", { name: "Find a payment" });
+    await search.fill("no-such-order-reference");
+    await page.getByRole("heading", { name: "No matching payments" }).waitFor();
+    assert.equal(await page.locator(".ledger-row").count(), 0);
+    await page
+      .getByRole("button", { name: "Clear filters", exact: true })
+      .click();
+    assert.equal(await page.locator(".ledger-row").count(), records.length);
+    await page.getByRole("button", { name: "Confirmed", exact: true }).click();
+    assert.equal(
+      await page.locator(".ledger-row").count(),
+      records.filter((record) => record.paymentStatus === "confirmed").length,
+    );
+    await page.getByRole("button", { name: "All", exact: true }).click();
+  }
+
   if (phase === "after" && width <= 900) {
     assert.equal(
       await page

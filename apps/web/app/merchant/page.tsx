@@ -2,7 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { AppHeader, AppFooter } from "../../src/shell.js";
+import { AppFooter } from "../../src/shell.js";
+import { MerchantWorkspace } from "../../src/merchant-workspace.js";
 import { StateLabel } from "../../src/status-label.js";
 import { useRecord } from "../../src/use-record.js";
 import { requestJson, parseZec } from "../../src/requests.js";
@@ -44,6 +45,8 @@ export default function Merchant() {
   const { data, loading, warning, refresh } = useRecord<Dashboard>(
     "/api/product/dashboard",
   );
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -63,6 +66,19 @@ export default function Merchant() {
   const [uncertain, setUncertain] = useState(false);
   const submitting = useRef(false);
   const records = data?.records ?? [];
+  const filteredRecords = records.filter((record) => {
+    const match = `${record.description ?? ""} ${record.orderReference}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase());
+    return (
+      match &&
+      (filter === "all" ||
+        (filter === "confirmed"
+          ? record.paymentStatus === "confirmed"
+          : record.paymentStatus !== "confirmed" &&
+            record.paymentStatus !== "expired"))
+    );
+  });
   const current = records.find((r) => r.id === selected);
   const summary = paymentSummary(records);
   useEffect(() => {
@@ -109,35 +125,23 @@ export default function Merchant() {
     );
   }
   return (
-    <main
-      className={`product-app dashboard-app ${current ? "detail-open" : ""}`}
+    <MerchantWorkspace
+      name={data?.merchant.name || "Merchant workspace"}
+      detailOpen={!!current}
+      onSignOut={async () => {
+        try {
+          await post("logout", {});
+          window.location.assign("/sign-in");
+        } catch {
+          setError("Could not sign out. Try again.");
+        }
+      }}
     >
-      <AppHeader role="Merchant" />
-      <nav className="workspace-nav">
-        <Link aria-current="page" href="/merchant">
-          Payments
-        </Link>
-        <Link href="/merchant/funds">Funds</Link>
-        <Link href="/merchant/settings">Store settings</Link>
-        <button
-          className="text-button"
-          onClick={async () => {
-            try {
-              await post("logout", {});
-              window.location.assign("/sign-in");
-            } catch {
-              setError("Could not sign out. Try again.");
-            }
-          }}
-        >
-          Sign out
-        </button>
-      </nav>
       <div className="dashboard-title">
         <div>
-          <p className="eyebrow">MERCHANT WORKSPACE</p>
-          <h1>{data?.merchant.name || "Your payments"}</h1>
-          <p>Receive privately. Fulfill with confidence. Refund when needed.</p>
+          <p className="eyebrow">WORKSPACE / PAYMENTS</p>
+          <h1>Payments</h1>
+          <p>Private in. A way back.</p>
         </div>
         <button
           className="primary"
@@ -148,7 +152,7 @@ export default function Merchant() {
           }}
           disabled={!data?.merchant.ready}
         >
-          + Create payment
+          New payment +
         </button>
       </div>
       {data && !data.merchant.ready && (
@@ -327,8 +331,12 @@ export default function Merchant() {
         <section className="ledger panel">
           <div className="section-head">
             <div>
-              <h2>Payments</h2>
-              <p>{records.length} payment requests</p>
+              <h2 className="studio-list-heading">Payment ledger</h2>
+              <p>
+                {data
+                  ? `${filteredRecords.length} of ${records.length} payment requests`
+                  : "Waiting for records"}
+              </p>
             </div>
             <button
               className="text-button"
@@ -337,6 +345,32 @@ export default function Merchant() {
             >
               Refresh
             </button>
+          </div>
+          <div className="studio-tools">
+            <div className="studio-tabs" aria-label="Filter payments">
+              {[
+                ["all", "All"],
+                ["awaiting", "Awaiting"],
+                ["confirmed", "Confirmed"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  aria-pressed={filter === value}
+                  onClick={() => setFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="studio-search">
+              <span className="sr-only">Find a payment</span>
+              <input
+                type="search"
+                placeholder="Find a payment"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
           </div>
           {loading && <StateLabel state="loading" text="Checking payments" />}
           <div className="ledger-columns" aria-hidden="true">
@@ -363,7 +397,7 @@ export default function Merchant() {
               </button>
             </div>
           ) : (
-            records.map((r) => (
+            filteredRecords.map((r) => (
               <button
                 key={r.id}
                 className={`ledger-row ${selected === r.id ? "selected" : ""}`}
@@ -379,6 +413,11 @@ export default function Merchant() {
               >
                 <span className="ledger-order">
                   <strong>{r.description || r.orderReference}</strong>
+                  <small>
+                    {r.orderReference.length > 22
+                      ? `${r.orderReference.slice(0, 18)}...`
+                      : r.orderReference}
+                  </small>
                 </span>
                 <span className="ledger-amount">
                   {zec(r.paymentAmountZat)} <small>ZEC</small>
@@ -401,6 +440,21 @@ export default function Merchant() {
                 <span className="ledger-date">{date(r.createdAt)}</span>
               </button>
             ))
+          )}
+          {data && records.length > 0 && filteredRecords.length === 0 && (
+            <div className="empty-state">
+              <h3>No matching payments</h3>
+              <p>Try another order name, reference, or payment filter.</p>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setQuery("");
+                  setFilter("all");
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
           )}
         </section>
         {current && (
@@ -477,7 +531,9 @@ export default function Merchant() {
                 <small>
                   {current.refundAmountZat > 0 || current.status === "failed"
                     ? status(current)
-                    : "If needed"}
+                    : current.payment?.canRefund
+                      ? "Available if needed"
+                      : "Not currently available"}
                 </small>
               </li>
             </ol>
@@ -775,6 +831,6 @@ export default function Merchant() {
         )}
       </div>
       <AppFooter />
-    </main>
+    </MerchantWorkspace>
   );
 }
