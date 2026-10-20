@@ -84,6 +84,35 @@ class HostedNodeTests(unittest.TestCase):
             self.assertNotIn(ENDPOINT,str(caught.exception))
             self.assertNotIn('private',str(caught.exception))
 
+    def test_zaino_null_params_are_normalized_only_for_no_argument_reads(self):
+        opener=Opener({'result':[],'error':None})
+        client=relay.HostedNode(ENDPOINT,opener=opener)
+        for method in relay.NO_ARGUMENT_READ_METHODS:
+            result=client.forward({'method':method,'params':None,'id':1})
+            self.assertEqual(result['result'],[])
+            self.assertEqual(json.loads(opener.requests[-1].data)['params'],[])
+        self.assertEqual(len(opener.requests),len(relay.NO_ARGUMENT_READ_METHODS))
+
+    def test_null_params_do_not_enable_argument_reads_or_wallet_or_send_methods(self):
+        for broadcast in (False,True):
+            opener=Opener({'result':'unused'})
+            client=relay.HostedNode(ENDPOINT,broadcast_enabled=broadcast,opener=opener)
+            for method in ['getblock','getblockhash','getrawtransaction','z_gettreestate',
+                           'z_getsubtreesbyindex','getaddressbalance','sendrawtransaction',
+                           'z_sendfromaccount','z_importviewingkey']:
+                with self.subTest(method=method,broadcast=broadcast):
+                    with self.assertRaises(relay.HostedNodeError):
+                        client.forward({'method':method,'params':None,'id':1})
+            self.assertEqual(opener.requests,[])
+
+    def test_other_non_array_params_remain_blocked_for_no_argument_reads(self):
+        opener=Opener({'result':1})
+        client=relay.HostedNode(ENDPOINT,opener=opener)
+        for params in ({},'private',1,False):
+            with self.assertRaises(relay.HostedNodeError):
+                client.forward({'method':'getrawmempool','params':params,'id':1})
+        self.assertEqual(opener.requests,[])
+
     def test_batches_and_unknown_request_fields_are_not_forwarded(self):
         opener=Opener({'result':1})
         client=relay.HostedNode(ENDPOINT,opener=opener)
@@ -139,11 +168,11 @@ class HostedNodeTests(unittest.TestCase):
         client=relay.HostedNode(ENDPOINT,opener=opener)
         server=relay.RelayServer(('127.0.0.1',0),client,'__cookie__:fixture')
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
-        def request(method,auth='',origin=''):
+        def request(method,auth='',origin='',params=None):
             connection=http.client.HTTPConnection('127.0.0.1',server.server_port,timeout=3)
             headers={'Content-Type':'application/json','Authorization':auth}
             if origin: headers['Origin']=origin
-            connection.request('POST','/',json.dumps({'id':1,'method':method,'params':[]}),headers)
+            connection.request('POST','/',json.dumps({'id':1,'method':method,'params':params}),headers)
             response=connection.getresponse();result=(response.status,response.read());connection.close();return result
         auth='Basic '+base64.b64encode(b'__cookie__:fixture').decode()
         try:
@@ -155,8 +184,10 @@ class HostedNodeTests(unittest.TestCase):
                 status,body=request('getblockcount',auth)
                 self.assertEqual(status,200)
                 self.assertEqual(json.loads(body)['result'],100)
+                self.assertEqual(json.loads(request('getblockcount',auth,params=[])[1])['result'],100)
             self.assertEqual(output.getvalue(),'')
-            self.assertEqual(len(opener.requests),1)
+            self.assertEqual(len(opener.requests),2)
+            self.assertTrue(all(json.loads(r.data)['params']==[] for r in opener.requests))
         finally:
             server.shutdown();server.server_close();thread.join(timeout=3)
 

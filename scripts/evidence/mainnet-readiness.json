@@ -46,7 +46,7 @@
       "encryptedConsentAndKeyClaim": true,
       "merchantSigningImplemented": false,
       "observerExtensionPinnedSource": "987382f67e622915228686e9f956c6a9c9a7514c",
-      "observerExtensionInstalledOnVps": false,
+      "observerExtensionInstalledOnVps": true,
       "realViewingKeyImportedByAgent": false,
       "liveConnectionVerified": false,
       "paymentsEnabled": false,
@@ -57,26 +57,49 @@
       "applicationTestsPassed": 311,
       "webPythonTestsPassed": 31,
       "isolatedBuilderSafetyTestsPassed": 4,
-      "armObserverBuildVerified": false
+      "armObserverBuildVerified": true
     },
     "hostedArmBuild": {
       "workflowRunId": 39321077735,
       "sourceRevision": "5d4b52c0b7c398ef454ff351ea46ca16aae291f6",
-      "state": "running",
-      "artifactVerified": false,
+      "state": "passed",
+      "artifactVerified": true,
       "vpsRustInstallRequired": false,
       "operatorPreflight": {
         "architecture": "aarch64",
         "cargoAvailableInShell": false,
         "freeDiskGiB": 16
       },
-      "scope": "Operator searches did not locate Cargo in checked host paths. This does not establish whether the existing binary was built inside a container or elsewhere. Native ARM GitHub build and checksum/provenance validation replace the VPS compile path. No VPS service or wallet was changed.",
+      "scope": "GitHub native ARM build, key test, version/linkage and upload passed. Operator verified the artifact checksum/provenance on the VPS and executed --version. Observer startup remains blocked before RPC; no live key import or sync proof.",
       "previousRun": {
         "workflowRunId": 39317239917,
         "binaryCompilationPassed": true,
         "artifactUploaded": false,
         "failure": "Core tests targeted backend workspace, where zallet-core is not a workspace member."
-      }
+      },
+      "artifactId": 12221416956,
+      "binarySha256": "7d45a730a4d4d1b79e237123b126312086c16f359def3a3c88c66dbba1dc5eee"
+    },
+    "observerRuntime": {
+      "source": "Operator-supplied outputs on 19 October 2026",
+      "directory": "/home/ubuntu/nostos/mainnet/observer",
+      "port": 38234,
+      "mnemonicGenerated": false,
+      "encryptionInitialized": true,
+      "rpcVerified": false,
+      "realViewingKeyImported": false,
+      "broadcastEnabled": false,
+      "lastKnownState": "stopped_after_bounded_startup_probe",
+      "probe": {
+        "timeoutReached": true,
+        "exitCodeAfterTermination": 0,
+        "markers": ["Starting Zaino indexer"],
+        "missingFields": [],
+        "privateLogBytes": 3197
+      },
+      "relayGetinfoPassed": true,
+      "sendsRequested": 0,
+      "sourceFinding": "Pinned Zaino serializes no-argument reads with params:null; installed relay rejects that shape. Its mempool startup retries before wallet RPC startup. Source fix tested offline; runtime repair remains unverified."
     }
   }
 }

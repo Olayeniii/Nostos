@@ -23,6 +23,11 @@ READ_METHODS = frozenset(('getinfo', 'getblockchaininfo', 'getbestblockhash', 'g
     'getblockhash', 'getblock', 'getblockheader', 'getrawmempool', 'getrawtransaction',
     'z_gettreestate', 'z_getsubtreesbyindex', 'getaddressbalance', 'getaddresstxids',
     'getaddressutxos', 'getmempoolinfo'))
+# The pinned Zaino connector serializes Rust's unit type as JSON null for these
+# no-argument reads. Normalize only that shape; argument-bearing and send methods
+# must still supply arrays and pass the existing authorization/parameter checks.
+NO_ARGUMENT_READ_METHODS = frozenset(('getinfo', 'getblockchaininfo', 'getbestblockhash',
+    'getblockcount', 'getrawmempool', 'getmempoolinfo'))
 
 
 class HostedNodeError(Exception):
@@ -62,13 +67,16 @@ class HostedNode:
     def forward(self, payload):
         if (not isinstance(payload, dict) or set(payload) - {'jsonrpc', 'id', 'method', 'params'}
                 or not isinstance(payload.get('method'), str)
-                or not isinstance(payload.get('params', []), list)
                 or isinstance(payload.get('id'), (dict, list, bool))):
             raise HostedNodeError('Invalid chain RPC request.')
         method = payload['method']
         if method not in READ_METHODS and not (method == 'sendrawtransaction' and self.broadcast_enabled):
             raise HostedNodeError('Chain RPC method is not enabled.')
         params = payload.get('params', [])
+        if params is None and method in NO_ARGUMENT_READ_METHODS:
+            params = []
+        if not isinstance(params, list):
+            raise HostedNodeError('Invalid chain RPC request.')
         if method == 'sendrawtransaction' and (len(params) != 1 or not isinstance(params[0], str)
                 or not re.fullmatch(r'[a-fA-F0-9]+', params[0]) or len(params[0]) % 2):
             raise HostedNodeError('A signed raw transaction is required.')

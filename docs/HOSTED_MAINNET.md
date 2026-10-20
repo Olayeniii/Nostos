@@ -142,3 +142,41 @@ review remains required and must include the new relay/provider boundary.
 
 Local tests and a successful probe cannot establish a live mainnet payment,
 refund, withdrawal or final privacy/submission readiness.
+
+## October 20 observer startup compatibility repair
+
+The operator verified native ARM artifact 12221416956 from successful workflow
+39321077735, installed it separately and confirmed version 0.1.0-beta.3. The new
+observer has an encryption identity but no generated mnemonic or imported merchant
+key. Its first startup stayed before wallet RPC initialization. A bounded probe
+logged `Starting Zaino indexer`, and left the observer stopped. The relay's
+`getinfo` read passed separately. No key import, wallet sync or mainnet payment is
+proved.
+
+Pinned Zaino d2d06bdd serializes Rust unit parameters as JSON `null` for
+`getrawmempool`, `getbestblockhash`, `getblockcount` and other no-argument reads.
+Its mempool initialization retries a rejected read before opening wallet RPC.
+The earlier relay rejected every non-array parameter value. The repair normalizes
+`null` to `[]` only for the six existing no-argument read methods. It adds no
+method permissions. Argument-bearing calls and broadcasts still require arrays;
+wallet methods, credentials, redirects, TLS and default-disabled broadcasts retain
+their existing checks.
+
+After reviewing/pulling this repair, with the new observer stopped:
+
+```bash
+sudo python3 scripts/web/update-hosted-node.py
+sudo python3 scripts/web/update-hosted-node.py --apply
+```
+
+The first invocation is read-only. Explicit apply preserves the old installed code,
+atomically replaces only the relay script, and restarts only
+`nostos-mainnet-rpc-relay.service`. It preserves the provider configuration, cookie
+and unit file. If the relay restart fails, it restores the old script and attempts
+to start that version. Inspect the returned state before any further startup;
+`is-active` is not RPC, sync or payment proof. Testnet wallets, Zebra and web
+services are never operated by this helper. Runtime repair and an actual
+observer connection remain unverified until operator evidence is returned.
+
+Upstream source reviewed: <https://github.com/zodl-inc/zaino/blob/d2d06bdd/packages/zaino-fetch/src/jsonrpsee/connector.rs>
+and <https://github.com/zodl-inc/zaino/blob/d2d06bdd/packages/zaino-state/src/chain_index/mempool.rs>.
