@@ -1,0 +1,59 @@
+name: Read-only lightwalletd SDK probe
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/lightclient/**
+      - .github/workflows/lightclient-probe.yml
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: nostos
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zcash/zallet
+          ref: 987382f67e622915228686e9f956c6a9c9a7514c
+          path: zallet
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/target
+          key: lightclient-probe-v1-987382f
+          restore-keys: |
+            observer-Linux-987382f-
+      - name: Add only the public-chain SDK example
+        run: |
+          test "$(git -C zallet rev-parse HEAD)" = 987382f67e622915228686e9f956c6a9c9a7514c
+          mkdir -p zallet/zallet-core/examples
+          cp nostos/scripts/lightclient/probe.rs zallet/zallet-core/examples/nostos_lightclient_probe.rs
+      - name: Test full viewing key decoding without a real key
+        working-directory: zallet
+        run: cargo +1.95.0 test --locked -p zallet-core --example nostos_lightclient_probe
+      - name: Check two hosted mainnet services with the pinned SDK
+        working-directory: zallet
+        run: cargo +1.95.0 run --locked -p zallet-core --example nostos_lightclient_probe
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/target
+          key: lightclient-probe-v1-987382f
