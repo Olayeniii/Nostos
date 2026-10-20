@@ -43,6 +43,9 @@ jobs:
           test "$(git -C zallet rev-parse HEAD)" = 987382f67e622915228686e9f956c6a9c9a7514c
           mkdir -p zallet/zallet-core/examples
           cp nostos/scripts/lightclient/probe.rs zallet/zallet-core/examples/nostos_lightclient_probe.rs
+          mkdir -p zallet/zallet-core/examples/nostos_observer
+          cp nostos/scripts/lightclient/observer.rs zallet/zallet-core/examples/nostos_observer/mod.rs
+          cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
           python3 nostos/scripts/lightclient/prepare.py zallet
       - name: Test full viewing key decoding without a real key
         working-directory: zallet
@@ -50,6 +53,12 @@ jobs:
       - name: Check two hosted mainnet services with the pinned SDK
         working-directory: zallet
         run: cargo +1.95.0 run --locked -p zallet-core --example nostos_lightclient_probe
+      - name: Test observer cache gaps and rewind behavior
+        working-directory: zallet
+        run: cargo +1.95.0 test --locked -p zallet-core --example nostos_observer_fixture
+      - name: Prove temporary view-only sync and database reopen
+        working-directory: zallet
+        run: cargo +1.95.0 run --locked -p zallet-core --example nostos_observer_fixture
       - uses: actions/cache/save@v4
         if: always()
         with:

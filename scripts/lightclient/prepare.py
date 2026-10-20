@@ -12,6 +12,7 @@ assert versions["rustls"] == "0.23.41"
 assert versions["ring"] == "0.17.14"
 text = manifest.read_text()
 assert text.count("[dependencies]\n") == 1
+text = text.replace('    "sync-decryptor",', '    "sync",\n    "sync-decryptor",')
 manifest.write_text(text.replace(
     "[dependencies]\n",
     '[dependencies]\nrustls = { version = "=0.23.41", default-features = false, features = ["ring", "std"] }\n',
@@ -24,6 +25,9 @@ for index, part in enumerate(parts):
     if part.startswith('\nname = "rustls"\n'):
         assert '\n "ring",\n' not in part
         parts[index] = part.replace('dependencies = [\n', 'dependencies = [\n "ring",\n')
+    if part.startswith('\nname = "zcash_client_backend"\n'):
+        assert '\n "async-trait",\n' not in part
+        parts[index] = part.replace('dependencies = [\n', 'dependencies = [\n "async-trait",\n "futures-util",\n')
 updated = "[[package]]".join(parts)
 after = tomllib.loads(updated)
 assert [(p["name"], p["version"], p.get("source"), p.get("checksum")) for p in before["package"]] == [
