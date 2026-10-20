@@ -1,5 +1,33 @@
 # Mainnet through a hosted node
 
+## Observer timeout correction, 20 October
+
+The operator's persistent observer exited at 09:48:22 UTC with a recover-history
+sync error caused by a backing-node request timeout. This is stronger evidence
+than the earlier mempool warnings; the observer did not remain ready.
+
+The exact pinned Zaino connector sets a five-second request timeout, while the
+relay allowed a single provider request to wait 25 seconds. The replacement build
+uses a 35-second timeout only for the relay's explicit public-chain read methods.
+All other methods retain the upstream timeout. The relay makes at most three
+eight-second attempts for transient read failures, with bounded delays. It never
+retries transaction broadcast, provider authentication failures, malformed data
+or application RPC errors. Broadcast remains disabled in deployed settings.
+
+The build checks out Zaino at d2d06bdd6591f3b238a3829b8f1b973ae0ec40be, applies
+the recorded transport patch and checks the exact source hashes. Local Cargo
+source overrides replace only the four Zaino lockfile sources. Dependency
+versions, registry checksums and the remaining lock entries are unchanged;
+`--locked` remains required. The artifact includes transport provenance.
+This correction still requires a successful ARM build and operator installation
+with the prior binary retained, followed by sustained runtime verification.
+No wallet reset, imported key, funding or testnet service change is required.
+
+Product direction: use https://nostos.iyforge.xyz for both networks, with Mainnet
+Preview selected initially and an obvious Testnet option. Existing separate-origin
+setup checks are not yet adapted to that routing model. Do not apply the old
+subdomain setup or enter a viewing key until the shared-origin handling is tested.
+
 **Custody decision update:** Follow [MERCHANT_CUSTODY.md](MERCHANT_CUSTODY.md).
 The operator wallet bring-up below is historical infrastructure preparation, not
 the approved merchant custody model. Keep that wallet unfunded and stopped.

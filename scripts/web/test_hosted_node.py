@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 import threading
 import unittest
+from unittest.mock import patch
+import urllib.error
 
 spec = importlib.util.spec_from_file_location('hosted_node', Path(__file__).with_name('hosted-node.py'))
 relay = importlib.util.module_from_spec(spec)
@@ -49,6 +51,36 @@ class ProbeClient:
 
 
 class HostedNodeTests(unittest.TestCase):
+    def test_transient_chain_reads_retry_but_broadcast_never_repeats(self):
+        class SequenceOpener:
+            def __init__(self, failures):
+                self.failures = list(failures)
+                self.timeouts = []
+            def open(self, request, timeout):
+                self.timeouts.append(timeout)
+                result = self.failures.pop(0)
+                if isinstance(result, Exception): raise result
+                return Response(result)
+        opener = SequenceOpener([TimeoutError(), urllib.error.URLError('private'), {'result':123}])
+        with patch.object(relay.time,'sleep'):
+            self.assertEqual(relay.HostedNode(ENDPOINT,opener=opener).call('getblockcount'),123)
+        self.assertEqual(opener.timeouts,[8,8,8])
+        opener = SequenceOpener([TimeoutError(), {'result':'must not retry'}])
+        with self.assertRaises(relay.HostedNodeError):
+            relay.HostedNode(ENDPOINT,True,opener).call('sendrawtransaction',['aabb'])
+        self.assertEqual(opener.timeouts,[25])
+
+    def test_read_retries_are_bounded_and_do_not_repeat_permanent_errors(self):
+        for error, count in [(TimeoutError(),3),
+                             (urllib.error.HTTPError(ENDPOINT,429,'private',{},None),3),
+                             (urllib.error.HTTPError(ENDPOINT,401,'private',{},None),1),
+                             (RuntimeError('private'),1)]:
+            opener = Opener(error)
+            with patch.object(relay.time,'sleep'), self.assertRaises(relay.HostedNodeError) as caught:
+                relay.HostedNode(ENDPOINT,opener=opener).call('getblockcount')
+            self.assertEqual(len(opener.requests),count)
+            self.assertNotIn('private',str(caught.exception))
+
     def test_only_documented_https_provider_origin_is_accepted(self):
         self.assertEqual(relay.validate_endpoint(ENDPOINT),ENDPOINT)
         for value in ['http://shared.eu-central-1.getblock.io/'+'a'*32, 'https://shared.eu-central-1.getblock.io.evil.example/'+'a'*32,

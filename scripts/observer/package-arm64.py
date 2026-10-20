@@ -26,6 +26,9 @@ def package(binary, output):
         'source_pin': PIN, 'nostos_revision': os.environ['GITHUB_SHA'],
         'workflow_run_id': os.environ['GITHUB_RUN_ID'],
         'patch_sha256': hashlib.sha256(Path(__file__).with_name('zallet-ufvk.patch').read_bytes()).hexdigest(),
+        'transport_source_pin': 'd2d06bdd6591f3b238a3829b8f1b973ae0ec40be',
+        'transport_patch_sha256': hashlib.sha256(Path(__file__).with_name('zaino-transport.patch').read_bytes()).hexdigest(),
+        'transport_policy': 'chain-reads-35s-other-methods-upstream-default',
         'binary_sha256': binary_hash, 'binary_size_bytes': binary.stat().st_size,
         'services_changed': False, 'wallet_files_included': False, 'sends_requested': 0,
     }

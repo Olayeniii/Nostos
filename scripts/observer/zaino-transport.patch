@@ -1,0 +1,46 @@
+--- a/packages/zaino-fetch/src/jsonrpsee/connector.rs
++++ b/packages/zaino-fetch/src/jsonrpsee/connector.rs
+@@ -215,6 +215,27 @@
+ enum CookieSupport {
+     Enabled,
+     Disabled,
++}
++
++// Exact public-chain allowlist. This does not enable any RPC or retry a send.
++fn nostos_chain_read(method: &str) -> bool {
++    matches!(method,
++        "getinfo" | "getblockchaininfo" | "getbestblockhash" | "getblockcount"
++        | "getblockhash" | "getblock" | "getblockheader" | "getrawmempool"
++        | "getrawtransaction" | "z_gettreestate" | "z_getsubtreesbyindex"
++        | "getaddressbalance" | "getaddresstxids" | "getaddressutxos" | "getmempoolinfo"
++    )
++}
++
++#[test]
++fn nostos_timeout_policy_excludes_wallet_and_broadcast_calls() {
++    for method in ["getblock", "getrawtransaction", "z_gettreestate", "getbestblockhash"] {
++        assert!(nostos_chain_read(method));
++    }
++    for method in ["sendrawtransaction", "z_sendmany", "z_sendfromaccount",
++                   "z_importviewingkey", "walletpassphrase", "getblock ", "GETBLOCK"] {
++        assert!(!nostos_chain_read(method));
++    }
+ }
+ 
+ /// Builds the outbound JSON-RPC HTTP client shared by every connector
+@@ -342,6 +363,15 @@
+                 .build_request(method, &params, id)
+                 .map_err(RpcRequestError::JsonRpc)?;
+ 
++            // NOSTOS observer: the local relay can spend up to 25 seconds on
++            // bounded hosted-chain reads. Keep all other methods at the upstream
++            // five-second default, especially transaction submission.
++            let request_builder = if nostos_chain_read(method) {
++                request_builder.timeout(Duration::from_secs(35))
++            } else {
++                request_builder
++            };
++
+             let response = request_builder
+                 .send()
+                 .await

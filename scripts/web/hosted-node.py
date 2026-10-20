@@ -7,6 +7,7 @@ transactions contain encrypted shielded data; no request/response bodies are log
 import argparse
 import base64
 import hmac
+import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -14,6 +15,8 @@ from pathlib import Path
 import re
 import ssl
 import threading
+import time
+import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
@@ -83,10 +86,26 @@ class HostedNode:
         body = json.dumps({'jsonrpc': '2.0', 'id': payload.get('id'), 'method': method, 'params': params}).encode()
         if len(body) > MAX_REQUEST:
             raise HostedNodeError('Chain RPC request is too large.')
+        # Three short attempts fit below the observer's 35-second read deadline.
+        # Never repeat transaction submission, even after an ambiguous timeout.
+        attempts = 3 if method in READ_METHODS else 1
+        for attempt in range(attempts):
+            try:
+                return self._exchange(body, payload.get('id'), 8 if method in READ_METHODS else 25)
+            except (TimeoutError, ConnectionError, urllib.error.URLError, http.client.IncompleteRead) as error:
+                transient = not isinstance(error, urllib.error.HTTPError) or error.code in (429, 502, 503, 504)
+                if not transient or attempt + 1 == attempts:
+                    break
+                time.sleep(0.25 * (attempt + 1))
+            except Exception:
+                break
+        raise HostedNodeError('Hosted chain RPC request failed.') from None
+
+    def _exchange(self, body, request_id, timeout):
         try:
             request = urllib.request.Request(self.endpoint, data=body,
                 headers={'Content-Type': 'application/json'}, method='POST')
-            with self.opener.open(request, timeout=25) as response:
+            with self.opener.open(request, timeout=timeout) as response:
                 if response.status != 200:
                     raise HostedNodeError('Hosted chain RPC is unavailable.')
                 raw = response.read(MAX_RESPONSE + 1)
@@ -96,7 +115,9 @@ class HostedNode:
             if not isinstance(result, dict) or result.get('error') is not None or 'result' not in result:
                 raise HostedNodeError('Hosted chain RPC request failed.')
             # Never forward provider error text, HTTP headers or unrequested fields.
-            return {'jsonrpc': '2.0', 'id': payload.get('id'), 'result': result['result'], 'error': None}
+            return {'jsonrpc': '2.0', 'id': request_id, 'result': result['result'], 'error': None}
+        except (TimeoutError, ConnectionError, urllib.error.URLError, http.client.IncompleteRead):
+            raise
         except Exception:
             raise HostedNodeError('Hosted chain RPC request failed.') from None
 

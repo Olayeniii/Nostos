@@ -5,6 +5,8 @@ on:
     paths:
       - scripts/observer/zallet-ufvk.patch
       - scripts/observer/package-arm64.py
+      - scripts/observer/zaino-transport.patch
+      - scripts/observer/prepare-transport.py
       - .github/workflows/observer-arm64.yml
 permissions:
   contents: read
@@ -32,6 +34,12 @@ jobs:
           persist-credentials: false
       - name: Install build dependencies on GitHub runner only
         run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler
+      - uses: actions/checkout@v4
+        with:
+          repository: zodl-inc/zaino
+          ref: d2d06bdd6591f3b238a3829b8f1b973ae0ec40be
+          path: zaino
+          persist-credentials: false
       - run: rustup toolchain install 1.95.0 --profile minimal
       - uses: actions/cache/restore@v4
         with:
@@ -39,7 +47,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             zallet/backends/zaino/target
-          key: observer-arm64-release-v1-${{ hashFiles('nostos/scripts/observer/zallet-ufvk.patch') }}
+          key: observer-arm64-release-v2-${{ hashFiles('nostos/scripts/observer/*patch') }}
+          restore-keys: |
+            observer-arm64-release-v1-
       - name: Verify pinned source and observer patch
         working-directory: zallet
         run: |
@@ -52,6 +62,13 @@ jobs:
           path = Path('zallet-core/src/components/json_rpc/methods/import_viewing_key.rs')
           assert hashlib.sha256(path.read_bytes()).hexdigest() == 'a5df373ea4406af55cc203487a8f5eb2f70c5cac3a2c498428b2f6a96c7b26f2'
           PY
+      - name: Prepare pinned chain-read timeout patch
+        run: python3 nostos/scripts/observer/prepare-transport.py zallet zaino
+      - name: Test chain-read timeout policy
+        working-directory: zallet
+        env:
+          CARGO_TARGET_DIR: backends/zaino/target
+        run: cargo +1.95.0 test --locked --release --manifest-path backends/zaino/Cargo.toml -p zaino-fetch --lib nostos_timeout_policy
       - name: Build ARM64 Zaino backend
         id: backend
         working-directory: zallet
@@ -63,7 +80,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             zallet/backends/zaino/target
-          key: observer-arm64-release-v1-${{ hashFiles('nostos/scripts/observer/zallet-ufvk.patch') }}
+          key: observer-arm64-release-v2-${{ hashFiles('nostos/scripts/observer/*patch') }}
       - name: Run Orchard key checks on ARM64
         working-directory: zallet
         env:
