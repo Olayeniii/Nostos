@@ -47,6 +47,11 @@ def prepare(zallet, zaino):
     subprocess.run(['git','apply',str(patch)], cwd=zaino, check=True)
     if hashlib.sha256(source.read_bytes()).hexdigest() != AFTER:
         raise ValueError('Transport patch checksum mismatch.')
+    # Run the actual patched pure policy function without pulling this external
+    # dependency into Zallet's workspace or resolving its unrelated dev graph.
+    policy = 'fn nostos_chain_read' + source.read_text().split('fn nostos_chain_read',1)[1]
+    policy = policy.split('/// Builds the outbound JSON-RPC HTTP client',1)[0]
+    (zallet/'backends/zaino/nostos-transport-policy.rs').write_text(policy)
     manifest.write_text(new_manifest)
     lock.write_text(new_lock)
 
