@@ -249,3 +249,31 @@ It does not operate the original observer unit, testnet wallets, Zebra or web
 services, import a viewing key, or request a send. A second failure must be
 diagnosed from evidence before changing memory limits, restarting live wallets
 or altering consensus/refund policy.
+
+### Let the initial indexer catch up
+
+The subsequent operator log tail shows that the 75-second diagnostic continued
+processing blocks after a mempool transport warning, reached scanned height
+3523331 against a sampled chain height of 3524240, and then received SIGTERM from
+the diagnostic limit. This run does not demonstrate a fatal wallet error. It
+also does not explain the earlier status-1 exit. Repeated bounded startups
+interrupt the ephemeral indexer's initial catch-up.
+
+The persistent-service installer is limited to the already prepared, empty
+observer and exact verified binary/configuration. It refuses an active observer,
+an existing persistent unit, a changed binary, any account, or a configuration
+that enables broadcasts/async spending, changes network or moves RPC off the
+reviewed loopback ports. It keeps the 3 GiB memory cap, disables core dumps and
+automatic restart, writes a fresh root-only service log, and has no probe runtime
+timeout. Only the new observer service is enabled/started. No testnet service is
+operated and no account or seed is generated.
+
+```bash
+sudo python3 scripts/web/install-observer-service.py --apply
+```
+
+This requests startup; it is not proof of RPC availability, sustained operation
+or sync. Leave the observer running while the indexer catches up. If it exits,
+the private service log now retains its error for filtered inspection. Do not
+print raw logs or recreate its authentication cookie. This adds a protected log
+whose retention and backup scope need review before funded mainnet proof.

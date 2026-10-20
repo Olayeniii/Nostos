@@ -115,7 +115,19 @@
         "exitStatus": 1,
         "unitCollected": true,
         "causeVerified": false
-      }
+      },
+      "boundedRuntimeProbe": {
+        "source": "Operator supplied redacted log tail on 20 October 2026",
+        "privateLogBytes": 31003,
+        "indexerStarted": true,
+        "continuedSyncAfterTransportWarning": true,
+        "lastScannedHeight": 3523331,
+        "sampledChainHeight": 3524240,
+        "endedByProbeSigterm": true,
+        "fatalErrorShown": false
+      },
+      "persistentServiceSourcePrepared": true,
+      "persistentServiceInstalled": false
     },
     "observerPreviewDeployment": {
       "sourcePrepared": true,
