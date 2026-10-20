@@ -37,6 +37,15 @@ class HostedNodeError(Exception):
     """Fixed, private-data-free failure."""
 
 
+def sanitized_rpc_error(result, request_id):
+    error = result.get('error') if isinstance(result, dict) else None
+    code = error.get('code') if isinstance(error, dict) else None
+    if type(code) is not int or not -(2**63) <= code < 2**63:
+        raise HostedNodeError('Hosted chain RPC request failed.')
+    return {'jsonrpc': '2.0', 'id': request_id, 'result': None,
+            'error': {'code': code, 'message': 'Chain RPC request failed.'}}
+
+
 def validate_endpoint(endpoint):
     if not isinstance(endpoint, str) or any(c.isspace() for c in endpoint):
         raise HostedNodeError('Invalid hosted endpoint.')
@@ -65,6 +74,8 @@ class HostedNode:
 
     def call(self, method, params=None):
         payload = self.forward({'jsonrpc': '2.0', 'id': 1, 'method': method, 'params': params or []})
+        if payload.get('error') is not None:
+            raise HostedNodeError('Hosted chain RPC request failed.')
         return payload['result']
 
     def forward(self, payload):
@@ -112,10 +123,31 @@ class HostedNode:
                 if len(raw) > MAX_RESPONSE:
                     raise HostedNodeError('Hosted chain RPC response is too large.')
             result = json.loads(raw)
-            if not isinstance(result, dict) or result.get('error') is not None or 'result' not in result:
+            if not isinstance(result, dict):
+                raise HostedNodeError('Hosted chain RPC request failed.')
+            if result.get('error') is not None:
+                # Zaino uses typed numeric errors, including -8 for a block not
+                # yet present at the tip. Keep the code and caller's ID, never
+                # provider messages, error data, headers or response identifiers.
+                return sanitized_rpc_error(result, request_id)
+            if 'result' not in result:
                 raise HostedNodeError('Hosted chain RPC request failed.')
             # Never forward provider error text, HTTP headers or unrequested fields.
             return {'jsonrpc': '2.0', 'id': request_id, 'result': result['result'], 'error': None}
+        except urllib.error.HTTPError as error:
+            # zcashd-compatible nodes can use HTTP 500 for ordinary typed RPC
+            # errors. Read only a bounded JSON error and retain its numeric code.
+            # Invalid bodies stay failures; never convert HTTP errors to success.
+            if error.code == 500:
+                with error:
+                    raw = error.read(MAX_RESPONSE + 1)
+                if len(raw) > MAX_RESPONSE:
+                    raise HostedNodeError('Hosted chain RPC request failed.') from None
+                try:
+                    return sanitized_rpc_error(json.loads(raw), request_id)
+                except Exception:
+                    raise HostedNodeError('Hosted chain RPC request failed.') from None
+            raise
         except (TimeoutError, ConnectionError, urllib.error.URLError, http.client.IncompleteRead):
             raise
         except Exception:
@@ -224,6 +256,12 @@ class RelayHandler(BaseHTTPRequestHandler):
                 status = 413
                 raise HostedNodeError()
             payload = json.loads(self.rfile.read(length))
+            if isinstance(payload, dict):
+                request_id = payload.get('id')
+                if type(request_id) is int and -(2**63) <= request_id < 2**63:
+                    response['id'] = request_id
+                elif isinstance(request_id, str) and len(request_id) <= 128:
+                    response['id'] = request_id
             response = self.server.client.forward(payload)
         except Exception:
             pass

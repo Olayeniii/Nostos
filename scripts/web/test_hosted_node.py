@@ -51,6 +51,53 @@ class ProbeClient:
 
 
 class HostedNodeTests(unittest.TestCase):
+    def test_http_500_missing_block_keeps_typed_error_and_never_becomes_success(self):
+        raw = json.dumps({'id':None,'result':None,'error':{'code':-8,'message':ENDPOINT+' private'}}).encode()
+        error = urllib.error.HTTPError(ENDPOINT,500,'private',{},io.BytesIO(raw))
+        opener = Opener(error)
+        result = relay.HostedNode(ENDPOINT,opener=opener).forward(
+            {'id':42,'method':'getblock','params':['3524702',0]})
+        self.assertEqual(result['id'],42)
+        self.assertEqual(result['error']['code'],-8)
+        self.assertIsNone(result['result'])
+        self.assertNotIn('private',json.dumps(result))
+        self.assertEqual(len(opener.requests),1)
+
+    def test_missing_block_error_preserves_numeric_id_and_code_without_provider_details(self):
+        opener = Opener({'id':987,'result':None,'error':{'code':-8,
+            'message':ENDPOINT+' private block details','data':{'private':'hidden'}}})
+        client = relay.HostedNode(ENDPOINT,opener=opener)
+        result = client.forward({'id':42,'method':'getblock','params':['3524702',0]})
+        self.assertEqual(result,{'jsonrpc':'2.0','id':42,'result':None,
+            'error':{'code':-8,'message':'Chain RPC request failed.'}})
+        self.assertNotIn('private',json.dumps(result))
+        self.assertEqual(len(opener.requests),1)
+        with self.assertRaises(relay.HostedNodeError): client.call('getblock',['3524702',0])
+
+    def test_invalid_error_codes_are_not_forwarded(self):
+        for code in (None,True,'-8',2**63,-2**63-1):
+            client = relay.HostedNode(ENDPOINT,opener=Opener({'error':{'code':code,'message':'private'}}))
+            with self.assertRaises(relay.HostedNodeError):
+                client.forward({'id':42,'method':'getblock','params':['3524702',0]})
+
+    def test_http_failure_echoes_authenticated_request_id_without_null_integer(self):
+        client = relay.HostedNode(ENDPOINT,opener=Opener(RuntimeError('private')))
+        server = relay.RelayServer(('127.0.0.1',0),client,'__cookie__:fixture')
+        thread = threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        try:
+            connection = http.client.HTTPConnection('127.0.0.1',server.server_port,timeout=3)
+            auth = 'Basic '+base64.b64encode(b'__cookie__:fixture').decode()
+            connection.request('POST','/',json.dumps({'id':42,'method':'getblock','params':['3524702',0]}),
+                {'Content-Type':'application/json','Authorization':auth})
+            response = connection.getresponse()
+            body = response.read(); connection.close()
+            result = json.loads(body)
+            self.assertEqual(result['id'],42)
+            self.assertEqual(result['error']['code'],-32000)
+            self.assertNotIn(b'private',body)
+        finally:
+            server.shutdown(); server.server_close(); thread.join(timeout=3)
+
     def test_transient_chain_reads_retry_but_broadcast_never_repeats(self):
         class SequenceOpener:
             def __init__(self, failures):

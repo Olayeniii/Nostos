@@ -13,7 +13,7 @@
     "fundsPageBalancesIndependentlyVerified": false
   },
   "mainnet": {
-    "approach": "hosted_zebra_json_rpc_and_separate_local_zallet_signing_wallet",
+    "approach": "merchant_external_signing_wallet_and_separate_viewing_observer_with_hosted_chain_rpc",
     "selfHostedFullNodeRequired": false,
     "providerCandidate": "GetBlock Zcash mainnet JSON-RPC, based on current provider and upstream wallet documentation",
     "privateEndpointAvailableToAgent": false,
@@ -60,25 +60,37 @@
       "armObserverBuildVerified": true
     },
     "hostedArmBuild": {
-      "workflowRunId": 39321077735,
-      "sourceRevision": "5d4b52c0b7c398ef454ff351ea46ca16aae291f6",
+      "workflowRunId": 39405836573,
+      "sourceRevision": "7e2dd4b75389f5f7839d9af635153cdc096ac265",
       "state": "passed",
       "artifactVerified": true,
+      "artifactId": 12257311820,
+      "binarySha256": "95dd8f3519da07b14eddff2048d3a75149fb926c0d78928296c87de824881902",
       "vpsRustInstallRequired": false,
-      "operatorPreflight": {
-        "architecture": "aarch64",
-        "cargoAvailableInShell": false,
-        "freeDiskGiB": 16
-      },
-      "scope": "GitHub native ARM build, key test, version/linkage and upload passed. Operator verified the artifact checksum/provenance on the VPS and executed --version. Observer startup remains blocked before RPC; no live key import or sync proof.",
-      "previousRun": {
-        "workflowRunId": 39317239917,
-        "binaryCompilationPassed": true,
-        "artifactUploaded": false,
-        "failure": "Core tests targeted backend workspace, where zallet-core is not a workspace member."
-      },
-      "artifactId": 12221416956,
-      "binarySha256": "7d45a730a4d4d1b79e237123b126312086c16f359def3a3c88c66dbba1dc5eee"
+      "installedByOperator": true,
+      "previousBinaryRetained": true,
+      "scope": "Build checks and artifact hashes verified by agent; operator reports successful installation. Persistent observer runs and indexes, but status RPC still times out. No real viewing key import or merchant sync proof.",
+      "previousVerifiedBuild": {
+        "workflowRunId": 39321077735,
+        "sourceRevision": "5d4b52c0b7c398ef454ff351ea46ca16aae291f6",
+        "state": "passed",
+        "artifactVerified": true,
+        "vpsRustInstallRequired": false,
+        "operatorPreflight": {
+          "architecture": "aarch64",
+          "cargoAvailableInShell": false,
+          "freeDiskGiB": 16
+        },
+        "scope": "GitHub native ARM build, key test, version/linkage and upload passed. Operator verified the artifact checksum/provenance on the VPS and executed --version. Observer startup remains blocked before RPC; no live key import or sync proof.",
+        "previousRun": {
+          "workflowRunId": 39317239917,
+          "binaryCompilationPassed": true,
+          "artifactUploaded": false,
+          "failure": "Core tests targeted backend workspace, where zallet-core is not a workspace member."
+        },
+        "artifactId": 12221416956,
+        "binarySha256": "7d45a730a4d4d1b79e237123b126312086c16f359def3a3c88c66dbba1dc5eee"
+      }
     },
     "observerRuntime": {
       "source": "Operator-supplied outputs on 19 and 20 October 2026",
@@ -89,7 +101,7 @@
       "rpcVerified": false,
       "realViewingKeyImported": false,
       "broadcastEnabled": false,
-      "lastKnownState": "exited_status_1_after_initial_rpc_readiness",
+      "lastKnownState": "operator_reported_active_indexing_status_rpc_timeout",
       "probe": {
         "timeoutReached": true,
         "exitCodeAfterTermination": 0,
@@ -99,14 +111,14 @@
       },
       "relayGetinfoPassed": true,
       "sendsRequested": 0,
-      "sourceFinding": "Pinned Zaino serializes no-argument reads with params:null; installed relay rejects that shape. Its mempool startup retries before wallet RPC startup. Source fix tested offline; runtime repair remains unverified.",
+      "sourceFinding": "Relay error envelopes use null request IDs; pinned Zaino requires i64. Generic error handling also drops missing-block RPC codes. Relay-only source correction tested; live outcome pending.",
       "accountCount": 0,
-      "nodeHeight": 3523211,
+      "nodeHeight": 3524694,
       "fullySyncedHeight": null,
       "syncLocked": true,
       "relayNullParametersFixApplied": true,
       "relayNullParametersFixSourceRevision": "b865b9c65b123065872f20f481e68665eb33d538",
-      "scope": "Observer RPC and wallet status initially responded after relay repair, with zero accounts. Journal then records exit status 1 after 47 seconds. Cookie is absent and the transient unit was collected. Current runtime readiness is false; error cause remains unverified. No merchant key import or funds movement.",
+      "scope": "Operator reports timeout build installed, prior binary retained, no wallet files replaced, broadcast disabled and testnet unchanged. Service active/running with exit status zero. Log shows chain indexing but malformed RPC error envelope; no merchant sync or live connection proof.",
       "rpcPreviouslyVerified": true,
       "lastExit": {
         "source": "Operator-supplied systemd journal on 20 October 2026",
@@ -127,7 +139,30 @@
         "fatalErrorShown": false
       },
       "persistentServiceSourcePrepared": true,
-      "persistentServiceInstalled": false
+      "persistentServiceInstalled": true,
+      "latestOperatorEvidence": {
+        "source": "Operator-supplied status, RPC and redacted log outputs on 20 October 2026",
+        "serviceActive": true,
+        "serviceSubState": "running",
+        "execMainStatus": 0,
+        "chainRelayPassed": true,
+        "chainRelayHeight": 3524701,
+        "observerStatusRpcPassed": false,
+        "observerStatusRpcError": "TimeoutError",
+        "indexerStarted": true,
+        "latestIndexedHeight": 3524694,
+        "lastLogTimeUtc": "2026-10-20T19:03:09.065977Z",
+        "warning": "RPC response decoding: null where i64 expected",
+        "sendsRequested": 0
+      },
+      "relayErrorEnvelopeFix": {
+        "sourcePrepared": true,
+        "runtimeApplied": false,
+        "preservesRequestId": true,
+        "preservesNumericRpcErrorCodes": true,
+        "forwardsProviderErrorText": false,
+        "newBinaryRequired": false
+      }
     },
     "observerPreviewDeployment": {
       "sourcePrepared": true,

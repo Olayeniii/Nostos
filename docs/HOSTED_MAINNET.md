@@ -2,6 +2,26 @@
 
 ## Observer timeout correction, 20 October
 
+After the operator installed the verified replacement, systemd reported active,
+running and exit status zero. A later chain relay read returned height 3524701.
+The observer log at 19:03:09 UTC showed indexing through 3524694 and a started
+indexer, but `getwalletstatus` still timed out. These observations prove progress,
+not sustained readiness or merchant-wallet sync.
+
+The next warning was `invalid type: null, expected i64` while parsing a response
+for `SerializedBlock`. In the pinned connector, `SerializedBlock` itself expects
+a hex string; the RPC envelope's `id` and error `code` require integers. The
+relay's generic failure envelope always emitted `id: null`, and its successful
+transport path discarded all provider RPC errors, including expected missing-block
+code -8. The source correction echoes the authenticated caller's valid request
+ID on failure and preserves signed 64-bit numeric provider error codes with fixed
+messages only. Provider messages, error data and identifiers remain suppressed.
+Errors remain errors, with no fabricated block data or successful result. This
+does not establish which underlying error triggered the operator's warning, or
+that live readiness is restored. It requires only the existing relay updater,
+with the empty mainnet observer stopped during installation. No binary download
+or change to consensus rules is required.
+
 ARM run [39405836573](https://github.com/Olayeniii/Nostos/actions/runs/39405836573)
 passed at 10:17:53 UTC for revision 7e2dd4b75389f5f7839d9af635153cdc096ac265.
 The downloaded artifact was checked independently against Actions' ZIP digest,
