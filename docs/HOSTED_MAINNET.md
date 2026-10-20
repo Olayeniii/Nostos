@@ -2,6 +2,24 @@
 
 ## Observer timeout correction, 20 October
 
+ARM run [39405836573](https://github.com/Olayeniii/Nostos/actions/runs/39405836573)
+passed at 10:17:53 UTC for revision 7e2dd4b75389f5f7839d9af635153cdc096ac265.
+The downloaded artifact was checked independently against Actions' ZIP digest,
+the build log's inner archive digest and the binary/provenance verifier.
+ZIP SHA-256: 5874a1bafa406db32c6d87a3c077294b5f9d3a475c380868c8c85adc9cddef5a.
+Inner archive SHA-256: 74c29b24eab454a6978ef4f6d271dd42991220b41be7869af07ef199cff31b51.
+Binary SHA-256: 95dd8f3519da07b14eddff2048d3a75149fb926c0d78928296c87de824881902.
+The ZIP is 73,828,398 bytes and the binary is 110,094,664 bytes.
+
+`scripts/web/update-observer.py <downloaded-zip>` performs a read-only preflight.
+Its explicit `--apply --start` option verifies the exact artifact, unit, stopped
+state, empty observer, no-broadcast configuration and known prior binary. It then
+updates only the relay source using its existing backup/rollback helper, retains
+the old observer binary, atomically installs the checked replacement and starts
+only the mainnet observer. It never replaces the database, identity, settings or
+logs. A successful start request is not RPC or sustained-sync evidence. No VPS
+installation has yet been independently observed for this replacement.
+
 The operator's persistent observer exited at 09:48:22 UTC with a recover-history
 sync error caused by a backing-node request timeout. This is stronger evidence
 than the earlier mempool warnings; the observer did not remain ready.
