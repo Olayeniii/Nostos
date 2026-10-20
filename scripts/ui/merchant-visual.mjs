@@ -62,6 +62,7 @@ const records = [
     ...base,
     id: "order-3",
     description: "Custom print, returned",
+    refunds: [{ id: "refund-3", status: "confirmed", amountZat: 1800000 }],
     fulfillment: "fulfilled",
     refundAmountZat: 1800000,
     confirmedRefundAmountZat: 1800000,
@@ -111,6 +112,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const page = await context.newPage();
   let mode = "populated";
+  let customerReceipt = base;
   const posts = [];
   await page.route("**/api/product/**", async (route) => {
     const action = new URL(route.request().url()).pathname.split("/").at(-1);
@@ -130,7 +132,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
       });
     }
     if (action === "checkout")
-      return route.fulfill({ json: { receipt: base, syncWarning: false } });
+      return route.fulfill({
+        json: { receipt: customerReceipt, syncWarning: false },
+      });
     if (action === "funds")
       return route.fulfill({
         json: {
@@ -152,6 +156,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     });
   });
   const capture = async (name) => {
+    await page.addStyleTag({
+      content: "nextjs-portal { display: none !important; }",
+    });
     await page.screenshot({
       path: `${out}/${width}-${name}.png`,
       fullPage: true,
@@ -219,9 +226,11 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByRole("button", { name: "Review withdrawal", exact: true })
     .waitFor();
   await capture("funds");
+  customerReceipt = records[1];
   await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
   await page.getByRole("heading", { name: "JaraBot", exact: true }).waitFor();
   await capture("checkout");
+  customerReceipt = base;
   await page.goto("http://127.0.0.1:3000/receipt#" + "a".repeat(43));
   await page.getByText("Private payment receipt").waitFor();
   await capture("receipt");

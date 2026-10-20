@@ -2563,3 +2563,33 @@ form .primary {
     transition: none;
   }
 }
+
+/* Receipt helpers stay readable on their light surface. */
+.product-app
+  .receipt-card
+  :where(
+    .receipt-facts dt,
+    .receipt-details summary,
+    .receipt-tx > span,
+    .privacy
+  ) {
+  color: #43574d;
+}
+.receipt-facts div,
+.receipt-refund p {
+  font-size: 13px;
+}
+.receipt-refund p {
+  color: #43574d;
+}
+.receipt-details summary,
+.receipt-bottom > span {
+  font-size: 12px;
+}
+.funds-app .payment-summary :where(dt, dd):nth-last-child(-n + 2) {
+  background: transparent;
+}
+.funds-app .payment-summary dd:last-child {
+  color: var(--mint);
+  font-size: 18px;
+}
