@@ -178,7 +178,9 @@ export function ReceiptCard({
           <p>
             {receipt.routeClosedReason === "expired"
               ? "The refund request window has ended. The return route has been removed from active product records."
-              : "The merchant can refund to the route supplied in the shielded memo of this payment if a refund is due."}
+              : receipt.canRequestRefund
+                ? "You can request a refund to the shielded route supplied with this payment. The merchant reviews each request."
+                : "Refund availability depends on the confirmed payment, its original shielded route and the refund window. Check the status below."}
           </p>
         )}
         {receipt.refundExpiresAt ? (

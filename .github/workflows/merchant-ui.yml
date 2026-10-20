@@ -1,0 +1,60 @@
+name: Merchant UI review
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "scripts/ui/**"
+      - ".github/workflows/merchant-ui.yml"
+permissions:
+  contents: read
+jobs:
+  responsive-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_MODULES: /tmp/nostos-ui/node_modules
+      NEXT_TELEMETRY_DISABLED: 1
+      NOSTOS_RETENTION_ENABLED: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npm install --prefix /tmp/nostos-ui playwright@1.56.1
+      - run: /tmp/nostos-ui/node_modules/.bin/playwright install --with-deps chromium
+      - name: Capture original source baseline
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add /tmp/nostos-before "$BASE_SHA"
+          cp -r scripts/ui /tmp/nostos-before/scripts/ui
+          cd /tmp/nostos-before
+          pnpm install --frozen-lockfile
+          pnpm --filter @nostos/web dev > /tmp/nostos-before.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for attempt in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/sign-up > /dev/null && break || sleep 1; done
+          node scripts/ui/merchant-visual.mjs before
+          cp -r docs/ui-review "$GITHUB_WORKSPACE/docs/ui-review"
+          kill $SERVER_PID || true
+          pkill -f 'next dev' || true
+      - name: Capture updated source and verify responsive flows
+        run: |
+          pnpm --filter @nostos/web dev > /tmp/nostos-after.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for attempt in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/sign-up > /dev/null && break || sleep 1; done
+          node scripts/ui/merchant-visual.mjs after
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: merchant-ui-review
+          path: |
+            docs/ui-review
+            /tmp/nostos-before.log
+            /tmp/nostos-after.log

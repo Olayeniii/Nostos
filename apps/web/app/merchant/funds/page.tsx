@@ -64,17 +64,19 @@ export default function FundsPage() {
         </Link>
         <Link href="/merchant/settings">Store settings</Link>
       </nav>
+      <p className="eyebrow">MERCHANT WORKSPACE / FUNDS</p>
       <h1>Your funds</h1>
       <p>
         Withdraw released earnings to your shielded wallet. Hosted merchant
         Zallet holds spending authority.
       </p>
       {(warning || error) && (
-        <p role="alert">
+        <p role="alert" className="warning">
           {error ||
             "Funds are unavailable. Chain verification or wallet sync may need operator attention. Saved payment records remain available."}
         </p>
       )}
+      {loading && <p role="status">Checking shielded funds...</p>}
       {data && (
         <>
           <dl className="payment-summary">
@@ -87,14 +89,16 @@ export default function FundsPage() {
             <dt>Available before withdrawal fee</dt>
             <dd>{zec(data.withdrawableBeforeFeeZat)} ZEC</dd>
           </dl>
-          <p>
-            Refund value stays reserved until its window closes and open
-            requests are resolved. Older payments without a deadline keep their
-            original terms. The fee allowance is a buffer, not a guarantee of
-            future refund fees.
+          <p className="funds-explainer">
+            The available amount is before the withdrawal fee. Review provides
+            the exact fee and total debit before you authorize a send. Refund
+            value stays reserved until its window closes and open requests are
+            resolved. Older payments without a deadline keep their original
+            terms. The fee allowance is a buffer, not a guarantee of future
+            refund fees.
           </p>
           {data.fundingShortfallZat > 0 && (
-            <p role="alert">
+            <p role="alert" className="warning">
               Add at least {zec(data.fundingShortfallZat)} ZEC to cover current
               refund reserves and the fee allowance. A refund still needs enough
               funds for its actual transaction fee.
@@ -133,6 +137,11 @@ export default function FundsPage() {
               }
             }}
           >
+            <h2>Withdraw released earnings</h2>
+            <p>
+              1. Enter the destination and amount. 2. Review the actual fee. 3.
+              Confirm the send.
+            </p>
             <label>
               Shielded destination
               <input
