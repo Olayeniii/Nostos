@@ -183,6 +183,37 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .click();
   await page.getByRole("heading", { name: "Payment link ready" }).waitFor();
   await capture("payment-link");
+  if (phase === "after") {
+    for (const record of records.slice(1)) {
+      await page.goto("http://127.0.0.1:3000/merchant");
+      await page
+        .getByRole("button", {
+          name: new RegExp(
+            record.description.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+          ),
+        })
+        .click();
+      await page
+        .getByRole("heading", { name: record.description, exact: true })
+        .waitFor();
+      if (!record.payment?.canRefund) {
+        assert.equal(
+          await page
+            .getByRole("button", { name: "Review refund", exact: true })
+            .count(),
+          0,
+        );
+      }
+      await capture(`detail-${record.id}`);
+      await page
+        .getByRole("button", { name: "Back to payments", exact: true })
+        .click();
+      await page
+        .getByRole("heading", { name: "Payments", exact: true })
+        .waitFor();
+    }
+  }
+
   await page.goto("http://127.0.0.1:3000/merchant/funds");
   await page
     .getByRole("button", { name: "Review withdrawal", exact: true })
