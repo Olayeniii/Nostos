@@ -41,11 +41,29 @@ export function productConfiguration() {
       key === process.env.NOSTOS_PRODUCT_DATA_KEY
     )
       throw new Error("Separate mainnet storage and key are required.");
-    const cookie = runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE");
-    const url = runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_URL");
+    const mode = runtimeValue("NOSTOS_WALLET_MODE");
+    if (mode && mode !== "observer-preview")
+      throw new Error("Invalid mainnet wallet mode.");
+    const preview = mode === "observer-preview";
+    if (
+      preview &&
+      (runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE") ||
+        runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_URL"))
+    )
+      throw new Error("Observer preview must not configure a hosted signer.");
+    const cookieName = preview
+      ? "NOSTOS_OBSERVER_RPC_COOKIE_FILE"
+      : "NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE";
+    const urlName = preview
+      ? "NOSTOS_OBSERVER_RPC_URL"
+      : "NOSTOS_MERCHANT_WALLET_RPC_URL";
+    const cookie = runtimeValue(cookieName);
+    const url = runtimeValue(urlName);
     if (
       !cookie ||
       !url ||
+      cookie === process.env[cookieName] ||
+      url === process.env[urlName] ||
       cookie === process.env.NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE ||
       url === process.env.NOSTOS_MERCHANT_WALLET_RPC_URL
     )

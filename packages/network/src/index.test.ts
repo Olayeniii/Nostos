@@ -75,6 +75,39 @@ describe("explicit deployment network boundary", () => {
     expect(runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_URL")).toBe("");
     expect(() => productConfiguration()).toThrow();
   });
+  it("allows an explicit observer preview without configuring a hosted signer", () => {
+    mainnetConfig();
+    vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+    vi.stubEnv("NOSTOS_MAINNET_MERCHANT_WALLET_RPC_URL", "");
+    vi.stubEnv("NOSTOS_MAINNET_MERCHANT_WALLET_RPC_COOKIE_FILE", "");
+    vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RPC_URL", "http://127.0.0.1:38234");
+    vi.stubEnv(
+      "NOSTOS_MAINNET_OBSERVER_RPC_COOKIE_FILE",
+      "/wallet/observer/.cookie",
+    );
+    expect(productConfiguration().network).toBe("mainnet");
+    vi.stubEnv(
+      "NOSTOS_MAINNET_MERCHANT_WALLET_RPC_URL",
+      "http://127.0.0.1:38233",
+    );
+    expect(() => productConfiguration()).toThrow(/hosted signer/);
+  });
+  it("rejects unknown wallet modes and missing or reused observer credentials", () => {
+    mainnetConfig();
+    vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "other");
+    expect(() => productConfiguration()).toThrow(/wallet mode/);
+    vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+    vi.stubEnv("NOSTOS_MAINNET_MERCHANT_WALLET_RPC_URL", "");
+    vi.stubEnv("NOSTOS_MAINNET_MERCHANT_WALLET_RPC_COOKIE_FILE", "");
+    expect(() => productConfiguration()).toThrow();
+    vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RPC_URL", "http://127.0.0.1:38234");
+    vi.stubEnv(
+      "NOSTOS_MAINNET_OBSERVER_RPC_COOKIE_FILE",
+      "/wallet/observer/.cookie",
+    );
+    vi.stubEnv("NOSTOS_OBSERVER_RPC_URL", "http://127.0.0.1:38234");
+    expect(() => productConfiguration()).toThrow();
+  });
   it("rejects using either testnet database path for mainnet", () => {
     mainnetConfig();
     vi.stubEnv(

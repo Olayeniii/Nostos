@@ -180,3 +180,53 @@ observer connection remain unverified until operator evidence is returned.
 
 Upstream source reviewed: <https://github.com/zodl-inc/zaino/blob/d2d06bdd/packages/zaino-fetch/src/jsonrpsee/connector.rs>
 and <https://github.com/zodl-inc/zaino/blob/d2d06bdd/packages/zaino-state/src/chain_index/mempool.rs>.
+
+## Observer-only web preview
+
+The earlier mainnet deploy profile expected an operator signing wallet. The
+explicit `observer-preview` mode now allows the account and view-access pages to
+start with a separate observer RPC and no merchant signing RPC configuration.
+It retains the unconditional hosted-mainnet operation hold. The web mode flag
+`NOSTOS_MAINNET_ENABLED=yes` enables the isolated application profile, not payments,
+refunds, withdrawals or hosted store creation. No environment flag releases the
+custody hold. Unknown wallet modes and signer configuration in preview are
+rejected.
+
+Prepare a separate HTTPS origin, for example `https://mainnet.nostos.iyforge.xyz`.
+DNS and TLS must be configured and verified before entering any viewing key.
+The testnet origin and its existing web deployment must remain separate.
+
+With the observer running, first run the read-only preflight:
+
+```bash
+cd ~/nostos/repo
+sudo python3 scripts/web/configure-mainnet-preview.py --origin https://mainnet.nostos.iyforge.xyz
+```
+
+It compares observer/node heights and hashes, requires mainnet, reads existing
+mail settings privately, and reports only readiness booleans, heights and the
+proposed public origin. No wallet key, cookie, provider URL or email key is
+printed. On a chain mismatch it creates no settings. Node movement may require
+repeating the read-only check. It does not send email.
+
+Only after `eligible: true`, the explicit operator `--apply` option creates new
+protected `mainnet.env` and `observer-rpc/.cookie` files. The cookie is a snapshot
+of the current observer RPC authentication credential, readable by the web UID
+through a read-only mount. The observer wallet directory, age identity and
+wallet database are not mounted into the web container. No signer cookie or
+operator wallet is configured. Existing mail sender/API settings are reused;
+merchant accounts, payments and encryption keys are not copied from testnet.
+The initializer refuses to overwrite existing settings.
+
+The observer creates a new authentication cookie each time it starts. A snapshot
+from before an observer restart becomes stale. Refresh that snapshot privately
+before reconnecting, with the mainnet application held; do not change directory
+permissions or mount the complete observer wallet to bypass the credential
+boundary. Automatic snapshot refresh and persistent observer service setup remain
+operational follow-ups.
+
+The existing isolated mainnet deployer then uses the preview mode and cookie-only
+mounts, separate data/key/runtime/release directories, and ports 3100/3101. This
+source change neither deploys that application nor provisions DNS/nginx/TLS.
+Registration, HTTPS, real UFVK import and subsequent merchant sync/signing must
+still be demonstrated.

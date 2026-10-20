@@ -1,5 +1,5 @@
 {
-  "reviewDate": "2026-10-19",
+  "reviewDate": "2026-10-20",
   "currentTestnet": {
     "source": "Operator supplied deployed-health, mount and read-only runtime outputs in the work session",
     "deployedRevision": "c4690541572ffb8d9dee6ba940119d9c6751b896",
@@ -81,15 +81,15 @@
       "binarySha256": "7d45a730a4d4d1b79e237123b126312086c16f359def3a3c88c66dbba1dc5eee"
     },
     "observerRuntime": {
-      "source": "Operator-supplied outputs on 19 October 2026",
+      "source": "Operator-supplied outputs on 19 and 20 October 2026",
       "directory": "/home/ubuntu/nostos/mainnet/observer",
       "port": 38234,
       "mnemonicGenerated": false,
       "encryptionInitialized": true,
-      "rpcVerified": false,
+      "rpcVerified": true,
       "realViewingKeyImported": false,
       "broadcastEnabled": false,
-      "lastKnownState": "stopped_after_bounded_startup_probe",
+      "lastKnownState": "running_with_wallet_rpc_ready",
       "probe": {
         "timeoutReached": true,
         "exitCodeAfterTermination": 0,
@@ -99,7 +99,27 @@
       },
       "relayGetinfoPassed": true,
       "sendsRequested": 0,
-      "sourceFinding": "Pinned Zaino serializes no-argument reads with params:null; installed relay rejects that shape. Its mempool startup retries before wallet RPC startup. Source fix tested offline; runtime repair remains unverified."
+      "sourceFinding": "Pinned Zaino serializes no-argument reads with params:null; installed relay rejects that shape. Its mempool startup retries before wallet RPC startup. Source fix tested offline; runtime repair remains unverified.",
+      "accountCount": 0,
+      "nodeHeight": 3523211,
+      "fullySyncedHeight": null,
+      "syncLocked": true,
+      "relayNullParametersFixApplied": true,
+      "relayNullParametersFixSourceRevision": "b865b9c65b123065872f20f481e68665eb33d538",
+      "scope": "Observer RPC and wallet status respond after relay repair. Empty account inventory. No merchant viewing key imported, no merchant sync, signing or payment proof. No direct VPS access by agent."
+    },
+    "observerPreviewDeployment": {
+      "sourcePrepared": true,
+      "runtimeMode": "observer-preview",
+      "hostedSignerRequired": false,
+      "cookieSnapshotOnly": true,
+      "walletDatabaseMounted": false,
+      "mainnetWebDeployed": false,
+      "httpsOriginVerified": false,
+      "registrationVerified": false,
+      "realViewingKeyImported": false,
+      "paymentsEnabled": false,
+      "sendsRequested": 0
     }
   }
 }

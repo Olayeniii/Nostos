@@ -25,11 +25,18 @@ def private_env(path):
     origin = urlsplit(origins[0])
     if len(origins) != 1 or origin.scheme != 'https' or not origin.hostname or origin.username or origin.password or origin.query or origin.fragment or origin.path or origins[0] == 'https://nostos.iyforge.xyz':
         raise ValueError('Use a separate exact HTTPS mainnet origin.')
-    expected = {'NOSTOS_MAINNET_MERCHANT_WALLET_RPC_COOKIE_FILE': '/wallet/merchant/.cookie', 'NOSTOS_MAINNET_CHAIN_RPC_COOKIE_FILE': '/wallet/node/.cookie'}
+    wallet_mode = result.get('NOSTOS_MAINNET_WALLET_MODE')
+    if wallet_mode not in (None, 'observer-preview'):
+        raise ValueError('Unknown mainnet wallet mode.')
+    observer = wallet_mode == 'observer-preview'
+    if observer and any(k.startswith('NOSTOS_MAINNET_MERCHANT_WALLET_') for k in result):
+        raise ValueError('Observer preview must not include hosted signer configuration.')
+    prefix = 'NOSTOS_MAINNET_OBSERVER' if observer else 'NOSTOS_MAINNET_MERCHANT_WALLET'
+    expected = {prefix+'_RPC_COOKIE_FILE': '/wallet/observer/.cookie' if observer else '/wallet/merchant/.cookie', 'NOSTOS_MAINNET_CHAIN_RPC_COOKIE_FILE': '/wallet/node/.cookie'}
     for key, value in expected.items():
         if result.get(key) != value:
             raise ValueError('Use the separate mainnet cookie mounts.')
-    for key in ('NOSTOS_MAINNET_MERCHANT_WALLET_RPC_URL', 'NOSTOS_MAINNET_CHAIN_RPC_URL'):
+    for key in (prefix+'_RPC_URL', 'NOSTOS_MAINNET_CHAIN_RPC_URL'):
         url = urlsplit(result.get(key, ''))
         if url.scheme != 'http' or url.hostname not in ('127.0.0.1', 'localhost', '::1') or url.username or url.password or url.query or url.fragment:
             raise ValueError('Mainnet RPC must be on loopback without URL credentials.')
@@ -46,8 +53,9 @@ def run():
     deploy = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(deploy)
     env = private_env(ROOT / 'mainnet.env')
+    observer = env.get('NOSTOS_MAINNET_WALLET_MODE') == 'observer-preview'
     # Mainnet cookie files must already exist. Never create wallets or copy keys.
-    for directory in ('wallet-rpc', 'node-rpc'):
+    for directory in ('observer-rpc' if observer else 'wallet-rpc', 'node-rpc'):
         path = ROOT / directory / '.cookie'
         if not path.is_file() or path.is_symlink():
             raise ValueError('Separate mainnet RPC cookies must already be provisioned.')
@@ -58,10 +66,12 @@ def run():
         # Copy only the Node image/user, never testnet env or credential mounts.
         config = {'Image': template['Config']['Image'], 'User': template['Config']['User'], 'WorkingDir': '/app',
                   'Cmd': ['node', '--version'], 'Env': [k+'='+v for k, v in env.items()],
-                  'HostConfig': {'NetworkMode': 'host', 'Binds': [str(Path(__file__).resolve().parents[2])+':/app:ro', str(ROOT/'wallet-rpc')+':/wallet/merchant:ro', str(ROOT/'node-rpc')+':/wallet/node:ro']}}
+                  'HostConfig': {'NetworkMode': 'host', 'Binds': [str(Path(__file__).resolve().parents[2])+':/app:ro', str(ROOT/('observer-rpc' if observer else 'wallet-rpc'))+(':/wallet/observer:ro' if observer else ':/wallet/merchant:ro'), str(ROOT/'node-rpc')+':/wallet/node:ro']}}
         deploy.docker('POST', '/containers/create?name=nostos-mainnet-web', config)
     else:
         current = deploy.docker('GET', '/containers/nostos-mainnet-web/json')
+        if observer and any(m.get('Destination') == '/wallet/merchant' for m in current.get('Mounts', [])):
+            raise ValueError('Observer preview must not retain a signer mount.')
         current_env = dict(v.split('=', 1) for v in current['Config']['Env'] if '=' in v)
         # Do not silently leave a newly edited network or origin out of a redeploy.
         if any(current_env.get(k) != v for k, v in env.items()):
