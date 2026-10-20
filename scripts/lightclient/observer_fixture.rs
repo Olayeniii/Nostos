@@ -5,14 +5,31 @@ use std::time::Duration;
 use tonic::transport::{ClientTlsConfig, Endpoint};
 use zcash_client_backend::{data_api::{AccountBirthday, WalletRead},
     proto::service::{compact_tx_streamer_client::CompactTxStreamerClient, BlockId, Empty}};
-use zcash_keys::keys::UnifiedSpendingKey;
+use zcash_keys::keys::{UnifiedSpendingKey, UnifiedFullViewingKey};
+use zcash_address::unified::{Container, Encoding, Fvk, Ufvk};
 use zcash_protocol::consensus::MAIN_NETWORK;
+
+fn fixture_key(seed: u8) -> Result<UnifiedFullViewingKey, &'static str> {
+    let full = UnifiedSpendingKey::from_seed(&MAIN_NETWORK,&[seed;32],zip32::AccountId::ZERO)
+        .map_err(|_| "fixture_key")?.to_unified_full_viewing_key();
+    let (network, raw) = Ufvk::decode(&full.encode(&MAIN_NETWORK)).map_err(|_| "fixture_key_decode")?;
+    let orchard_only = Ufvk::try_from_items(raw.items().into_iter().filter(|k| matches!(k,Fvk::Orchard(_))).collect())
+        .map_err(|_| "fixture_key_scope")?;
+    UnifiedFullViewingKey::decode(&MAIN_NETWORK,&orchard_only.encode(&network)).map_err(|_| "fixture_key_decode")
+}
+
+fn only_shielded_reads(request: tonic::Request<()>) -> Result<tonic::Request<()>,tonic::Status> {
+    let allowed = request.extensions().get::<tonic::GrpcMethod>().is_some_and(|m| matches!(m.method(),
+        "GetLightdInfo" | "GetTreeState" | "GetLatestBlock" | "GetBlockRange" | "GetSubtreeRoots"));
+    if allowed { Ok(request) } else { Err(tonic::Status::permission_denied("method_not_allowlisted")) }
+}
 
 async fn check() -> Result<serde_json::Value, &'static str> {
     let endpoint = Endpoint::from_static("https://zec.rocks:443")
         .connect_timeout(Duration::from_secs(5)).timeout(Duration::from_secs(30))
         .tls_config(ClientTlsConfig::new().with_webpki_roots()).map_err(|_| "tls_configuration")?;
-    let mut client = CompactTxStreamerClient::new(endpoint.connect().await.map_err(|_| "tls_connection")?);
+    let mut client = CompactTxStreamerClient::with_interceptor(
+        endpoint.connect().await.map_err(|_| "tls_connection")?, only_shielded_reads);
     let info = client.get_lightd_info(Empty{}).await.map_err(|_| "chain_metadata")?.into_inner();
     if info.chain_name != "main" || info.block_height < 3_428_200 || info.block_height > u64::from(u32::MAX-100) {
         return Err("mainnet_identity");
@@ -23,16 +40,20 @@ async fn check() -> Result<serde_json::Value, &'static str> {
     if tree.network != "main" || tree.height != u64::from(birthday_height-1) { return Err("birthday_identity"); }
     let birthday = AccountBirthday::from_treestate(tree,None).map_err(|_| "birthday_decode")?;
     // Public deterministic test material only. Never export the address or fund it.
-    let key = UnifiedSpendingKey::from_seed(&MAIN_NETWORK,&[9;32],zip32::AccountId::ZERO)
-        .map_err(|_| "fixture_key")?.to_unified_full_viewing_key();
+    let key = fixture_key(9)?;
     let temp = tempfile::tempdir().map_err(|_| "fixture_directory")?;
     let path = temp.path().join("fixture.sqlite");
     let mut db = observer::open_fixture(&path)?;
+    let unscoped = UnifiedSpendingKey::from_seed(&MAIN_NETWORK,&[9;32],zip32::AccountId::ZERO)
+        .map_err(|_| "fixture_key")?.to_unified_full_viewing_key();
+    if observer::import_once(&mut db,&unscoped,&birthday,birthday_height).is_ok()
+        || !db.get_account_ids().map_err(|_| "account_count")?.is_empty() {
+        return Err("transparent_key_not_rejected_before_import");
+    }
     if !observer::import_once(&mut db,&key,&birthday,birthday_height)? { return Err("initial_import"); }
     if observer::import_once(&mut db,&key,&birthday,birthday_height)? { return Err("duplicate_import"); }
     if observer::import_once(&mut db,&key,&birthday,birthday_height+1).is_ok() { return Err("birthday_conflict_allowed"); }
-    let other = UnifiedSpendingKey::from_seed(&MAIN_NETWORK,&[10;32],zip32::AccountId::ZERO)
-        .map_err(|_| "fixture_key")?.to_unified_full_viewing_key();
+    let other = fixture_key(10)?;
     if observer::import_once(&mut db,&other,&birthday,birthday_height).is_ok() { return Err("different_key_allowed"); }
     // Retry only public reads. A new in-memory cache cannot overwrite durable account identity.
     let mut synced = false;
@@ -40,10 +61,20 @@ async fn check() -> Result<serde_json::Value, &'static str> {
     for attempt in 0..3 {
         attempts += 1;
         let cache = observer::MemoryCache::default();
-        if zcash_client_backend::sync::run(&mut client,&MAIN_NETWORK,&cache,&mut db,128).await.is_ok() {
-            synced = true; break;
+        match zcash_client_backend::sync::run(&mut client,&MAIN_NETWORK,&cache,&mut db,128).await {
+            Ok(()) => { synced = true; break; },
+            Err(zcash_client_backend::sync::Error::Server(status)) if matches!(status.code(),
+                tonic::Code::Unavailable | tonic::Code::DeadlineExceeded | tonic::Code::ResourceExhausted) => {
+                if attempt == 2 { return Err("fixture_server_transient_exhausted"); }
+                tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
+            },
+            Err(zcash_client_backend::sync::Error::Server(_)) => return Err("fixture_server_rejected"),
+            Err(zcash_client_backend::sync::Error::Cache(_)) => return Err("fixture_cache"),
+            Err(zcash_client_backend::sync::Error::Scan(_)) => return Err("fixture_scan_data"),
+            Err(zcash_client_backend::sync::Error::Wallet(_)) => return Err("fixture_wallet_storage"),
+            Err(zcash_client_backend::sync::Error::WalletTrees(_)) => return Err("fixture_wallet_trees"),
+            Err(zcash_client_backend::sync::Error::MisbehavingServer) => return Err("fixture_server_invalid"),
         }
-        tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
     }
     if !synced { return Err("fixture_scan"); }
     let first = db.block_fully_scanned().map_err(|_| "scan_status")?.ok_or("no_scanned_block")?.block_height();
@@ -58,14 +89,14 @@ async fn check() -> Result<serde_json::Value, &'static str> {
         .await.map_err(|_| "resume_scan")?;
     Ok(serde_json::json!({"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
         "same_key_idempotent":true,"changed_key_rejected":true,"changed_birthday_rejected":true,
-        "sampled_height":info.block_height,"fully_scanned_height":u32::from(reopened),"attempts":attempts}))
+        "shielded_rpc_allowlist_enforced":true,"sampled_height":info.block_height,"fully_scanned_height":u32::from(reopened),"attempts":attempts}))
 }
 
 #[tokio::main]
 async fn main() {
     rustls::crypto::ring::default_provider().install_default().expect("probe TLS provider");
     let result = tokio::time::timeout(Duration::from_secs(240),check()).await;
-    let mut output = serde_json::json!({"fixture_only":true,"temporary_wallet_created":true,
+    let mut output = serde_json::json!({"fixture_only":true,"temporary_wallet_only":true,
         "public_test_key_only":true,"merchant_sync_verified":false,"transaction_enhancement_verified":false,
         "payment_refund_verified":false,"sends_requested":0,"vps_services_changed":false});
     let passed = match result {
@@ -76,4 +107,24 @@ async fn main() {
     output["passed"] = passed.into();
     println!("{output}");
     if !passed {std::process::exit(1);}
+}
+
+#[cfg(test)]
+mod policy_tests {
+    use super::*;
+    #[test]
+    fn all_other_methods_are_denied_before_transport() {
+        for method in ["SendTransaction", "GetAddressUtxos", "GetTaddressTxids", "Unknown"] {
+            let mut request = tonic::Request::new(());
+            request.extensions_mut().insert(tonic::GrpcMethod::new("cash.z.wallet.sdk.rpc.CompactTxStreamer", method));
+            assert!(only_shielded_reads(request).is_err());
+        }
+        assert!(only_shielded_reads(tonic::Request::new(())).is_err());
+    }
+    #[test]
+    fn fixture_scope_has_no_transparent_component() {
+        let key = fixture_key(9).unwrap();
+        assert!(key.transparent().is_none());
+        assert!(key.orchard().is_some());
+    }
 }

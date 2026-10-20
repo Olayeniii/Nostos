@@ -95,6 +95,10 @@ pub fn open_fixture(path: &Path) -> Result<Database, &'static str> {
 
 pub fn import_once(db: &mut Database, key: &UnifiedFullViewingKey, birthday: &AccountBirthday,
     expected_birthday: u32) -> Result<bool, &'static str> {
+    if birthday.height() != BlockHeight::from_u32(expected_birthday) {
+        return Err("birthday_anchor_mismatch");
+    }
+    if key.transparent().is_some() { return Err("transparent_view_access_rejected"); }
     if key.orchard().is_none() { return Err("orchard_view_access_required"); }
     if let Some(existing) = db.get_account_for_ufvk(key).map_err(|_| "account_lookup")? {
         if existing.birthday_height() != BlockHeight::from_u32(expected_birthday)
