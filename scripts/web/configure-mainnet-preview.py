@@ -11,6 +11,20 @@ import urllib.request
 from urllib.parse import urlsplit
 
 ROOT = Path('/home/ubuntu/nostos/mainnet')
+DIAGNOSTIC = {'stage':'not_started'}
+PUBLIC_ERRORS = frozenset((
+    'Use sudo for private configuration checks.',
+    'Use a separate exact HTTPS mainnet origin.',
+    'Preview settings exist. Preserve and inspect them before changing anything.',
+    'Expected a protected regular file.',
+    'Unexpected RPC cookie format.',
+    'RPC readiness check failed.',
+    'Mainnet node metadata is unavailable.',
+    'Expected numeric web UID:GID.',
+    'Existing verified mail configuration is required.',
+    'Invalid mail configuration.',
+    'RPC redirects are refused.',
+))
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -44,6 +58,9 @@ def rpc(port, cookie, method, params):
     with opener.open(request, timeout=15) as response:
         result = json.loads(response.read(2_000_001))
     if result.get('error') is not None or 'result' not in result:
+        error = result.get('error')
+        if isinstance(error, dict) and type(error.get('code')) is int:
+            DIAGNOSTIC['rpc_error_code'] = error['code']
         raise ValueError('RPC readiness check failed.')
     return result['result']
 
@@ -85,19 +102,28 @@ def write_private(path, value, uid=0, gid=0):
 
 
 def run(origin, apply=False):
+    DIAGNOSTIC.clear()
+    DIAGNOSTIC['stage'] = 'operator_privileges'
     if os.geteuid() != 0:
         raise ValueError('Use sudo for private configuration checks.')
+    DIAGNOSTIC['stage'] = 'https_origin'
     validate_origin(origin)
     # No new source profile may reuse existing data or silently replace credentials.
+    DIAGNOSTIC['stage'] = 'existing_preview_settings'
     if (ROOT/'mainnet.env').exists() or (ROOT/'observer-rpc').exists():
         raise ValueError('Preview settings exist. Preserve and inspect them before changing anything.')
+    DIAGNOSTIC['stage'] = 'observer_cookie'
     observer_cookie = protected(ROOT/'observer/.cookie')
+    DIAGNOSTIC['stage'] = 'chain_cookie'
     chain_cookie = protected(ROOT/'node-rpc/.cookie')
     for cookie in (observer_cookie, chain_cookie):
         if not cookie.startswith('__cookie__:') or '\n' in cookie or '\r' in cookie:
             raise ValueError('Unexpected RPC cookie format.')
+    DIAGNOSTIC['stage'] = 'chain_rpc'
     chain = rpc(38231, chain_cookie, 'getblockchaininfo', None)
+    DIAGNOSTIC['stage'] = 'observer_rpc'
     status = rpc(38234, observer_cookie, 'getwalletstatus', [])
+    DIAGNOSTIC['stage'] = 'chain_identity'
     matching = chain_identity(chain, status)
     result = {'read_only':not apply, 'eligible':matching, 'applied':False,
               'matching_chain_tip':matching, 'node_height':chain.get('blocks'),
@@ -107,6 +133,7 @@ def run(origin, apply=False):
     if not matching:
         return result
     # Copy only mail fields and the numeric runtime user, never testnet wallet env.
+    DIAGNOSTIC['stage'] = 'existing_web_configuration'
     template = json.loads(subprocess.check_output(
         ['docker','inspect','nostos-web'], stderr=subprocess.PIPE, text=True, timeout=15))[0]
     user = template['Config']['User']
@@ -117,15 +144,18 @@ def run(origin, apply=False):
     mail = {k:existing.get(k,'') for k in mail_names}
     mail_file = ROOT.parent/'email.env'
     if mail_file.exists():
+        DIAGNOSTIC['stage'] = 'mail_file'
         for line in protected(mail_file).splitlines():
             key, separator, value = line.partition('=')
             if separator and key in mail_names:
                 mail[key] = value
+    DIAGNOSTIC['stage'] = 'mail_configuration'
     env = settings(origin, mail)
     result['mail_configured'] = True
     result['origin'] = origin
     if not apply:
         return result
+    DIAGNOSTIC['stage'] = 'write_preview_settings'
     directory = ROOT/'observer-rpc'
     directory.mkdir(mode=0o700)
     uid, gid = map(int, user.split(':'))
@@ -136,6 +166,24 @@ def run(origin, apply=False):
                 web_deployed=False, https_verified=False)
 
 
+def failure(error, apply=False):
+    # Never expose raw exceptions, HTTP bodies, subprocess output or private paths.
+    reason = 'Private check failed; raw details were withheld.'
+    if type(error) is ValueError and str(error) in PUBLIC_ERRORS:
+        reason = str(error)
+    elif isinstance(error, FileNotFoundError):
+        reason = 'Required file is missing.'
+    elif isinstance(error, PermissionError):
+        reason = 'Required protected file could not be read.'
+    result = {'read_only':not apply, 'preview_configuration_complete':False,
+              'failed_stage':DIAGNOSTIC.get('stage','not_started'),
+              'error_type':type(error).__name__, 'reason':reason,
+              'services_changed':False, 'sends_requested':0}
+    if 'rpc_error_code' in DIAGNOSTIC:
+        result['rpc_error_code'] = DIAGNOSTIC['rpc_error_code']
+    return result
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--origin', required=True)
@@ -143,8 +191,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try:
         print(json.dumps(run(args.origin, args.apply)))
-    except Exception:
-        print(json.dumps({'preview_configuration_complete':False,
-                          'services_changed':False, 'sends_requested':0,
-                          'action':'Preserve existing files. Check observer, chain and private settings; no key or provider URL should be shared.'}))
+    except Exception as error:
+        print(json.dumps(failure(error, args.apply)))
         raise SystemExit(1) from None

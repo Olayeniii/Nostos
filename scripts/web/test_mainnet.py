@@ -86,6 +86,22 @@ class MainnetBoundary(unittest.TestCase):
         self.assertFalse(module.chain_identity(chain, {'node_tip':{'height':99,'blockhash':'a'*64}}))
         with self.assertRaises(ValueError): module.chain_identity(dict(chain,chain='test'), {})
 
+    def test_preview_failure_reports_stage_without_private_exception_text(self):
+        import json
+        module = load('configure-mainnet-preview')
+        module.DIAGNOSTIC.update(stage='observer_rpc',rpc_error_code=-28)
+        for error in (RuntimeError('uview1PRIVATE https://provider.example/private-token'),
+                      ValueError('uview1PRIVATE'), FileNotFoundError('/private/cookie-token')):
+            result = module.failure(error)
+            self.assertEqual(result['failed_stage'],'observer_rpc')
+            self.assertEqual(result['rpc_error_code'],-28)
+            self.assertTrue(result['read_only'])
+            text = json.dumps(result)
+            for value in ('uview1PRIVATE','provider.example','cookie-token'):
+                self.assertNotIn(value,text)
+        result = module.failure(ValueError('Expected a protected regular file.'))
+        self.assertEqual(result['reason'],'Expected a protected regular file.')
+
     def test_preview_deployment_mounts_only_rpc_cookies_without_signer_or_wallet_database(self):
         module = load('deploy-mainnet')
         configure = load('configure-mainnet-preview')
