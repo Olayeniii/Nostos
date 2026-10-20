@@ -230,3 +230,22 @@ mounts, separate data/key/runtime/release directories, and ports 3100/3101. This
 source change neither deploys that application nor provisions DNS/nginx/TLS.
 Registration, HTTPS, real UFVK import and subsequent merchant sync/signing must
 still be demonstrated.
+
+### Runtime exit after initial RPC readiness
+
+The operator's 20 October journal shows startup at 08:57:47 UTC followed by
+exit status 1 at 08:58:34 UTC. Initial empty-observer RPC success is therefore
+not sustained runtime readiness. The transient unit was collected and its cookie
+is absent; do not recreate the cookie or claim sync. The private preview
+configuration remains blocked.
+
+`sudo python3 scripts/web/probe-observer-startup.py` runs only against an empty,
+already-stopped observer. It starts a uniquely named diagnostic unit with the
+same 3 GiB memory and filesystem restrictions, a 75-second runtime ceiling and
+10-second stop timeout. Output stays in a new root-only file. It reports bounded,
+filtered errors and public stage markers; raw credentials, long values, URLs,
+paths and key/memo lines are not returned. The diagnostic unit is left stopped.
+It does not operate the original observer unit, testnet wallets, Zebra or web
+services, import a viewing key, or request a send. A second failure must be
+diagnosed from evidence before changing memory limits, restarting live wallets
+or altering consensus/refund policy.

@@ -86,10 +86,10 @@
       "port": 38234,
       "mnemonicGenerated": false,
       "encryptionInitialized": true,
-      "rpcVerified": true,
+      "rpcVerified": false,
       "realViewingKeyImported": false,
       "broadcastEnabled": false,
-      "lastKnownState": "running_with_wallet_rpc_ready",
+      "lastKnownState": "exited_status_1_after_initial_rpc_readiness",
       "probe": {
         "timeoutReached": true,
         "exitCodeAfterTermination": 0,
@@ -106,7 +106,16 @@
       "syncLocked": true,
       "relayNullParametersFixApplied": true,
       "relayNullParametersFixSourceRevision": "b865b9c65b123065872f20f481e68665eb33d538",
-      "scope": "Observer RPC and wallet status respond after relay repair. Empty account inventory. No merchant viewing key imported, no merchant sync, signing or payment proof. No direct VPS access by agent."
+      "scope": "Observer RPC and wallet status initially responded after relay repair, with zero accounts. Journal then records exit status 1 after 47 seconds. Cookie is absent and the transient unit was collected. Current runtime readiness is false; error cause remains unverified. No merchant key import or funds movement.",
+      "rpcPreviouslyVerified": true,
+      "lastExit": {
+        "source": "Operator-supplied systemd journal on 20 October 2026",
+        "startedAtUtc": "2026-10-20T08:57:47Z",
+        "exitedAtUtc": "2026-10-20T08:58:34Z",
+        "exitStatus": 1,
+        "unitCollected": true,
+        "causeVerified": false
+      }
     },
     "observerPreviewDeployment": {
       "sourcePrepared": true,
