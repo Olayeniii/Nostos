@@ -64,13 +64,15 @@ export default function Merchant() {
   const current = records.find((r) => r.id === selected);
   const summary = paymentSummary(records);
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) {
+      selectedRow.current?.focus();
+      return;
+    }
     detailRef.current?.focus();
     detailRef.current?.scrollIntoView({ block: "start" });
   }, [selected]);
   function closeDetail() {
     setSelected("");
-    selectedRow.current?.focus();
   }
   const safe =
     !warning && !data?.syncWarning && !loading && !busy && !uncertain;
@@ -431,7 +433,9 @@ export default function Merchant() {
             <div className="detail-amount">
               {zec(current.paymentAmountZat)} <span>ZEC</span>
             </div>
-            <span className={`status-chip ${current.paymentStatus}`}>
+            <span
+              className={`status-chip ${current.status === "failed" || current.refundAmountZat > 0 ? current.status : current.paymentStatus}`}
+            >
               {status(current)}
             </span>
             <ol className="payment-lifecycle" aria-label="Payment lifecycle">
@@ -468,7 +472,11 @@ export default function Merchant() {
               >
                 <span>03</span>
                 <strong>Refund</strong>
-                <small>If needed</small>
+                <small>
+                  {current.refundAmountZat > 0 || current.status === "failed"
+                    ? status(current)
+                    : "If needed"}
+                </small>
               </li>
             </ol>
             <dl>

@@ -228,6 +228,16 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await page.goto("http://127.0.0.1:3000/sign-up");
   await page.getByRole("textbox", { name: "Email", exact: true }).waitFor();
   await capture("registration");
+  await page.goto("http://127.0.0.1:3000/account-help");
+  await page
+    .getByRole("heading", { name: "Verify your email", exact: true })
+    .waitFor();
+  await capture("verification");
+  await page.goto("http://127.0.0.1:3000/account-link#" + "a".repeat(43));
+  await page
+    .getByRole("heading", { name: "Set your password", exact: true })
+    .waitFor();
+  await capture("set-password");
   for (const state of ["empty", "loading", "error"]) {
     mode = state;
     await page.goto("http://127.0.0.1:3000/merchant");
