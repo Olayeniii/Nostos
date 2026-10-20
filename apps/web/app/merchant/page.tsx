@@ -21,6 +21,8 @@ type Dashboard = {
   syncWarning: boolean;
 };
 function status(r: RecordData) {
+  if (r.status === "broadcast_unknown") return "Refund outcome unknown";
+  if (r.status === "broadcasting") return "Refund being submitted";
   if (r.status === "failed")
     return (r.confirmedRefundAmountZat ?? 0) > 0
       ? "Partially refunded"
@@ -604,7 +606,9 @@ export default function Merchant() {
                         ? "Confirmed"
                         : refund.status === "failed"
                           ? "Closed without settlement"
-                          : "Processing, awaiting confirmation"}
+                          : refund.status === "broadcast_unknown"
+                            ? "Outcome unknown, awaiting reconciliation"
+                            : "Processing, awaiting confirmation"}
                     </p>
                   </div>
                 ))}
@@ -733,11 +737,13 @@ export default function Merchant() {
                     : current.canRecoverRoute
                       ? "Verify the original route to refund the remaining value."
                       : "The recorded refund history is shown above. Open requests need a merchant decision."
-                  : current.routeClosedReason === "expired"
-                    ? "The refund window has ended. No refund is available."
-                    : current.paymentStatus === "confirmed"
-                      ? "No refund is currently available. A valid shielded route and an open refund window are required."
-                      : "Refund eligibility is checked after payment confirmation."}
+                  : (current.pendingRefundAmountZat ?? 0) > 0
+                    ? "A refund is already processing. Wait for confirmation or reconciliation before another refund. Do not send again."
+                    : current.routeClosedReason === "expired"
+                      ? "The refund window has ended. No refund is available."
+                      : current.paymentStatus === "confirmed"
+                        ? "No refund is currently available. A valid shielded route and an open refund window are required."
+                        : "Refund eligibility is checked after payment confirmation."}
               </p>
             )}
             <button
