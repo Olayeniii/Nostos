@@ -2,6 +2,25 @@
 
 ## Observer timeout correction, 20 October
 
+The operator subsequently reported the relay source already current, but another
+observer exit with status 1. At 20:38:08 UTC the saved log contains a valid numeric
+RPC code -32000 with fixed text `Chain RPC unavailable.` The envelope parser fix
+therefore exposed a real relay failure, but its original generic error did not
+identify whether the cause was policy, provider transport, HTTP status or decoding.
+Do not call this resolved or infer a provider outage from the generic text alone.
+
+The next relay revision adds only fixed failure categories and an allowlisted
+method name to generic failure messages. It does not add request logging, forward
+parameters/addresses/IDs/provider URLs, reveal provider error bodies, enable any
+method, or alter retries. Unrecognized method names are replaced with the fixed
+label `not_allowlisted`. The existing observer log can then show a category such
+as `getblock:provider_timeout` or `getblock:provider_http_429`.
+
+Use `sudo python3 scripts/web/inspect-observer-status.py` for service state, the
+latest start's public indexing progress, filtered errors and a read-only status
+RPC check when active. It does not start, stop or alter services or files. Retained
+logs remain within the pending live privacy and backup review scope.
+
 After the operator installed the verified replacement, systemd reported active,
 running and exit status zero. A later chain relay read returned height 3524701.
 The observer log at 19:03:09 UTC showed indexing through 3524694 and a started

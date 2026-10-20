@@ -35,13 +35,47 @@ NO_ARGUMENT_READ_METHODS = frozenset(('getinfo', 'getblockchaininfo', 'getbestbl
 
 class HostedNodeError(Exception):
     """Fixed, private-data-free failure."""
+    def __init__(self, message='', category='relay_failure'):
+        super().__init__(message)
+        self.category = category if category in FAILURE_CATEGORIES else 'relay_failure'
+
+
+FAILURE_CATEGORIES = frozenset(('relay_failure','method_blocked','invalid_params',
+    'request_too_large','provider_timeout','provider_connection','provider_tls',
+    'provider_transport','provider_incomplete','provider_json_invalid',
+    'provider_response_invalid','provider_response_too_large','provider_redirect',
+    'provider_http_400','provider_http_401','provider_http_403','provider_http_404',
+    'provider_http_408','provider_http_413','provider_http_429','provider_http_500',
+    'provider_http_502','provider_http_503','provider_http_504','provider_http_other'))
+
+
+def failure_category(error):
+    if isinstance(error, HostedNodeError):
+        return error.category
+    if isinstance(error, urllib.error.HTTPError):
+        category = 'provider_http_'+str(error.code)
+        return category if category in FAILURE_CATEGORIES else 'provider_http_other'
+    cause = error.reason if isinstance(error, urllib.error.URLError) else error
+    if isinstance(cause, TimeoutError): return 'provider_timeout'
+    if isinstance(cause, ssl.SSLError): return 'provider_tls'
+    if isinstance(cause, ConnectionError): return 'provider_connection'
+    if isinstance(cause, http.client.IncompleteRead): return 'provider_incomplete'
+    if isinstance(cause, json.JSONDecodeError): return 'provider_json_invalid'
+    if isinstance(error, urllib.error.URLError): return 'provider_transport'
+    return 'relay_failure'
+
+
+def safe_failure_message(payload, error):
+    method = payload.get('method') if isinstance(payload,dict) else None
+    method = method if isinstance(method,str) and (method in READ_METHODS or method == 'sendrawtransaction') else 'not_allowlisted'
+    return 'Chain RPC unavailable. ['+method+':'+failure_category(error)+']'
 
 
 def sanitized_rpc_error(result, request_id):
     error = result.get('error') if isinstance(result, dict) else None
     code = error.get('code') if isinstance(error, dict) else None
     if type(code) is not int or not -(2**63) <= code < 2**63:
-        raise HostedNodeError('Hosted chain RPC request failed.')
+        raise HostedNodeError('Hosted chain RPC request failed.', 'provider_response_invalid')
     return {'jsonrpc': '2.0', 'id': request_id, 'result': None,
             'error': {'code': code, 'message': 'Chain RPC request failed.'}}
 
@@ -59,7 +93,7 @@ def validate_endpoint(endpoint):
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
-        raise HostedNodeError('Hosted endpoint redirects are rejected.')
+        raise HostedNodeError('Hosted endpoint redirects are rejected.', 'provider_redirect')
 
 
 class HostedNode:
@@ -85,32 +119,35 @@ class HostedNode:
             raise HostedNodeError('Invalid chain RPC request.')
         method = payload['method']
         if method not in READ_METHODS and not (method == 'sendrawtransaction' and self.broadcast_enabled):
-            raise HostedNodeError('Chain RPC method is not enabled.')
+            raise HostedNodeError('Chain RPC method is not enabled.', 'method_blocked')
         params = payload.get('params', [])
         if params is None and method in NO_ARGUMENT_READ_METHODS:
             params = []
         if not isinstance(params, list):
-            raise HostedNodeError('Invalid chain RPC request.')
+            raise HostedNodeError('Invalid chain RPC request.', 'invalid_params')
         if method == 'sendrawtransaction' and (len(params) != 1 or not isinstance(params[0], str)
                 or not re.fullmatch(r'[a-fA-F0-9]+', params[0]) or len(params[0]) % 2):
             raise HostedNodeError('A signed raw transaction is required.')
         body = json.dumps({'jsonrpc': '2.0', 'id': payload.get('id'), 'method': method, 'params': params}).encode()
         if len(body) > MAX_REQUEST:
-            raise HostedNodeError('Chain RPC request is too large.')
+            raise HostedNodeError('Chain RPC request is too large.', 'request_too_large')
         # Three short attempts fit below the observer's 35-second read deadline.
         # Never repeat transaction submission, even after an ambiguous timeout.
         attempts = 3 if method in READ_METHODS else 1
+        category = 'relay_failure'
         for attempt in range(attempts):
             try:
                 return self._exchange(body, payload.get('id'), 8 if method in READ_METHODS else 25)
             except (TimeoutError, ConnectionError, urllib.error.URLError, http.client.IncompleteRead) as error:
+                category = failure_category(error)
                 transient = not isinstance(error, urllib.error.HTTPError) or error.code in (429, 502, 503, 504)
                 if not transient or attempt + 1 == attempts:
                     break
                 time.sleep(0.25 * (attempt + 1))
-            except Exception:
+            except Exception as error:
+                category = failure_category(error)
                 break
-        raise HostedNodeError('Hosted chain RPC request failed.') from None
+        raise HostedNodeError('Hosted chain RPC request failed.', category) from None
 
     def _exchange(self, body, request_id, timeout):
         try:
@@ -118,20 +155,20 @@ class HostedNode:
                 headers={'Content-Type': 'application/json'}, method='POST')
             with self.opener.open(request, timeout=timeout) as response:
                 if response.status != 200:
-                    raise HostedNodeError('Hosted chain RPC is unavailable.')
+                    raise HostedNodeError('Hosted chain RPC is unavailable.', 'provider_http_other')
                 raw = response.read(MAX_RESPONSE + 1)
                 if len(raw) > MAX_RESPONSE:
-                    raise HostedNodeError('Hosted chain RPC response is too large.')
+                    raise HostedNodeError('Hosted chain RPC response is too large.', 'provider_response_too_large')
             result = json.loads(raw)
             if not isinstance(result, dict):
-                raise HostedNodeError('Hosted chain RPC request failed.')
+                raise HostedNodeError('Hosted chain RPC request failed.', 'provider_response_invalid')
             if result.get('error') is not None:
                 # Zaino uses typed numeric errors, including -8 for a block not
                 # yet present at the tip. Keep the code and caller's ID, never
                 # provider messages, error data, headers or response identifiers.
                 return sanitized_rpc_error(result, request_id)
             if 'result' not in result:
-                raise HostedNodeError('Hosted chain RPC request failed.')
+                raise HostedNodeError('Hosted chain RPC request failed.', 'provider_response_invalid')
             # Never forward provider error text, HTTP headers or unrequested fields.
             return {'jsonrpc': '2.0', 'id': request_id, 'result': result['result'], 'error': None}
         except urllib.error.HTTPError as error:
@@ -142,16 +179,16 @@ class HostedNode:
                 with error:
                     raw = error.read(MAX_RESPONSE + 1)
                 if len(raw) > MAX_RESPONSE:
-                    raise HostedNodeError('Hosted chain RPC request failed.') from None
+                    raise HostedNodeError('Hosted chain RPC request failed.', 'provider_response_too_large') from None
                 try:
                     return sanitized_rpc_error(json.loads(raw), request_id)
-                except Exception:
-                    raise HostedNodeError('Hosted chain RPC request failed.') from None
+                except Exception as invalid:
+                    raise HostedNodeError('Hosted chain RPC request failed.', failure_category(invalid)) from None
             raise
         except (TimeoutError, ConnectionError, urllib.error.URLError, http.client.IncompleteRead):
             raise
-        except Exception:
-            raise HostedNodeError('Hosted chain RPC request failed.') from None
+        except Exception as error:
+            raise HostedNodeError('Hosted chain RPC request failed.', failure_category(error)) from None
 
 
 def probe(client):
@@ -244,6 +281,7 @@ class RelayHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         response = {'jsonrpc': '2.0', 'id': None, 'error': {'code': -32000, 'message': 'Chain RPC unavailable.'}}
         status = 200
+        payload = None
         try:
             if self.path != '/' or self.headers.get('Origin') or not hmac.compare_digest(self.headers.get('Authorization', ''), self.server.authorization):
                 status = 403
@@ -263,8 +301,9 @@ class RelayHandler(BaseHTTPRequestHandler):
                 elif isinstance(request_id, str) and len(request_id) <= 128:
                     response['id'] = request_id
             response = self.server.client.forward(payload)
-        except Exception:
-            pass
+        except Exception as error:
+            if payload is not None:
+                response['error']['message'] = safe_failure_message(payload,error)
         body = json.dumps(response).encode()
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')

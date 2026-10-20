@@ -51,6 +51,27 @@ class ProbeClient:
 
 
 class HostedNodeTests(unittest.TestCase):
+    def test_failure_categories_never_echo_arbitrary_error_or_request_text(self):
+        for error,category in [(TimeoutError(ENDPOINT),'provider_timeout'),
+                               (urllib.error.URLError(TimeoutError(ENDPOINT)),'provider_timeout'),
+                               (urllib.error.HTTPError(ENDPOINT,429,'private',{},None),'provider_http_429'),
+                               (RuntimeError(ENDPOINT+' private'),'relay_failure')]:
+            message = relay.safe_failure_message({'method':'getblock','params':[ENDPOINT]},error)
+            self.assertEqual(message,'Chain RPC unavailable. [getblock:'+category+']')
+            self.assertNotIn(ENDPOINT,message)
+            self.assertNotIn('private',message)
+        for method in (ENDPOINT,{'private':'hidden'},['hidden'],None):
+            self.assertEqual(relay.safe_failure_message({'method':method},RuntimeError('private')),
+                             'Chain RPC unavailable. [not_allowlisted:relay_failure]')
+
+    def test_forward_preserves_safe_transport_category_after_bounded_attempts(self):
+        opener = Opener(TimeoutError(ENDPOINT+' private'))
+        with patch.object(relay.time,'sleep'), self.assertRaises(relay.HostedNodeError) as caught:
+            relay.HostedNode(ENDPOINT,opener=opener).call('getblock',['3524702',0])
+        self.assertEqual(caught.exception.category,'provider_timeout')
+        self.assertEqual(len(opener.requests),3)
+        self.assertNotIn(ENDPOINT,str(caught.exception))
+
     def test_http_500_missing_block_keeps_typed_error_and_never_becomes_success(self):
         raw = json.dumps({'id':None,'result':None,'error':{'code':-8,'message':ENDPOINT+' private'}}).encode()
         error = urllib.error.HTTPError(ENDPOINT,500,'private',{},io.BytesIO(raw))
@@ -94,6 +115,7 @@ class HostedNodeTests(unittest.TestCase):
             result = json.loads(body)
             self.assertEqual(result['id'],42)
             self.assertEqual(result['error']['code'],-32000)
+            self.assertEqual(result['error']['message'],'Chain RPC unavailable. [getblock:relay_failure]')
             self.assertNotIn(b'private',body)
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=3)

@@ -101,7 +101,7 @@
       "rpcVerified": false,
       "realViewingKeyImported": false,
       "broadcastEnabled": false,
-      "lastKnownState": "operator_reported_active_indexing_status_rpc_timeout",
+      "lastKnownState": "operator_reported_failed_status_1_after_relay_error_envelope_repair",
       "probe": {
         "timeoutReached": true,
         "exitCodeAfterTermination": 0,
@@ -118,7 +118,7 @@
       "syncLocked": true,
       "relayNullParametersFixApplied": true,
       "relayNullParametersFixSourceRevision": "b865b9c65b123065872f20f481e68665eb33d538",
-      "scope": "Operator reports timeout build installed, prior binary retained, no wallet files replaced, broadcast disabled and testnet unchanged. Service active/running with exit status zero. Log shows chain indexing but malformed RPC error envelope; no merchant sync or live connection proof.",
+      "scope": "Operator reports latest installed observer failed with a valid generic relay RPC error. Earlier chain indexing is historical evidence only. Current status RPC readiness and merchant sync remain unverified. No keys imported, sends requested or testnet service changes reported.",
       "rpcPreviouslyVerified": true,
       "lastExit": {
         "source": "Operator-supplied systemd journal on 20 October 2026",
@@ -157,11 +157,29 @@
       },
       "relayErrorEnvelopeFix": {
         "sourcePrepared": true,
-        "runtimeApplied": false,
+        "runtimeApplied": true,
         "preservesRequestId": true,
         "preservesNumericRpcErrorCodes": true,
         "forwardsProviderErrorText": false,
         "newBinaryRequired": false
+      },
+      "latestRelayFailureEvidence": {
+        "source": "Operator-supplied updater, systemd and redacted log outputs",
+        "relayUpdaterAlreadyCurrent": true,
+        "execMainStatus": 1,
+        "serviceActiveState": "failed",
+        "failureLoggedAtUtc": "2026-10-20T20:38:08.215668Z",
+        "rpcErrorCode": -32000,
+        "rpcErrorMessage": "Chain RPC unavailable.",
+        "underlyingCauseVerified": false,
+        "sendsRequested": 0
+      },
+      "relayFailureDiagnostic": {
+        "sourcePrepared": true,
+        "runtimeApplied": false,
+        "output": "Fixed failure category and allowlisted method only in existing RPC failure message",
+        "newRequestLogging": false,
+        "providerUrlOrParametersEmitted": false
       }
     },
     "observerPreviewDeployment": {
