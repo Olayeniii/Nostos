@@ -53,6 +53,34 @@ prove a merchant import, durable wallet sync, memo intake, outgoing receiver/amo
 verification or funded payment/refund. Those remain required before mainnet use.
 The workflow is not a decision to replace the existing deployment.
 
+## Verified probe result
+
+GitHub run [39516665072](https://github.com/Olayeniii/Nostos/actions/runs/39516665072)
+passed on 20 October at 23:43 UTC, using source commit
+`181ee753940be84432825c3be29d253e0017ada1`. Both reference-wallet endpoints
+reported mainnet height 3,524,921 and agreed on the mined anchor at 3,524,919.
+TLS verification, actual SDK account-birthday tree decoding, compact-block hash
+agreement and Ironwood metadata checks all passed. The deterministic viewing-key
+decoding test also passed. Normal application CI
+[39516665071](https://github.com/Olayeniii/Nostos/actions/runs/39516665071) passed.
+
+The first probe failed before any endpoint call because Rustls had no selected
+crypto provider. The isolated preparation script now explicitly enables the
+already-pinned ring provider, while asserting unchanged dependency versions,
+sources and checksums. This is a probe setup fix, not evidence about the VPS fault.
+
+The next implementation target is an isolated view-only SDK observer adapter:
+import a merchant-authorized full viewing key, persist and resume sync, expose
+exact received outputs and memos, and verify exact outgoing receiver/amount/pool
+against the authorized instruction. Prove those with fixtures before connecting
+real merchant view access. Preserve the existing Zallet installation for comparison
+and rollback; no backend switch or VPS service action has occurred.
+
+No wallet was created, no real key was imported and no send was requested by this
+probe. Merchant sync, transaction decryption and a mainnet payment/refund remain
+unverified. Public hosted services learn the client's network address and queried
+chain ranges; using TLS is not a privacy certification.
+
 ## Merchant signing remains separate
 
 ZODL Android's source changelog records full/incoming viewing-key export and
