@@ -43,6 +43,7 @@ jobs:
           test "$(git -C zallet rev-parse HEAD)" = 987382f67e622915228686e9f956c6a9c9a7514c
           mkdir -p zallet/zallet-core/examples
           cp nostos/scripts/lightclient/probe.rs zallet/zallet-core/examples/nostos_lightclient_probe.rs
+          python3 nostos/scripts/lightclient/prepare.py zallet
       - name: Test full viewing key decoding without a real key
         working-directory: zallet
         run: cargo +1.95.0 test --locked -p zallet-core --example nostos_lightclient_probe

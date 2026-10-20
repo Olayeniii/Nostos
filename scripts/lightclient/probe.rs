@@ -59,6 +59,9 @@ async fn probe(url: &'static str) -> Result<serde_json::Value, &'static str> {
 
 #[tokio::main]
 async fn main() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("install the probe TLS crypto provider");
     // Both endpoints occur in the ZODL Android reference wallet's source list.
     // No fallback to the hosted JSON-RPC relay or a local signing wallet.
     let endpoints = [
