@@ -2072,10 +2072,9 @@ form .primary {
 }
 .ledger-columns,
 .ledger-row {
-  grid-template-columns: minmax(180px, 1.6fr) minmax(
-      95px,
-      0.8fr
-    ) 105px 105px 125px 145px;
+  grid-template-columns:
+    minmax(180px, 1.6fr) minmax(95px, 0.8fr)
+    105px 105px 125px 145px;
   min-width: 900px;
   padding: 20px 24px;
   gap: 18px;
