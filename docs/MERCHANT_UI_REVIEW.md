@@ -17,6 +17,8 @@ The stylesheet contains several layers of ledger rules. A later 760px minimum
 width and fixed column sizes conflict with phone layouts. The desktop selected
 layout compresses those same columns beside a detail panel. Small status labels
 share almost identical treatment, and metric cards lack a clear first priority.
+Controlled baseline fixtures did not reproduce document-level horizontal overflow at the six tested widths. They did show stacked unlabelled phone status chips and a clipped desktop ledger beside details. The responsive changes address these observed issues; the external audit is not treated as proof of an additional live defect.
+
 Copy feedback previously reused the error channel. Remaining refundable payment
 value is accounting and must not be presented as spendable wallet funds.
 
@@ -65,11 +67,14 @@ screens. Baseline comes from the PR base SHA in a separate worktree. Images and
 JSON results are uploaded as the `merchant-ui-review` Actions artifact.
 
 Local Chromium launch is blocked by a socket restriction in the work environment.
-Browser evidence must be taken from the Actions run and visually reviewed before
-this PR is described as ready. Production authenticated behavior and an actual
-phone check remain separate from the fixture suite.
+The Actions browser run succeeded and its merchant, details, sharing, funds and
+receipt screenshots were visually reviewed. The review led to darker receipt
+helper text and a clearer available-funds row. Final evidence is linked in the PR.
+Production authenticated behavior and an actual phone check remain separate from
+the fixture suite.
 
-Local validation: 313 tests passed, lint, TypeScript, source build, Next production
-build and secret scan passed. CI and screenshot results are recorded in the PR.
+Local validation: 313 unit/integration tests and 57 Python tests passed. Lint,
+TypeScript, source build, Next production build and secret scan passed. CI and
+screenshot results are recorded in the PR.
 
 No merge or deployment is authorized by this review.
