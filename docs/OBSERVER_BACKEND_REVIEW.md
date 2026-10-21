@@ -137,6 +137,37 @@ consensus validation. See `scripts/lightclient/README.md` for current gates.
 No service was installed or started, no real key was imported and no send was
 requested by this work. Existing production/refund state is untouched by this code.
 
+## Authenticated service connection, verified 21 October
+
+SDK [run 39648793461](https://github.com/Olayeniii/Nostos/actions/runs/39648793461)
+passed at 18:02 UTC using `ea8b63518c52efcbe8b2e3b2be367db225858fe8`.
+The public fixture scanned through 3,525,789. Tests crossed the actual authenticated
+HTTP broker and native pipe worker, checked idempotent import, rejected birthday
+changes and kept merchant databases separate. The web adapter is opt-in and
+requires new explicit scope consent; existing Zallet claims are not converted.
+Normal application CI also passed. HTTP policy tests block sends and internal
+sync requests before worker dispatch.
+
+This closes the isolated service-connection gate, not live merchant verification.
+Payments remain held. No service was installed or restarted, no real merchant key
+was imported, and no mainnet payment/refund was made. See the lightclient README
+for the deployment, recovery, encrypted backup and live privacy gates.
+
+## Recovery fixtures, verified 21 October
+
+[Run 39650001104](https://github.com/Olayeniii/Nostos/actions/runs/39650001104)
+passed at 18:12 UTC, source `7ae86f1add917f8df35aeb76a2a591ff313a84bf`.
+Child processes exited without destructors inside an uncommitted SDK import and
+after a committed import with WAL present. Reopening checked the expected account
+count, SQLite integrity and writer-lock reacquisition. The public-chain fixture
+also rewound its persisted scan and recovered through height 3,525,796.
+
+These tests use fresh temporary directories and public deterministic material.
+They do not establish recovery of real merchant enhancements, competing-chain
+forks, encrypted backups or live VPS storage. A separate follow-up fixes background
+sync resumption after a stored account reopens; its regression test requires no
+reimported viewing key and keeps status locked while sync is busy.
+
 ## Merchant signing remains separate
 
 ZODL Android's source changelog records full/incoming viewing-key export and

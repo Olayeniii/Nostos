@@ -68,20 +68,55 @@ validation or a privacy certification. The SDK wallet database contains viewing
 keys, decrypted transaction data and history in plaintext behind file permissions.
 It is not encrypted at rest by this guard.
 
+## Authenticated app connection, verified 21 October
+
+Source `ea8b63518c52efcbe8b2e3b2be367db225858fe8` passed SDK
+[run 39648793461](https://github.com/Olayeniii/Nostos/actions/runs/39648793461)
+and application [run 39648793755](https://github.com/Olayeniii/Nostos/actions/runs/39648793755).
+The public fixture scanned through height 3,525,789. Its authenticated HTTP broker
+called the compiled native worker through private pipes, imported the same scoped
+key idempotently, rejected a changed birthday and kept a second merchant's database
+separate. HTTP tests reject missing credentials, browser-origin requests, invalid
+merchant identifiers, extra arguments, oversized bodies and send methods.
+
+The web adapter requires an authenticated merchant, explicit scope consent and a
+new `sdk-orchard-view-access-v1` claim. It does not convert an existing Zallet claim
+automatically. Before native import, the worker extracts only the Orchard viewing
+component. The original encrypted web claim remains subject to the existing
+retention policy; scoping the worker does not remove that web record.
+
+The service accepts only status, view-key import and Orchard receiver decoding.
+Merchant UUIDs select separate private roots and workers; they are supplied by the
+server-side app session. Only the broker can request a sync. An in-progress import
+is not cancelled when the browser request times out. Busy status is locked and
+payments stay disabled. Workers have no signing or send interface.
+
+This is opt-in source, not an installed VPS backend. `run-service.mjs` requires a
+private mode-0600 configuration with absolute `root` and `binary`, a verified
+`binarySha256` and a loopback `port`. It validates file ownership, paths and modes,
+creates a private service cookie and binds only to loopback. Do not run it against
+existing Zallet storage. Configuration of the web adapter requires
+`NOSTOS_OBSERVER_BACKEND=sdk-preview`, mainnet, `NOSTOS_WALLET_MODE=observer-preview`, a separate
+observer RPC URL and an app-readable private cookie. Do not broaden cookie
+permissions to bridge service/container users. A deployment procedure must supply
+a protected credential copy or mount. No production configuration was changed.
+
 ## Remaining gates before real merchant view access
 
-1. Add a service and authenticated app adapter. Map the existing merchant identity,
-   encrypted key claim and consent to the SDK account. Construct expected fields
-   from persisted checkout/refund instructions, never client-supplied match claims.
-   Recheck current chain context before committing a payment/refund result.
-2. Prove interruption and reorg handling. Checkpoint reopening after a completed
-   scan is not a mid-write crash or reorg test. Exercise enhancement storage with
-   detected encrypted transactions and changing block context.
-3. Implement a consistent encrypted backup and recovery procedure, then inspect
-   real VPS storage, logs, WAL and backups. No backup export exists here and no
-   live backup check has been completed by the agent.
-4. Complete merchant-authorized sync and separately authorized payment/refund
-   evidence before mainnet use. Keep existing testnet data and services isolated.
+1. Test actual changing-chain context and mid-enhancement interruption. Public
+   fixture [run 39650001104](https://github.com/Olayeniii/Nostos/actions/runs/39650001104),
+   source `7ae86f1add917f8df35aeb76a2a591ff313a84bf`, passed abrupt-exit
+   recovery of committed and uncommitted SDK imports, SQLite integrity and writer
+   lock reacquisition. It also rewound and rescanned persisted public-chain state
+   at height 3,525,796. This is not a competing-chain fork or VPS recovery proof.
+2. Exercise SDK enhancement persistence with detected encrypted transactions.
+   Construct expected fields from persisted checkout/refund instructions, never
+   client-supplied match claims. Recheck chain context before committing results.
+3. Implement and restore a consistent encrypted backup, then inspect real VPS
+   storage, logs, WAL and backups. No live backup check is complete.
+4. Package the pinned worker for Ubuntu ARM64 and verify isolated installation,
+   private app credentials, merchant-authorized sync and the separately authorized
+   funded payment/refund evidence. Preserve current testnet services and rollback.
 
 The `prepare.py` helper changes only the CI checkout's features/provider selection
 and asserts unchanged dependency versions, sources and checksums. It does not
