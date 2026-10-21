@@ -1,0 +1,572 @@
+/* Customer and account screens share the approved merchant palette. */
+.public-surface {
+  color-scheme: light;
+  --ivory: #192e29;
+  --muted: #617065;
+  --border: #d1d6c9;
+  --surface: #faf8f2;
+  background: #f3efe6;
+  color: #192e29;
+  max-width: none;
+  min-height: 100svh;
+  margin: 0;
+  padding: 0;
+}
+.public-surface > header {
+  padding: 22px 36px;
+  margin: 0;
+  border-bottom: 1px solid #d1d6c9;
+  gap: 20px;
+}
+.public-surface .brand {
+  color: #203a2f;
+  font-size: 18px;
+  letter-spacing: 0.1em;
+}
+.public-surface .brand .mark {
+  width: 36px;
+  height: 36px;
+}
+.public-surface .header-context {
+  color: #617065;
+  font-size: 11px;
+}
+.public-body {
+  max-width: 1240px;
+  margin: auto;
+  padding: 44px 36px 56px;
+}
+.public-surface h1,
+.public-surface h2 {
+  color: #192e29;
+  font-family: Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+.public-surface h1 {
+  font-size: clamp(34px, 4vw, 48px);
+  line-height: 1.16;
+}
+.public-surface h2 {
+  font-size: 28px;
+  line-height: 1.25;
+}
+.public-surface .eyebrow {
+  color: #617065;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+.public-surface :is(p, .privacy, .lede) {
+  color: #617065;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.public-surface :is(.panel, .account-card, .setup-card) {
+  background: #faf8f2;
+  color: #192e29;
+  border: 1px solid #d1d6c9;
+  border-radius: 4px;
+  box-shadow: none;
+  min-width: 0;
+}
+.public-surface :is(.primary, .secondary, .text-button) {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  border-radius: 4px;
+  text-align: center;
+}
+.public-surface .primary {
+  background: #203b30;
+  color: #f3fbef;
+  border: 1px solid #203b30;
+  box-shadow: none;
+  padding: 12px 20px;
+}
+.public-surface .primary:hover:not(:disabled) {
+  background: #31553e;
+}
+.public-surface .secondary {
+  background: transparent;
+  color: #203b30;
+  border: 1px solid #acbaa4;
+  padding: 12px 18px;
+}
+.public-surface .text-button {
+  color: #365944;
+}
+.public-surface :is(input, textarea, select) {
+  background: #fffdf8;
+  color: #192e29;
+  border: 1px solid #bac6af;
+  border-radius: 4px;
+  min-height: 46px;
+  font-size: 14px;
+}
+.public-surface input::placeholder,
+.public-surface textarea::placeholder {
+  color: #788273;
+  opacity: 1;
+}
+.public-surface label {
+  color: #36513d;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.public-surface .password-toggle {
+  color: #365944;
+  background: transparent;
+  min-width: 44px;
+  min-height: 44px;
+}
+.public-surface :focus-visible {
+  outline: 2px solid #547c42;
+  outline-offset: 4px;
+}
+.public-surface .info-panel,
+.public-surface .refund-policy {
+  background: #edf0e3;
+  border: 1px solid #c6d0b9;
+  border-radius: 3px;
+  color: #294632;
+}
+.public-surface .info-panel p {
+  color: #617065;
+}
+.public-surface .warning {
+  color: #8b472f;
+  border-color: #ddc4a5;
+  background: #f7eadd;
+  border-radius: 4px;
+}
+.public-surface .state {
+  color: #547341;
+  font-size: 12px;
+}
+.public-surface .status-chip {
+  color: #986b2d;
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+  padding: 0;
+}
+.public-surface .status-chip.success,
+.public-surface .status-chip.confirmed {
+  color: #2d6543;
+}
+.public-surface .status-chip.expired {
+  color: #79776d;
+}
+.public-surface .status-chip.failed {
+  color: #9c442f;
+}
+.public-surface > footer {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 24px 36px 32px;
+  border-top: 1px solid #d1d6c9;
+  color: #617065;
+  gap: 32px;
+}
+.public-surface > footer p,
+.public-surface > footer span {
+  font-size: 11px;
+  line-height: 1.8;
+}
+.public-surface .checkout-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 64px;
+  margin: 0;
+}
+.public-surface .checkout-summary {
+  min-width: 0;
+}
+.public-surface .checkout-summary h1 {
+  font-size: 42px;
+  margin: 16px 0;
+}
+.public-surface .checkout-summary > p {
+  font-size: 14px;
+}
+.public-surface .checkout-total {
+  background: #e6ebdc;
+  border-block: 1px solid #c9cec0;
+  padding: 24px;
+  margin: 26px 0;
+  color: #192e29;
+  font-size: 48px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.public-surface .checkout-total span {
+  color: #617065;
+  font-size: 13px;
+}
+.public-surface .checkout-assurance {
+  margin-top: 26px;
+  border-top: 1px solid #c9cec0;
+  padding-top: 22px;
+}
+.public-surface .checkout-card {
+  border-top: 3px solid #547341;
+  padding: 28px;
+}
+.public-surface .checkout-card h2 {
+  margin: 0 0 16px;
+}
+.public-surface .checkout-card :is(form, .wallet-payment) {
+  margin-top: 22px;
+}
+.public-surface .checkout-card > .status-chip {
+  margin-bottom: 18px;
+}
+.public-surface .wallet-payment {
+  width: 100%;
+  gap: 12px;
+}
+.public-surface .wallet-payment img {
+  width: min(248px, 100%);
+  height: auto;
+  border-radius: 2px;
+}
+.public-surface .wallet-payment :is(a, button) {
+  width: 100%;
+  white-space: normal;
+}
+.public-surface .manual-payment {
+  border-block: 1px solid #d1d6c9;
+  padding: 10px 0;
+  margin-top: 24px;
+}
+.public-surface .manual-payment summary {
+  min-height: 44px;
+  color: #365944;
+  font-size: 13px;
+}
+.public-surface .manual-payment :is(input, textarea) {
+  max-width: 100%;
+}
+.public-surface .manual-payment textarea {
+  min-height: 100px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.public-surface .workspace-intro {
+  max-width: 720px;
+  margin: 0 0 32px;
+  text-align: left;
+}
+.public-surface .workspace-intro h1 {
+  margin-top: 0;
+}
+.public-surface .receipt-container {
+  max-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  align-items: start;
+  gap: 30px;
+  margin: 0;
+}
+.public-surface .receipt-container > .privacy {
+  grid-column: 1/-1;
+  margin-top: 0;
+}
+.public-surface .receipt-card {
+  background: #faf8f2;
+  color: #192e29;
+  border: 1px solid #cbd3bf;
+  border-top: 3px solid #547341;
+  border-radius: 3px;
+  box-shadow: none;
+  padding: 28px;
+}
+.public-surface .receipt-brand {
+  letter-spacing: 0.12em;
+}
+.public-surface .receipt-total {
+  text-align: left;
+  padding: 28px 0;
+}
+.public-surface .receipt-total h2 {
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-size: 44px;
+  font-weight: 400;
+  color: #192e29;
+}
+.public-surface .receipt-divider {
+  margin: 0;
+  border-top: 1px solid #cbd3bf;
+}
+.public-surface .receipt-divider::before,
+.public-surface .receipt-divider::after {
+  display: none;
+}
+.public-surface .receipt-facts div {
+  padding: 12px 0;
+  gap: 18px;
+  border-bottom: 1px solid #e0e3d7;
+  font-size: 12px;
+}
+.public-surface .receipt-facts dt {
+  flex-shrink: 1;
+}
+.public-surface .receipt-facts dd {
+  font-weight: 500;
+  line-height: 1.7;
+}
+.public-surface .receipt-facts .mono {
+  font-size: 11px;
+}
+.public-surface .receipt-refund {
+  background: #edf0e3;
+  border-color: #c6d0b9;
+  border-radius: 3px;
+  padding: 20px;
+}
+.public-surface .receipt-refund.complete {
+  background: #e3edda;
+}
+.public-surface .receipt-refund p {
+  font-size: 12px;
+}
+.public-surface .receipt-refund .refund-total {
+  color: #294632;
+  font-size: 28px;
+}
+.public-surface .receipt-details summary {
+  min-height: 44px;
+  color: #365944;
+  font-size: 12px;
+}
+.public-surface .receipt-details > p {
+  font-size: 12px;
+}
+.public-surface .receipt-tx code {
+  font-size: 11px;
+}
+.public-surface .receipt-bottom {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.public-surface .receipt-bottom > span {
+  font-size: 11px;
+}
+.public-surface .refund-request-panel {
+  margin-top: 0;
+  padding: 28px;
+}
+.public-surface .refund-request-panel h2 {
+  margin-top: 0;
+}
+.public-surface .refund-request-panel p {
+  font-size: 12px;
+}
+.public-surface .refund-policy {
+  margin: 20px 0;
+  padding: 16px;
+}
+.public-surface .refund-policy h3 {
+  font-size: 12px;
+  margin-top: 0;
+}
+.public-surface .refund-request {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #d1d6c9;
+  border-radius: 0;
+  padding: 18px 0;
+}
+.public-surface .refund-request .section-head {
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: start;
+}
+.public-surface .refund-request strong {
+  font-size: 13px;
+}
+.public-surface .access {
+  max-width: 560px;
+  margin: 24px 0;
+  padding: 26px;
+  border: 1px solid #cbd3bf;
+  background: #faf8f2;
+  border-radius: 4px;
+}
+.public-surface .account-layout {
+  margin: 0;
+  gap: 70px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  align-items: start;
+}
+.public-surface .account-context {
+  padding-top: 20px;
+}
+.public-surface .account-context h1 {
+  font-size: clamp(38px, 4.2vw, 54px);
+  line-height: 1.18;
+}
+.public-surface .account-context > p {
+  max-width: 450px;
+  font-size: 14px;
+}
+.public-surface .account-benefits {
+  padding: 24px 0 0;
+  margin-top: 26px;
+  border-top: 1px solid #c9cec0;
+  color: #617065;
+  font-size: 13px;
+  line-height: 2;
+}
+.public-surface .account-benefits li::before {
+  color: #547341;
+}
+.public-surface .account-card {
+  padding: 30px;
+}
+.public-surface .account-card h2 {
+  margin: 0 0 16px;
+}
+.public-surface .account-card small {
+  color: #617065;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.public-surface .account-switch {
+  font-size: 12px;
+}
+.public-surface .account-switch a {
+  color: #365944;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.public-surface .account-help {
+  margin: 0 auto;
+  max-width: 540px;
+}
+.public-surface .account-help h1 {
+  font-size: 36px;
+  margin-top: 0;
+}
+.public-surface .setup-card {
+  max-width: 660px;
+  margin: 0 auto;
+  padding: 30px;
+}
+@media (max-width: 900px) {
+  .public-surface .checkout-layout,
+  .public-surface .account-layout,
+  .public-surface .receipt-container {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .public-surface .checkout-summary {
+    position: static;
+  }
+  .public-surface .checkout-assurance {
+    margin-top: 18px;
+    padding-top: 18px;
+  }
+  .public-surface .account-context {
+    padding-top: 0;
+  }
+  .public-surface .account-context h1 {
+    font-size: 40px;
+  }
+  .public-surface .account-benefits {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .public-surface > header {
+    padding: 16px 18px;
+    gap: 12px;
+  }
+  .public-surface .brand {
+    gap: 8px;
+    font-size: 15px;
+  }
+  .public-surface .brand .mark {
+    width: 30px;
+    height: 30px;
+  }
+  .public-surface .header-context {
+    font-size: 9px;
+    gap: 12px;
+  }
+  .public-body {
+    padding: 26px 18px 36px;
+  }
+  .public-surface h1 {
+    font-size: 34px;
+  }
+  .public-surface .checkout-summary h1 {
+    font-size: 36px;
+  }
+  .public-surface .checkout-summary > p {
+    font-size: 13px;
+  }
+  .public-surface .checkout-total {
+    padding: 20px;
+    font-size: 42px;
+    margin: 20px 0;
+  }
+  .public-surface
+    :is(
+      .checkout-card,
+      .receipt-card,
+      .refund-request-panel,
+      .account-card,
+      .setup-card,
+      .access
+    ) {
+    padding: 22px 18px;
+  }
+  .public-surface .receipt-total h2 {
+    font-size: 38px;
+  }
+  .public-surface .receipt-brand {
+    font-size: 12px;
+  }
+  .public-surface .receipt-brand small {
+    font-size: 9px;
+  }
+  .public-surface .receipt-network {
+    font-size: 8px;
+    padding: 4px;
+  }
+  .public-surface .receipt-facts div {
+    font-size: 12px;
+    gap: 12px;
+  }
+  .public-surface .receipt-facts dd {
+    max-width: 62%;
+  }
+  .public-surface .receipt-refund {
+    padding: 16px;
+  }
+  .public-surface > footer {
+    padding: 22px 18px 30px;
+    display: block;
+  }
+  .public-surface > footer p {
+    max-width: none;
+    margin-top: 12px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .public-surface :is(.primary, .secondary) {
+    transition: background-color 120ms ease;
+  }
+}
+@media (max-width: 600px) {
+  .public-surface input,
+  .public-surface textarea,
+  .public-surface select {
+    font-size: 16px;
+  }
+  .public-surface .manual-payment textarea {
+    font-size: 12px;
+  }
+}

@@ -2,42 +2,8 @@
 import { useState } from "react";
 import { Mark } from "./mark.js";
 import { StateLabel } from "./status-label.js";
-export type ReceiptData = {
-  id?: string;
-  merchantName?: string;
-  description?: string;
-  orderReference: string;
-  paymentAmountZat: number;
-  paymentConfirmations: number;
-  refundAmountZat: number;
-  status: string;
-  paymentStatus?: string;
-  fulfillment?: "pending" | "fulfilled" | "failed";
-  paymentTxid?: string | null;
-  refundTxid?: string;
-  createdAt?: string;
-  paidAt?: string | null;
-  confirmedRefundAmountZat?: number;
-  pendingRefundAmountZat?: number;
-  remainingAmountZat?: number;
-  refunds?: { id: string; amountZat: number; status: string; txid?: string }[];
-  refundRequests?: {
-    id: string;
-    amountZat: number;
-    reason: string;
-    status: string;
-    decisionReason: string;
-    approvedZat: number | null;
-    createdAt: string;
-    decidedAt: string | null;
-  }[];
-  canRequestRefund?: boolean;
-  canRecoverRoute?: boolean;
-  refundPolicy?: string;
-  refundExpiresAt?: string | null;
-  refundWindowDays?: number | null;
-  routeClosedReason?: string | null;
-};
+import type { ReceiptData } from "./receipt-types.js";
+export type { ReceiptData } from "./receipt-types.js";
 export const zec = (amount: number) =>
   (amount / 1e8).toLocaleString("en", { maximumFractionDigits: 8 });
 export function date(value?: string | null) {
@@ -73,7 +39,9 @@ export function ReceiptCard({
       ? "Partially refunded"
       : "Refund attempt closed"
     : refundConfirmed
-      ? "Refund confirmed"
+      ? (receipt.remainingAmountZat ?? 0) > 0
+        ? "Partially refunded"
+        : "Refund confirmed"
       : refundUnknown
         ? "Refund state being checked"
         : receipt.status === "broadcast"
@@ -110,9 +78,11 @@ export function ReceiptCard({
         <span className={`receipt-pill ${paid ? "success" : ""}`}>
           {paid
             ? "Confirmed"
-            : receipt.paymentStatus === "broadcast"
-              ? "Confirming payment"
-              : "Awaiting payment"}
+            : receipt.paymentStatus === "expired"
+              ? "Payment request expired"
+              : receipt.paymentStatus === "broadcast"
+                ? "Confirming payment"
+                : "Awaiting payment"}
         </span>
       </div>
       <div className="receipt-divider" />
@@ -127,6 +97,14 @@ export function ReceiptCard({
             <dd>{receipt.description}</dd>
           </div>
         )}
+        <div>
+          <dt>Fulfillment</dt>
+          <dd>
+            {receipt.fulfillment
+              ? `${receipt.fulfillment} (merchant reported)`
+              : "Not reported"}
+          </dd>
+        </div>
         <div>
           <dt>{receipt.paidAt ? "Confirmed at" : "Created"}</dt>
           <dd>{date(receipt.paidAt ?? receipt.createdAt)}</dd>
@@ -178,7 +156,9 @@ export function ReceiptCard({
           <p>
             {receipt.routeClosedReason === "expired"
               ? "The refund request window has ended. The return route has been removed from active product records."
-              : "The merchant can refund to the route supplied in the shielded memo of this payment if a refund is due."}
+              : receipt.canRequestRefund
+                ? "You can request a refund to the shielded route supplied with this payment. The merchant reviews each request."
+                : "Refund availability depends on the confirmed payment, its original shielded route and the refund window. Check the status below."}
           </p>
         )}
         {receipt.refundExpiresAt ? (

@@ -1,0 +1,1044 @@
+.merchant-studio {
+  color-scheme: light;
+  --ivory: #192e29;
+  --text: #192e29;
+  --muted: #6b746c;
+  --border: #d7d8cd;
+  --surface: #faf8f2;
+  color: #192e29;
+  background: #f3efe6;
+  max-width: none;
+  min-height: 100svh;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+.merchant-studio .studio-rail {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 88px;
+  background: #172d27;
+  color: #b7c6ba;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 25px 8px 18px;
+  z-index: 20;
+}
+.studio-rail a {
+  color: inherit;
+  text-decoration: none;
+}
+.studio-rail .studio-mark {
+  display: grid;
+  place-items: center;
+  margin-bottom: 58px;
+}
+.studio-mark svg {
+  width: 37px;
+  height: 37px;
+}
+.studio-destinations,
+.studio-rail-bottom {
+  display: grid;
+  gap: 12px;
+}
+.studio-rail-bottom {
+  margin-top: auto;
+}
+.studio-rail a:not(.studio-mark) {
+  min-height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 10px;
+  border-radius: 4px;
+}
+.studio-rail a[aria-current] {
+  color: #b9f8cc;
+  background: #294339;
+}
+.merchant-studio .studio-rail button {
+  background: transparent;
+  border: 0;
+  color: #b7c6ba;
+  min-height: 44px;
+  font-size: 10px;
+  padding: 4px;
+}
+.studio-body {
+  grid-column: 2;
+  min-width: 0;
+}
+.merchant-studio .studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 36px;
+  margin: 0;
+  border-bottom: 1px solid #d7d8cd;
+}
+.studio-identity {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 12px;
+  color: #687168;
+  min-width: 0;
+}
+.studio-identity > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio-wordmark {
+  font-size: 17px;
+  letter-spacing: 0.13em;
+  text-decoration: none;
+  color: #192e29;
+  font-weight: 800;
+}
+.studio-network {
+  font-size: 10px;
+  white-space: nowrap;
+  color: #687168;
+}
+.studio-page {
+  max-width: 1600px;
+  margin: auto;
+  padding: 36px;
+}
+.merchant-studio .dashboard-title {
+  margin: 0 0 30px;
+  align-items: center;
+}
+.merchant-studio .dashboard-title h1 {
+  font-family: Georgia, serif;
+  font-size: clamp(36px, 4vw, 52px);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
+  margin: 10px 0;
+}
+.merchant-studio .dashboard-title p {
+  color: #6b746c;
+  font-size: 13px;
+}
+.merchant-studio .eyebrow {
+  color: #6b746c;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+}
+.merchant-studio .primary {
+  background: #203b30;
+  color: #effbef;
+  border: 1px solid #203b30;
+  border-radius: 4px;
+  box-shadow: none;
+  min-height: 44px;
+}
+.merchant-studio .secondary {
+  background: transparent;
+  color: #203b30;
+  border: 1px solid #aeb8a9;
+  border-radius: 4px;
+}
+.merchant-studio .text-button {
+  color: #365944;
+}
+.merchant-studio .summary-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid #c9cec0;
+  border-bottom: 1px solid #c9cec0;
+  border-radius: 0;
+  margin: 0 0 36px;
+  gap: 0;
+  overflow: visible;
+}
+.merchant-studio .summary-grid article {
+  display: block;
+  background: transparent;
+  color: #192e29;
+  padding: 23px 26px;
+  border: 0;
+  border-radius: 0;
+  min-width: 0;
+}
+.merchant-studio .summary-grid article:first-child {
+  background: #e6ebdc;
+  padding-left: 22px;
+}
+.merchant-studio .summary-grid article:first-child::after {
+  display: none;
+}
+.merchant-studio .summary-grid article + article {
+  border-left: 1px solid #d7d8cd;
+}
+.merchant-studio .summary-grid span,
+.merchant-studio .summary-grid article:first-child :where(span, p, small) {
+  color: #61705f;
+}
+.merchant-studio .summary-grid span {
+  font-size: 11px;
+}
+.merchant-studio .summary-grid strong {
+  font-size: clamp(24px, 2.6vw, 36px);
+  color: #192e29;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  margin: 12px 0 8px;
+}
+.merchant-studio .summary-grid small {
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.merchant-studio .summary-grid p {
+  font-size: 10px;
+  color: #6b746c;
+}
+.merchant-studio .panel {
+  background: #faf8f2;
+  color: #192e29;
+  border: 1px solid #d7d8cd;
+  border-radius: 3px;
+  box-shadow: none;
+}
+.merchant-studio .ledger {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  overflow: visible;
+}
+.merchant-studio .section-head {
+  margin-bottom: 18px;
+}
+.merchant-studio .studio-list-heading {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 25px;
+  letter-spacing: -0.035em;
+}
+.merchant-studio .section-head p {
+  color: #6b746c;
+  font-size: 11px;
+}
+.studio-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #bfc8b9;
+  margin-bottom: 0;
+}
+.studio-tabs {
+  display: flex;
+  gap: 20px;
+}
+.merchant-studio .studio-tabs button {
+  color: #6b746c;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 14px 0;
+  font-size: 11px;
+  min-height: 44px;
+}
+.merchant-studio .studio-tabs button[aria-pressed="true"] {
+  color: #192e29;
+  border-bottom-color: #244c39;
+}
+.studio-search {
+  max-width: 190px;
+}
+.merchant-studio input,
+.merchant-studio select,
+.merchant-studio textarea {
+  color: #192e29;
+  background: #fffdf8;
+  border: 1px solid #c6cebd;
+  border-radius: 3px;
+}
+.merchant-studio .studio-search input {
+  font-size: 11px;
+  min-height: 36px;
+  padding: 8px 10px;
+}
+.merchant-studio .ledger-columns,
+.merchant-studio .ledger-row {
+  grid-template-columns:
+    minmax(150px, 1.8fr) minmax(95px, 1fr) minmax(95px, 1fr)
+    minmax(85px, 0.8fr) minmax(85px, 0.8fr) minmax(90px, 0.8fr);
+  gap: 14px;
+  min-width: 0;
+}
+.merchant-studio .ledger-columns {
+  padding: 15px 12px;
+  font-size: 9px;
+  color: #7a8378;
+  border-bottom: 1px solid #d7d8cd;
+}
+.merchant-studio .ledger-row {
+  padding: 19px 12px;
+  background: transparent;
+  color: #192e29;
+  border: 0;
+  border-bottom: 1px solid #d7d8cd;
+  border-radius: 0;
+  width: 100%;
+  margin: 0;
+  min-height: 78px;
+}
+.merchant-studio .ledger-row:hover {
+  background: #eaece0;
+}
+.merchant-studio .ledger-row.selected {
+  background: #e1e8d8;
+  box-shadow: inset 3px 0 #385e42;
+}
+.merchant-studio .ledger-row strong {
+  color: #192e29;
+  font-size: 12px;
+  font-weight: 600;
+}
+.merchant-studio .ledger-order {
+  display: grid;
+  gap: 6px;
+}
+.merchant-studio .ledger-order small {
+  color: #7a8378;
+  font-size: 9px;
+}
+.merchant-studio .ledger-row .ledger-amount {
+  color: #192e29;
+  font-size: 12px;
+  font-weight: 500;
+}
+.merchant-studio .ledger-row span > small {
+  color: #7a8378;
+  font-size: 9px;
+}
+.merchant-studio .status-chip,
+.merchant-studio .ledger-row .status-chip {
+  font-size: 9px;
+  border: 0;
+  background: transparent;
+  color: #697460;
+  padding: 0;
+  white-space: normal;
+}
+.merchant-studio .status-chip.confirmed,
+.merchant-studio .status-chip.fulfilled {
+  color: #2d6543;
+}
+.merchant-studio .status-chip.expired {
+  color: #878375;
+}
+.merchant-studio .status-chip.awaiting_payment,
+.merchant-studio .status-chip.pending {
+  color: #986b2d;
+}
+.merchant-studio .status-chip.failed,
+.merchant-studio .status-chip.broadcast_unknown {
+  color: #a04431;
+}
+.merchant-studio .ledger-date {
+  color: #7a8378;
+  font-size: 9px;
+}
+.merchant-studio .ledger-layout.has-selection {
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 28px;
+  align-items: start;
+}
+.merchant-studio .has-selection .ledger-columns,
+.merchant-studio .has-selection .ledger-row {
+  grid-template-columns: minmax(110px, 1fr) 92px 100px;
+  gap: 12px;
+}
+.merchant-studio .has-selection .ledger-columns span:nth-child(n + 4),
+.merchant-studio
+  .has-selection
+  .ledger-row
+  :is(.fulfillment-state, .refund-state, .ledger-date) {
+  display: none;
+}
+.merchant-studio .payment-detail {
+  border: 1px solid #cdd3c2;
+  border-top: 3px solid #506e45;
+  padding: 24px;
+  min-width: 0;
+  position: static;
+}
+.merchant-studio .payment-detail h2 {
+  font-family: Georgia, serif;
+  font-size: 27px;
+  font-weight: 400;
+  color: #192e29;
+}
+.merchant-studio .detail-amount {
+  color: #192e29;
+  font-size: 32px;
+  font-weight: 500;
+}
+.merchant-studio .payment-lifecycle {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  margin: 24px 0;
+}
+.merchant-studio .payment-lifecycle li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 3px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0 0 25px;
+  position: relative;
+}
+.merchant-studio .payment-lifecycle li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 30px;
+  height: calc(100% - 30px);
+  border-left: 1px solid #b9c6ac;
+}
+.merchant-studio .payment-lifecycle li > span {
+  grid-row: span 2;
+  border: 1px solid #c4ccba;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: #718065;
+  background: #f3f2e9;
+}
+.merchant-studio .payment-lifecycle li[data-state="complete"] > span {
+  background: #d8ecc9;
+  color: #305e36;
+  border-color: #b8d3a9;
+}
+.merchant-studio .payment-lifecycle strong {
+  color: #243e2e;
+  font-size: 12px;
+}
+.merchant-studio .payment-lifecycle small {
+  color: #77816d;
+  font-size: 10px;
+}
+.merchant-studio .payment-detail dl {
+  border-top: 1px solid #d7d8cd;
+}
+.merchant-studio .payment-detail dl > div {
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e3d7;
+}
+.merchant-studio dt,
+.merchant-studio .hint,
+.merchant-studio .helper {
+  color: #6b746c;
+}
+.merchant-studio dd {
+  color: #243e2e;
+  overflow-wrap: anywhere;
+}
+.merchant-studio .empty-state {
+  background: #eeefe4;
+  color: #192e29;
+  border: 0;
+  border-radius: 0;
+  padding: 40px 24px;
+}
+.merchant-studio .empty-state p {
+  color: #6b746c;
+}
+.merchant-studio footer {
+  color: #6b746c;
+  border-color: #d7d8cd;
+  margin-top: 40px;
+}
+.merchant-studio footer a {
+  color: #365944;
+}
+.merchant-studio :focus-visible {
+  outline: 2px solid #547c42;
+  outline-offset: 4px;
+}
+@media (max-width: 1200px) and (min-width: 901px) {
+  .merchant-studio .ledger-layout.has-selection {
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 18px;
+  }
+  .merchant-studio .ledger-columns,
+  .merchant-studio .ledger-row {
+    grid-template-columns: minmax(140px, 1.5fr) 100px 100px 90px 90px;
+  }
+  .merchant-studio .ledger-date {
+    display: none;
+  }
+  .merchant-studio .ledger-columns > span:last-child {
+    display: none;
+  }
+  .merchant-studio .has-selection .ledger-row,
+  .merchant-studio .has-selection .ledger-columns {
+    grid-template-columns: minmax(100px, 1fr) 85px;
+  }
+  .merchant-studio .has-selection .payment-state {
+    grid-column: 1 / -1;
+  }
+  .merchant-studio .has-selection .ledger-columns span:nth-child(3) {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .merchant-studio {
+    display: block;
+    padding: 0 0 80px;
+  }
+  .merchant-studio .studio-rail {
+    inset: auto 0 0;
+    width: 100%;
+    padding: 6px 10px max(6px, env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid #48604b;
+  }
+  .studio-rail .studio-mark {
+    display: none;
+  }
+  .studio-destinations,
+  .studio-rail-bottom {
+    display: contents;
+  }
+  .studio-rail a:not(.studio-mark) {
+    min-height: 52px;
+    gap: 4px;
+  }
+  .merchant-studio .studio-header {
+    padding: 18px;
+  }
+  .studio-identity {
+    gap: 12px;
+  }
+  .studio-identity > span {
+    max-width: 110px;
+    font-size: 10px;
+  }
+  .studio-network {
+    font-size: 8px;
+  }
+  .studio-page {
+    padding: 26px 18px;
+  }
+  .merchant-studio .dashboard-title {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-bottom: 24px;
+  }
+  .merchant-studio .dashboard-title h1 {
+    font-size: 40px;
+  }
+  .merchant-studio .dashboard-title .primary {
+    width: auto;
+    font-size: 11px;
+    padding: 12px 16px;
+  }
+  .merchant-studio .summary-grid {
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 28px;
+  }
+  .merchant-studio .summary-grid article {
+    display: block;
+    padding: 18px 12px;
+  }
+  .merchant-studio .summary-grid article:first-child {
+    grid-column: 1/-1;
+    padding: 20px 16px;
+  }
+  .merchant-studio .summary-grid article:nth-child(2) {
+    border-left: 0;
+  }
+  .merchant-studio .summary-grid strong,
+  .merchant-studio .summary-grid article + article strong {
+    font-size: 24px;
+  }
+  .merchant-studio .summary-grid article:first-child strong {
+    font-size: 36px;
+  }
+  .merchant-studio .summary-grid p,
+  .merchant-studio .summary-grid article + article p {
+    display: block;
+    font-size: 9px;
+  }
+  .studio-tools {
+    flex-wrap: wrap;
+    gap: 0;
+    padding-bottom: 12px;
+  }
+  .studio-tabs {
+    width: 100%;
+  }
+  .studio-search {
+    max-width: none;
+    width: 100%;
+  }
+  .merchant-studio .studio-search input {
+    width: 100%;
+    min-height: 44px;
+  }
+  .merchant-studio .ledger-columns {
+    display: none;
+  }
+  .merchant-studio .ledger-row,
+  .merchant-studio .has-selection .ledger-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+    padding: 20px 0;
+  }
+  .merchant-studio .ledger-row .ledger-amount {
+    text-align: right;
+    font-size: 13px;
+  }
+  .merchant-studio .ledger-row .payment-state {
+    grid-column: 1/-1;
+  }
+  .merchant-studio .ledger-row .fulfillment-state,
+  .merchant-studio .ledger-row .refund-state {
+    display: inline-flex;
+    font-size: 9px;
+    padding: 0;
+    border: 0;
+  }
+  .merchant-studio .ledger-row .ledger-date {
+    display: none;
+  }
+  .merchant-studio .ledger-row.selected {
+    padding-inline: 12px;
+  }
+  .merchant-studio .ledger-layout,
+  .merchant-studio .ledger-layout.has-selection {
+    display: block;
+  }
+  .merchant-studio .ledger-layout.has-selection .ledger {
+    display: none;
+  }
+  .merchant-studio.detail-open :is(.dashboard-title, .summary-grid) {
+    display: none;
+  }
+  .merchant-studio .payment-detail {
+    padding: 20px 16px;
+  }
+  .merchant-studio .payment-detail h2 {
+    font-size: 30px;
+  }
+  .merchant-studio .new-payment,
+  .merchant-studio .payment-link-result {
+    padding: 20px 16px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .merchant-studio .ledger-row {
+    transition: background-color 120ms ease;
+  }
+}
+
+.merchant-studio .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.merchant-studio .info-panel,
+.merchant-studio .refund-review {
+  background: #eef0e3;
+  color: #243e2e;
+  border: 1px solid #bfcdb1;
+  border-radius: 3px;
+}
+.merchant-studio .info-panel p {
+  color: #61705c;
+}
+.merchant-studio .refund-instructions,
+.merchant-studio .fulfillment-panel p {
+  color: #61705c;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.merchant-studio .warning {
+  color: #8c472d;
+  background: #f7eadb;
+  border-color: #dcc3a3;
+}
+.merchant-studio .empty-state::before {
+  border-color: #537847;
+}
+
+@media (max-width: 900px) {
+  .merchant-studio .dashboard-title {
+    text-align: left;
+    justify-content: space-between;
+  }
+  .merchant-studio .ledger-row .ledger-amount {
+    display: block;
+    white-space: nowrap;
+  }
+  .merchant-studio .ledger-row .ledger-amount small {
+    display: inline;
+  }
+  .merchant-studio .summary-grid article + article strong {
+    display: block;
+    margin: 12px 0 8px;
+  }
+  .merchant-studio .summary-grid article + article p {
+    line-height: 1.6;
+  }
+}
+/* Checkpoint 2: one workspace across merchant screens. */
+.studio-account {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.merchant-studio .studio-account button {
+  background: transparent;
+  color: #365944;
+  border: 0;
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 11px;
+}
+.studio-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 36px;
+  margin-bottom: 42px;
+}
+.studio-received {
+  padding: 32px;
+  background: #e6ebdc;
+  border-block: 1px solid #c9cec0;
+  position: relative;
+}
+.studio-received h2 {
+  font-family: Georgia, serif;
+  font-size: 25px;
+  font-weight: 400;
+  margin: 12px 0;
+}
+.studio-received > strong {
+  font-size: clamp(40px, 5vw, 64px);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  display: block;
+  margin: 16px 0 10px;
+}
+.studio-received strong small {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.studio-received > p:not(.eyebrow) {
+  color: #61705f;
+  font-size: 12px;
+}
+.studio-received > span {
+  font-size: 11px;
+  line-height: 1.8;
+  display: block;
+  margin-top: 28px;
+  color: #61705f;
+}
+.studio-received a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.studio-attention h2 {
+  font-family: Georgia, serif;
+  font-size: 25px;
+  font-weight: 400;
+  margin: 0 0 12px;
+}
+.studio-attention > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-bottom: 1px solid #d7d8cd;
+  font-size: 13px;
+}
+.studio-attention a small {
+  display: block;
+  margin-top: 6px;
+  color: #6b746c;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.studio-attention a strong {
+  font-size: 28px;
+  font-weight: 400;
+}
+.studio-record-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border-top: 1px solid #d7d8cd;
+}
+.studio-record-list li {
+  border-bottom: 1px solid #d7d8cd;
+}
+.studio-record-list a {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.6fr) minmax(100px, 0.7fr) minmax(140px, 1fr)
+    130px;
+  align-items: center;
+  gap: 24px;
+  padding: 22px 12px;
+  min-height: 82px;
+}
+.studio-record-list a:hover {
+  background: #e6ebdc;
+}
+.studio-record-name {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.studio-record-name strong {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.studio-record-name small {
+  font-size: 10px;
+  color: #77816d;
+  overflow-wrap: anywhere;
+}
+.studio-record-value {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.studio-record-value > small {
+  color: #6b746c;
+  font-size: 9px;
+}
+.studio-record-value > small:last-child:not(:first-of-type) {
+  display: block;
+  margin-top: 6px;
+}
+.studio-record-state {
+  display: grid;
+  gap: 8px;
+}
+.studio-record-state > small {
+  color: #6b746c;
+  font-size: 10px;
+}
+.studio-record-date {
+  font-size: 10px;
+  color: #77816d;
+  line-height: 1.8;
+}
+.studio-context {
+  max-width: 760px;
+  color: #61705f;
+  font-size: 13px;
+  line-height: 1.8;
+  margin-bottom: 28px;
+}
+.studio-tab-count {
+  margin-left: 7px;
+  font-size: 9px;
+  color: #77816d;
+}
+.studio-refresh {
+  margin-top: 24px;
+}
+.merchant-studio .settings-grid {
+  gap: 24px;
+  align-items: start;
+}
+.merchant-studio .settings-grid .panel {
+  padding: 26px;
+  min-width: 0;
+}
+.merchant-studio .settings-grid h2,
+.studio-funds h1,
+.studio-funds h2 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+.merchant-studio .settings-grid h2 {
+  margin-top: 0;
+  font-size: 25px;
+}
+.merchant-studio .settings-grid :is(p, .privacy) {
+  color: #61705f;
+  line-height: 1.8;
+  font-size: 12px;
+}
+.merchant-studio .settings-grid :is(input, textarea) {
+  max-width: 100%;
+}
+.merchant-studio .settings-grid dd {
+  overflow-wrap: anywhere;
+  margin-left: 0;
+  max-width: 58%;
+}
+.merchant-studio .settings-grid dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+.merchant-studio .studio-funds > h1 {
+  font-size: 46px;
+  margin: 12px 0;
+}
+.studio-funds > p {
+  color: #61705f;
+  font-size: 13px;
+  line-height: 1.8;
+  max-width: 800px;
+}
+.merchant-studio .studio-funds .payment-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 22px 26px;
+  background: #e6ebdc;
+  border: 1px solid #c9cec0;
+  border-radius: 3px;
+  max-width: 800px;
+  gap: 0 24px;
+}
+.merchant-studio .studio-funds .payment-summary :is(dt, dd) {
+  padding: 14px 0;
+  border-bottom: 1px solid #c9cec0;
+  font-size: 13px;
+  margin: 0;
+  background: transparent;
+}
+.merchant-studio .studio-funds .payment-summary dd {
+  text-align: right;
+  white-space: nowrap;
+}
+.merchant-studio
+  .studio-funds
+  .payment-summary
+  :is(dt, dd):nth-last-child(-n + 2) {
+  color: #192e29;
+  font-weight: 600;
+  border: 0;
+}
+.merchant-studio .funds-withdrawal,
+.merchant-studio .funds-review {
+  max-width: 800px;
+  padding: 26px;
+  margin: 26px 0;
+}
+.merchant-studio .funds-withdrawal h2,
+.merchant-studio .funds-review h2 {
+  font-size: 27px;
+  margin-top: 0;
+}
+.merchant-studio .funds-withdrawal > p,
+.merchant-studio .funds-review > p {
+  color: #61705f;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.merchant-studio .withdrawal-record {
+  max-width: 800px;
+  padding: 20px 26px;
+  margin: 16px 0;
+}
+@media (max-width: 1000px) {
+  .studio-record-list a {
+    grid-template-columns: minmax(0, 1.5fr) 100px minmax(110px, 1fr);
+    gap: 16px;
+  }
+  .studio-record-date {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .merchant-studio .studio-rail {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding-inline: 4px;
+  }
+  .studio-account {
+    gap: 12px;
+  }
+  .studio-identity > span {
+    display: none;
+  }
+  .studio-overview-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-bottom: 32px;
+  }
+  .studio-received {
+    padding: 24px;
+  }
+  .studio-received > strong {
+    font-size: 48px;
+  }
+  .studio-record-list a {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 20px 0;
+    gap: 12px;
+  }
+  .studio-record-value {
+    text-align: right;
+    font-size: 14px;
+  }
+  .studio-record-state {
+    grid-column: 1 / -1;
+  }
+  .merchant-studio .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .merchant-studio .settings-grid .panel,
+  .merchant-studio .funds-withdrawal,
+  .merchant-studio .funds-review {
+    padding: 20px 16px;
+  }
+  .merchant-studio .studio-funds .payment-summary {
+    padding: 12px 16px;
+    gap: 0 14px;
+  }
+  .merchant-studio .studio-funds .payment-summary :is(dt, dd) {
+    font-size: 11px;
+  }
+  .merchant-studio .studio-tabs {
+    gap: 16px;
+  }
+  .merchant-studio .studio-tabs button {
+    font-size: 10px;
+  }
+  .studio-tab-count {
+    margin-left: 4px;
+  }
+}

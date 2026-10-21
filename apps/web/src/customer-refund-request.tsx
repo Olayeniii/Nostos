@@ -25,8 +25,9 @@ export function CustomerRefundRequest({
     >
       <h2>Need a refund?</h2>
       <p>
-        Request a full or partial refund from the merchant. No new address is
-        needed. Refunds use the route supplied with this payment.
+        {receipt.canRequestRefund
+          ? "Request a full or partial refund from the merchant. No new address is needed. Refunds use the route supplied with this payment."
+          : "Review your requests and the merchant's responses here. Current refund availability is shown below."}
       </p>
       {receipt.refundPolicy && (
         <div className="refund-policy">
@@ -41,7 +42,9 @@ export function CustomerRefundRequest({
         <article className="refund-request" key={r.id}>
           <div className="section-head">
             <strong>{zec(r.amountZat)} ZEC requested</strong>
-            <span className="status-chip">
+            <span
+              className={`status-chip ${r.status === "settled" ? "confirmed" : r.status === "declined" ? "failed" : "pending"}`}
+            >
               {r.status === "requested"
                 ? "Awaiting merchant decision"
                 : r.status === "settled"

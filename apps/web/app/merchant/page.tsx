@@ -1,50 +1,33 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { AppHeader, AppFooter } from "../../src/shell.js";
+import { AppFooter } from "../../src/shell.js";
+import { MerchantWorkspace } from "../../src/merchant-workspace.js";
 import { StateLabel } from "../../src/status-label.js";
 import { useRecord } from "../../src/use-record.js";
 import { requestJson, parseZec } from "../../src/requests.js";
-import { zec, date, type ReceiptData } from "../../src/receipt-card.js";
+import { zec, date } from "../../src/receipt-card.js";
 import { paymentSummary } from "../../src/payment-summary.js";
 import { MerchantRefundRequest } from "../../src/merchant-refund-request.js";
-import type { PaymentView } from "../../../api/src/index.js";
-type RecordData = ReceiptData & {
-  id: string;
-  paymentStatus: string;
-  payment?: PaymentView;
-};
-type Dashboard = {
-  merchant: { name: string; ready: boolean };
-  records: RecordData[];
-  syncWarning: boolean;
-};
-function status(r: RecordData) {
-  if (r.status === "failed")
-    return (r.confirmedRefundAmountZat ?? 0) > 0
-      ? "Partially refunded"
-      : "Refund attempt closed";
-  return r.refundAmountZat > 0
-    ? r.status === "confirmed"
-      ? (r.remainingAmountZat ?? 0) > 0
-        ? "Partially refunded"
-        : "Refund confirmed"
-      : "Refund pending"
-    : r.paymentStatus === "confirmed"
-      ? "Paid"
-      : r.paymentStatus === "broadcast"
-        ? "Confirming"
-        : "Awaiting payment";
-}
+import {
+  type Dashboard,
+  paymentRecordStatus as status,
+} from "../../src/merchant-records.js";
 export default function Merchant() {
   const { data, loading, warning, refresh } = useRecord<Dashboard>(
     "/api/product/dashboard",
   );
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [copyNotice, setCopyNotice] = useState("");
+  const shareRef = useRef<HTMLElement>(null);
+  const detailRef = useRef<HTMLElement>(null);
+  const selectedRow = useRef<HTMLButtonElement | null>(null);
   const [share, setShare] = useState("");
   const [qr, setQr] = useState("");
   const [draft, setDraft] = useState("");
@@ -56,8 +39,54 @@ export default function Merchant() {
   const [uncertain, setUncertain] = useState(false);
   const submitting = useRef(false);
   const records = data?.records ?? [];
+  const filteredRecords = records.filter((record) => {
+    const match = `${record.description ?? ""} ${record.orderReference}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase());
+    return (
+      match &&
+      (filter === "all" ||
+        (filter === "confirmed"
+          ? record.paymentStatus === "confirmed"
+          : record.paymentStatus !== "confirmed" &&
+            record.paymentStatus !== "expired"))
+    );
+  });
   const current = records.find((r) => r.id === selected);
   const summary = paymentSummary(records);
+  const entryHandled = useRef(false);
+  useEffect(() => {
+    if (!data || entryHandled.current) return;
+    entryHandled.current = true;
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const paymentId = params.get("payment");
+    if (paymentId && data.records.some((record) => record.id === paymentId))
+      setSelected(paymentId);
+    if (params.has("new") && data.merchant.ready) setCreating(true);
+  }, [data]);
+
+  useEffect(() => {
+    if (!selected) {
+      selectedRow.current?.focus();
+      return;
+    }
+    detailRef.current?.focus();
+    if (window.matchMedia("(max-width: 900px)").matches)
+      detailRef.current?.scrollIntoView({ block: "start" });
+  }, [selected]);
+  function clearPaymentHash() {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    if (params.has("payment") || params.has("new"))
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname + window.location.search,
+      );
+  }
+  function closeDetail() {
+    setSelected("");
+    clearPaymentHash();
+  }
   const safe =
     !warning && !data?.syncWarning && !loading && !busy && !uncertain;
   async function post<T>(action: string, body: unknown) {
@@ -71,7 +100,16 @@ export default function Merchant() {
       30000,
     );
   }
+  useEffect(() => {
+    if (share) {
+      shareRef.current?.focus();
+      shareRef.current?.scrollIntoView({ block: "start" });
+    }
+  }, [share]);
   async function showLink(token: string) {
+    clearPaymentHash();
+    setSelected("");
+    setCopyNotice("");
     const link = `${window.location.origin}/checkout#${token}`;
     setShare(link);
     setQr(
@@ -83,33 +121,29 @@ export default function Merchant() {
     );
   }
   return (
-    <main className="product-app dashboard-app">
-      <AppHeader role="Merchant" />
-      <nav className="workspace-nav">
-        <Link aria-current="page" href="/merchant">
-          Payments
-        </Link>
-        <Link href="/merchant/funds">Funds</Link>
-        <Link href="/merchant/settings">Store settings</Link>
-        <button
-          className="text-button"
-          onClick={async () => {
-            try {
-              await post("logout", {});
-              window.location.assign("/sign-in");
-            } catch {
-              setError("Could not sign out. Try again.");
-            }
-          }}
-        >
-          Sign out
-        </button>
-      </nav>
+    <MerchantWorkspace
+      name={data?.merchant.name || "Merchant workspace"}
+      detailOpen={!!current}
+      onPaymentsHome={() => {
+        if (busy) return;
+        closeDetail();
+        setCreating(false);
+        setShare("");
+      }}
+      onSignOut={async () => {
+        try {
+          await post("logout", {});
+          window.location.assign("/sign-in");
+        } catch {
+          setError("Could not sign out. Try again.");
+        }
+      }}
+    >
       <div className="dashboard-title">
         <div>
-          <p className="eyebrow">MERCHANT WORKSPACE</p>
-          <h1>{data?.merchant.name || "Your payments"}</h1>
-          <p>Track incoming payments and send private refunds.</p>
+          <p className="eyebrow">WORKSPACE / PAYMENTS</p>
+          <h1>Payments</h1>
+          <p>Private in. A way back.</p>
         </div>
         <button
           className="primary"
@@ -120,7 +154,7 @@ export default function Merchant() {
           }}
           disabled={!data?.merchant.ready}
         >
-          + Create payment
+          New payment +
         </button>
       </div>
       {data && !data.merchant.ready && (
@@ -131,25 +165,33 @@ export default function Merchant() {
       )}
       <section className="summary-grid" aria-label="Payment totals">
         <article>
-          <span>Received</span>
+          <span>Total received</span>
           <strong>
-            {zec(summary.receivedZat)} <small>ZEC</small>
+            {data ? zec(summary.receivedZat) : "..."} <small>ZEC</small>
           </strong>
-          <p>{summary.confirmedPayments} confirmed payments</p>
+          <p>
+            {data
+              ? `${summary.confirmedPayments} confirmed payments`
+              : "Waiting for payment records"}
+          </p>
         </article>
         <article>
           <span>Available to refund</span>
           <strong>
-            {zec(summary.availableZat)} <small>ZEC</small>
+            {data ? zec(summary.availableZat) : "..."} <small>ZEC</small>
           </strong>
-          <p>Remaining value eligible for refund</p>
+          <p>Payment value, subject to wallet funding</p>
         </article>
         <article>
           <span>Refunded</span>
           <strong>
-            {zec(summary.refundedZat)} <small>ZEC</small>
+            {data ? zec(summary.refundedZat) : "..."} <small>ZEC</small>
           </strong>
-          <p>{summary.confirmedRefunds} confirmed refunds</p>
+          <p>
+            {data
+              ? `${summary.confirmedRefunds} confirmed refunds`
+              : "Waiting for refund records"}
+          </p>
         </article>
       </section>
       {(warning || data?.syncWarning) && (
@@ -169,7 +211,10 @@ export default function Merchant() {
             <h2>Create payment request</h2>
             <button
               className="text-button"
-              onClick={() => setCreating(false)}
+              onClick={() => {
+                setCreating(false);
+                clearPaymentHash();
+              }}
               disabled={busy}
             >
               Close
@@ -239,7 +284,12 @@ export default function Merchant() {
         </section>
       )}
       {share && (
-        <section className="share-panel panel">
+        <section
+          className="share-panel panel"
+          aria-label="Private payment link"
+          ref={shareRef}
+          tabIndex={-1}
+        >
           <div>
             <h2>Payment link ready</h2>
             <p>
@@ -248,18 +298,21 @@ export default function Merchant() {
             </p>
             <input aria-label="Private payment link" readOnly value={share} />
             <button
-              className="secondary"
+              className="primary"
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(share);
-                  setError("Payment link copied.");
+                  setCopyNotice("Payment link copied.");
                 } catch {
-                  setError("Select and copy the link above.");
+                  setCopyNotice("Select and copy the link above.");
                 }
               }}
             >
               Copy payment link
             </button>
+            <p role="status" className="copy-notice">
+              {copyNotice}
+            </p>
             <a
               className="text-button"
               href={share}
@@ -283,8 +336,12 @@ export default function Merchant() {
         <section className="ledger panel">
           <div className="section-head">
             <div>
-              <h2>Payments</h2>
-              <p>{records.length} payment requests</p>
+              <h2 className="studio-list-heading">Payment ledger</h2>
+              <p>
+                {data
+                  ? `${filteredRecords.length} of ${records.length} payment requests`
+                  : "Waiting for records"}
+              </p>
             </div>
             <button
               className="text-button"
@@ -293,6 +350,32 @@ export default function Merchant() {
             >
               Refresh
             </button>
+          </div>
+          <div className="studio-tools">
+            <div className="studio-tabs" aria-label="Filter payments">
+              {[
+                ["all", "All"],
+                ["awaiting", "Awaiting"],
+                ["confirmed", "Confirmed"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  aria-pressed={filter === value}
+                  onClick={() => setFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="studio-search">
+              <span className="sr-only">Find a payment</span>
+              <input
+                type="search"
+                placeholder="Find a payment"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
           </div>
           {loading && <StateLabel state="loading" text="Checking payments" />}
           <div className="ledger-columns" aria-hidden="true">
@@ -303,7 +386,7 @@ export default function Merchant() {
             <span>Refund</span>
             <span>Date</span>
           </div>
-          {records.length === 0 && !loading ? (
+          {records.length === 0 && !loading && !!data ? (
             <div className="empty-state">
               <h3>Your first payment starts here.</h3>
               <p>
@@ -319,11 +402,13 @@ export default function Merchant() {
               </button>
             </div>
           ) : (
-            records.map((r) => (
+            filteredRecords.map((r) => (
               <button
                 key={r.id}
                 className={`ledger-row ${selected === r.id ? "selected" : ""}`}
-                onClick={() => {
+                aria-pressed={selected === r.id}
+                onClick={(event) => {
+                  selectedRow.current = event.currentTarget;
                   setSelected(r.id);
                   setReview(undefined);
                   setDraft("");
@@ -331,34 +416,70 @@ export default function Merchant() {
                   setUncertain(false);
                 }}
               >
-                <span>
+                <span className="ledger-order">
                   <strong>{r.description || r.orderReference}</strong>
+                  <small>
+                    {r.orderReference.length > 22
+                      ? `${r.orderReference.slice(0, 18)}...`
+                      : r.orderReference}
+                  </small>
                 </span>
                 <span className="ledger-amount">
                   {zec(r.paymentAmountZat)} <small>ZEC</small>
                 </span>
                 <span
-                  className={`status-chip ${r.paymentStatus === "confirmed" ? "success" : ""}`}
+                  className={`status-chip payment-state ${r.paymentStatus}`}
                 >
-                  {r.paymentStatus}
+                  {r.paymentStatus.replaceAll("_", " ")}
                 </span>
-                <span className="status-chip">
+                <span
+                  className={`status-chip fulfillment-state ${r.fulfillment ?? "pending"}`}
+                >
+                  <span className="mobile-label">Fulfillment</span>
                   {r.fulfillment ?? "pending"}
                 </span>
-                <span className="status-chip">
+                <span className={`status-chip refund-state ${r.status}`}>
+                  <span className="mobile-label">Refund</span>
                   {r.refundAmountZat > 0 ? status(r) : "No refund"}
                 </span>
                 <span className="ledger-date">{date(r.createdAt)}</span>
               </button>
             ))
           )}
+          {data && records.length > 0 && filteredRecords.length === 0 && (
+            <div className="empty-state">
+              <h3>No matching payments</h3>
+              <p>Try another order name, reference, or payment filter.</p>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setQuery("");
+                  setFilter("all");
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
         </section>
         {current && (
-          <aside className="payment-detail panel">
+          <aside
+            className="payment-detail panel"
+            ref={detailRef}
+            tabIndex={-1}
+            aria-label="Payment details"
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !busy) closeDetail();
+            }}
+          >
             <div className="section-head">
               <p className="eyebrow">PAYMENT DETAILS</p>
-              <button className="text-button" onClick={() => setSelected("")}>
-                Close
+              <button
+                className="text-button"
+                onClick={closeDetail}
+                disabled={busy}
+              >
+                Back to payments
               </button>
             </div>
             <button
@@ -373,7 +494,54 @@ export default function Merchant() {
             <div className="detail-amount">
               {zec(current.paymentAmountZat)} <span>ZEC</span>
             </div>
-            <span className="status-chip">{status(current)}</span>
+            <span
+              className={`status-chip ${current.status === "failed" || current.refundAmountZat > 0 ? current.status : current.paymentStatus}`}
+            >
+              {status(current)}
+            </span>
+            <ol className="payment-lifecycle" aria-label="Payment lifecycle">
+              <li
+                data-state={
+                  current.paymentStatus === "confirmed" ? "complete" : "waiting"
+                }
+              >
+                <span>01</span>
+                <strong>Pay</strong>
+                <small>
+                  {current.paymentStatus === "confirmed"
+                    ? "Confirmed"
+                    : current.paymentStatus === "expired"
+                      ? "Expired"
+                      : "Awaiting confirmation"}
+                </small>
+              </li>
+              <li
+                data-state={
+                  current.fulfillment === "fulfilled" ? "complete" : "waiting"
+                }
+              >
+                <span>02</span>
+                <strong>Fulfill</strong>
+                <small>{current.fulfillment ?? "pending"}</small>
+              </li>
+              <li
+                data-state={
+                  (current.confirmedRefundAmountZat ?? 0) > 0
+                    ? "complete"
+                    : "waiting"
+                }
+              >
+                <span>03</span>
+                <strong>Refund</strong>
+                <small>
+                  {current.refundAmountZat > 0 || current.status === "failed"
+                    ? status(current)
+                    : current.payment?.canRefund
+                      ? "Available if needed"
+                      : "Not currently available"}
+                </small>
+              </li>
+            </ol>
             <dl>
               <div>
                 <dt>Received</dt>
@@ -390,7 +558,7 @@ export default function Merchant() {
                 </div>
               )}
               <div>
-                <dt>Remaining value</dt>
+                <dt>Remaining payment value</dt>
                 <dd>{zec(current.payment?.availableZat ?? 0)} ZEC</dd>
               </div>
               <div>
@@ -399,7 +567,9 @@ export default function Merchant() {
                   {current.payment?.canRefund
                     ? "Route supplied with this payment"
                     : current.payment
-                      ? "See refund status below"
+                      ? current.routeClosedReason === "expired"
+                        ? "Refund window ended"
+                        : "Not currently available"
                       : "Waiting for payment"}
                 </dd>
               </div>
@@ -410,7 +580,7 @@ export default function Merchant() {
             </dl>
             {current.paymentStatus === "confirmed" && (
               <section className="fulfillment-panel">
-                <h3>Fulfillment</h3>
+                <h3>02 / Fulfillment</h3>
                 <p>
                   Merchant-reported state: {current.fulfillment ?? "pending"}. A
                   failed fulfillment does not send a refund automatically.
@@ -476,6 +646,7 @@ export default function Merchant() {
                 </button>
               </div>
             )}
+            <h3 className="refund-section-title">03 / Refund if needed</h3>
             {current.refundRequests?.map((r) => (
               <MerchantRefundRequest
                 key={r.id}
@@ -485,6 +656,25 @@ export default function Merchant() {
                 onRefresh={() => void refresh()}
               />
             ))}
+            {(current.refunds?.length ?? 0) > 0 && (
+              <section className="refund-history" aria-label="Recorded refunds">
+                <h4>Recorded refunds</h4>
+                {current.refunds!.map((refund) => (
+                  <div key={refund.id}>
+                    <strong>{zec(refund.amountZat)} ZEC</strong>
+                    <p>
+                      {refund.status === "confirmed"
+                        ? "Confirmed"
+                        : refund.status === "failed"
+                          ? "Closed without settlement"
+                          : refund.status === "broadcast_unknown"
+                            ? "Outcome unknown, awaiting reconciliation"
+                            : "Processing, awaiting confirmation"}
+                    </p>
+                  </div>
+                ))}
+              </section>
+            )}
             {current.payment?.canRefund && (
               <p className="refund-instructions">
                 NOSTOS uses the refund route supplied with this payment. No
@@ -608,7 +798,13 @@ export default function Merchant() {
                     : current.canRecoverRoute
                       ? "Verify the original route to refund the remaining value."
                       : "The recorded refund history is shown above. Open requests need a merchant decision."
-                  : "Refunding becomes available after a valid shielded payment is confirmed."}
+                  : (current.pendingRefundAmountZat ?? 0) > 0
+                    ? "A refund is already processing. Wait for confirmation or reconciliation before another refund. Do not send again."
+                    : current.routeClosedReason === "expired"
+                      ? "The refund window has ended. No refund is available."
+                      : current.paymentStatus === "confirmed"
+                        ? "No refund is currently available. A valid shielded route and an open refund window are required."
+                        : "Refund eligibility is checked after payment confirmation."}
               </p>
             )}
             <button
@@ -640,6 +836,6 @@ export default function Merchant() {
         )}
       </div>
       <AppFooter />
-    </main>
+    </MerchantWorkspace>
   );
 }

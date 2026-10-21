@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AppHeader, AppFooter } from "../../src/shell.js";
+import { PublicSurface } from "../../src/public-surface.js";
 import { StateLabel } from "../../src/status-label.js";
 import { requestJson, RequestError } from "../../src/requests.js";
 
@@ -111,8 +111,7 @@ export default function CustomerReceipt() {
     };
   }, [access]);
   return (
-    <main className="product-app">
-      <AppHeader role="Customer" />
+    <PublicSurface variant="receipt" role="Customer">
       <section className="workspace-intro">
         <h1>Your private receipt.</h1>
         <p className="lede">
@@ -181,7 +180,6 @@ export default function CustomerReceipt() {
       {loading && !receipt && (
         <StateLabel state="loading" text="Checking your private receipt" />
       )}
-      <AppFooter />
-    </main>
+    </PublicSurface>
   );
 }

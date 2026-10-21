@@ -1,0 +1,48 @@
+name: Merchant UI review
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "scripts/ui/**"
+      - ".github/workflows/merchant-ui.yml"
+permissions:
+  contents: read
+jobs:
+  responsive-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # Final flow review reuses existing images and takes no screenshots.
+      UI_SCREENSHOTS: "0"
+      PLAYWRIGHT_MODULES: /tmp/nostos-ui/node_modules
+      NEXT_TELEMETRY_DISABLED: 1
+      NOSTOS_RETENTION_ENABLED: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Record reviewed source
+        run: git log -1 --format='Review source %H%nParents %P'
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npm install --prefix /tmp/nostos-ui playwright@1.56.1
+      - run: /tmp/nostos-ui/node_modules/.bin/playwright install --with-deps chromium
+      - name: Capture updated source and verify responsive flows
+        run: |
+          pnpm --filter @nostos/web exec next dev --webpack --hostname 127.0.0.1 > /tmp/nostos-after.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for attempt in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/sign-up > /dev/null && break || sleep 1; done
+          curl -fsS http://127.0.0.1:3000/sign-up > /dev/null || { cat /tmp/nostos-after.log; exit 1; }
+          node scripts/ui/merchant-visual.mjs after
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: merchant-ui-review
+          path: |
+            docs/ui-review
+            /tmp/nostos-after.log
