@@ -674,7 +674,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByRole("heading", { name: "Payment link ready", exact: true })
     .waitFor();
   const checkoutLink = await page
-    .getByLabel("Private payment link", { exact: true })
+    .getByRole("textbox", { name: "Private payment link", exact: true })
     .inputValue();
   assert.equal(
     checkoutLink,
@@ -790,6 +790,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     pendingRefundAmountZat: 0,
     remainingAmountZat: 1500000,
     status: "confirmed",
+    canRequestRefund: true,
     refundRequests: flowRecord.refundRequests.map((request) => ({
       ...request,
       status: "settled",
@@ -808,6 +809,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByText("fulfilled (merchant reported)", { exact: true })
     .waitFor();
   await page.getByText("Refund confirmed", { exact: true }).first().waitFor();
+  await page
+    .getByText("Remaining payment value: 0.015 ZEC.", { exact: true })
+    .waitFor();
   await capture("flow-settled-receipt");
   await visit("http://127.0.0.1:3000/merchant/funds");
   await page
