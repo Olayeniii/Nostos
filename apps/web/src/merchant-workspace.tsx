@@ -1,11 +1,18 @@
 "use client";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { requestJson } from "./requests.js";
 import { Mark } from "./mark.js";
 import { NetworkLabel } from "./network-context.js";
 import "./merchant-workspace.css";
 
-function WorkspaceIcon({ kind }: { kind: "payments" | "funds" | "settings" }) {
+function WorkspaceIcon({
+  kind,
+}: {
+  kind: "overview" | "payments" | "refunds" | "funds" | "settings";
+}) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -16,7 +23,18 @@ function WorkspaceIcon({ kind }: { kind: "payments" | "funds" | "settings" }) {
       strokeWidth="1.5"
       aria-hidden="true"
     >
-      {kind === "payments" ? (
+      {kind === "overview" ? (
+        <>
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </>
+      ) : kind === "refunds" ? (
+        <>
+          <path d="M5 8h9a6 6 0 0 1 0 12h-3M5 8l4-4M5 8l4 4" />
+        </>
+      ) : kind === "payments" ? (
         <>
           <rect x="3" y="5" width="18" height="14" rx="2" />
           <path d="M3 10h18M7 15h4" />
@@ -36,16 +54,50 @@ function WorkspaceIcon({ kind }: { kind: "payments" | "funds" | "settings" }) {
   );
 }
 export function MerchantWorkspace({
-  name,
-  detailOpen,
+  name = "Merchant workspace",
+  detailOpen = false,
   onSignOut,
   children,
 }: {
-  name: string;
-  detailOpen: boolean;
-  onSignOut: () => Promise<void>;
+  name?: string;
+  detailOpen?: boolean;
+  onSignOut?: () => Promise<void>;
   children: ReactNode;
 }) {
+  const pathname = usePathname();
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError("");
+    try {
+      if (onSignOut) await onSignOut();
+      else {
+        await requestJson(
+          "/api/product/logout",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          },
+          15000,
+        );
+        window.location.assign("/sign-in");
+      }
+    } catch {
+      setSignOutError("Could not sign out. Try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
+  const destinations = [
+    { href: "/merchant/overview", kind: "overview", label: "Overview" },
+    { href: "/merchant", kind: "payments", label: "Payments" },
+    { href: "/merchant/refunds", kind: "refunds", label: "Refunds" },
+    { href: "/merchant/funds", kind: "funds", label: "Funds" },
+    { href: "/merchant/settings", kind: "settings", label: "Settings" },
+  ] as const;
   return (
     <main
       className={`product-app dashboard-app merchant-studio ${detailOpen ? "detail-open" : ""}`}
@@ -55,21 +107,16 @@ export function MerchantWorkspace({
           <Mark />
         </Link>
         <div className="studio-destinations">
-          <Link href="/merchant" aria-current="page">
-            <WorkspaceIcon kind="payments" />
-            <span>Payments</span>
-          </Link>
-          <Link href="/merchant/funds">
-            <WorkspaceIcon kind="funds" />
-            <span>Funds</span>
-          </Link>
-        </div>
-        <div className="studio-rail-bottom">
-          <Link href="/merchant/settings">
-            <WorkspaceIcon kind="settings" />
-            <span>Settings</span>
-          </Link>
-          <button onClick={() => void onSignOut()}>Sign out</button>
+          {destinations.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={pathname === item.href ? "page" : undefined}
+            >
+              <WorkspaceIcon kind={item.kind} />
+              <span>{item.label}</span>
+            </Link>
+          ))}
         </div>
       </nav>
       <div className="studio-body">
@@ -80,11 +127,27 @@ export function MerchantWorkspace({
             </Link>
             <span>{name}</span>
           </div>
-          <span className="studio-network">
-            <NetworkLabel />
-          </span>
+          <div className="studio-account">
+            <span className="studio-network">
+              <NetworkLabel />
+            </span>
+            <button
+              className="text-button"
+              disabled={signingOut}
+              onClick={() => void signOut()}
+            >
+              {signingOut ? "Signing out" : "Sign out"}
+            </button>
+          </div>
         </header>
-        <div className="studio-page">{children}</div>
+        <div className="studio-page">
+          {signOutError && (
+            <p role="alert" className="warning">
+              {signOutError}
+            </p>
+          )}
+          {children}
+        </div>
       </div>
     </main>
   );

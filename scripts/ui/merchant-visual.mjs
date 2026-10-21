@@ -104,6 +104,23 @@ const records = [
     canRequestRefund: false,
   },
 ];
+records.push({
+  ...base,
+  id: "order-7",
+  description: "Customer request to review",
+  refundRequests: [
+    {
+      id: "request-7",
+      amountZat: 1000000,
+      reason: "Wrong size received",
+      status: "requested",
+      decisionReason: "",
+      approvedZat: null,
+      createdAt: "2026-10-18T13:00:00Z",
+      decidedAt: null,
+    },
+  ],
+});
 const report = [];
 for (const width of [320, 375, 390, 430, 768, 1440]) {
   const context = await browser.newContext({
@@ -131,6 +148,19 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
         },
       });
     }
+    if (action === "me")
+      return route.fulfill({
+        json: {
+          merchant: {
+            name: "JaraBot",
+            email: "merchant@example.test",
+            ready: true,
+            setupPending: false,
+            refundPolicy: "Refunds within 30 days.",
+            refundWindowDays: 30,
+          },
+        },
+      });
     if (action === "checkout")
       return route.fulfill({
         json: { receipt: customerReceipt, syncWarning: false },
@@ -161,12 +191,13 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     });
     if (
       process.env.UI_SCREENSHOTS !== "0" &&
-      ((width === 1440 && name === "detail") ||
-        (width === 390 && name === "payments"))
+      ((width === 1440 && name === "overview") ||
+        (width === 390 && name === "refunds"))
     ) {
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({
         path: `${out}/${width}-${name}.png`,
-        fullPage: true,
+        fullPage: false,
       });
     }
     const overflow = await page.evaluate(
@@ -265,6 +296,58 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     }
   }
 
+  await page.goto("http://127.0.0.1:3000/merchant/overview");
+  await page
+    .getByRole("heading", { name: "Your store, at a glance." })
+    .waitFor();
+  await page.locator(".studio-record-list a").first().waitFor();
+  assert.equal(
+    await page.locator('.studio-rail [aria-current="page"]').textContent(),
+    "Overview",
+  );
+  await capture("overview");
+  await page.locator(".studio-record-list a").first().click();
+  await page
+    .getByRole("heading", { name: "Studio commission", exact: true })
+    .waitFor();
+  await capture("linked-detail");
+  await page.goto("http://127.0.0.1:3000/merchant/refunds");
+  await page.getByRole("heading", { name: "Refunds", exact: true }).waitFor();
+  await page.locator(".studio-record-list a").first().waitFor();
+  assert.equal(await page.locator(".studio-record-list a").count(), 3);
+  await capture("refunds");
+  await page.getByRole("button", { name: /Needs review/ }).click();
+  assert.equal(await page.locator(".studio-record-list a").count(), 1);
+  await page.getByRole("link", { name: /Customer request to review/ }).click();
+  await page
+    .getByRole("heading", { name: "Customer refund request", exact: true })
+    .waitFor();
+  await capture("linked-customer-request");
+  await page.goto("http://127.0.0.1:3000/merchant/refunds");
+  await page.locator(".studio-record-list a").first().waitFor();
+
+  await page.getByRole("button", { name: /Processing/ }).click();
+  assert.equal(await page.locator(".studio-record-list a").count(), 1);
+  await page
+    .getByRole("link", { name: /Refund awaiting confirmation/ })
+    .click();
+  await page
+    .getByRole("heading", { name: "Refund awaiting confirmation", exact: true })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Review refund", exact: true })
+      .count(),
+    0,
+  );
+  await capture("linked-unknown-refund");
+  await page.goto("http://127.0.0.1:3000/merchant/settings");
+  await page.getByRole("heading", { name: "Merchant profile" }).waitFor();
+  assert.equal(
+    await page.locator('.studio-rail [aria-current="page"]').textContent(),
+    "Settings",
+  );
+  await capture("settings");
   await page.goto("http://127.0.0.1:3000/merchant/funds");
   await page
     .getByRole("button", { name: "Review withdrawal", exact: true })
@@ -306,7 +389,38 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
         .filter({ hasText: "Connection interrupted" })
         .waitFor();
     await capture(state);
+    for (const routeName of ["overview", "refunds"]) {
+      await page.goto(`http://127.0.0.1:3000/merchant/${routeName}`);
+      if (state === "empty")
+        await page
+          .getByRole("heading", {
+            name:
+              routeName === "overview"
+                ? "Ready for your first payment."
+                : "No refund activity yet.",
+          })
+          .waitFor();
+      if (state === "loading")
+        await page
+          .getByText(
+            routeName === "overview"
+              ? "Checking store activity"
+              : "Checking refunds",
+            { exact: true },
+          )
+          .waitFor();
+      if (state === "error")
+        await page
+          .getByRole("alert")
+          .filter({ hasText: "Connection interrupted" })
+          .waitFor();
+      await capture(`${routeName}-${state}`);
+    }
   }
+  assert(
+    posts.every((action) => action === "link"),
+    "Review must not submit spending or account changes",
+  );
   await context.close();
 }
 await browser.close();

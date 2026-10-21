@@ -7,40 +7,13 @@ import { MerchantWorkspace } from "../../src/merchant-workspace.js";
 import { StateLabel } from "../../src/status-label.js";
 import { useRecord } from "../../src/use-record.js";
 import { requestJson, parseZec } from "../../src/requests.js";
-import { zec, date, type ReceiptData } from "../../src/receipt-card.js";
+import { zec, date } from "../../src/receipt-card.js";
 import { paymentSummary } from "../../src/payment-summary.js";
 import { MerchantRefundRequest } from "../../src/merchant-refund-request.js";
-import type { PaymentView } from "../../../api/src/index.js";
-type RecordData = ReceiptData & {
-  id: string;
-  paymentStatus: string;
-  payment?: PaymentView;
-};
-type Dashboard = {
-  merchant: { name: string; ready: boolean };
-  records: RecordData[];
-  syncWarning: boolean;
-};
-function status(r: RecordData) {
-  if (r.status === "broadcast_unknown") return "Refund outcome unknown";
-  if (r.status === "broadcasting") return "Refund being submitted";
-  if (r.status === "failed")
-    return (r.confirmedRefundAmountZat ?? 0) > 0
-      ? "Partially refunded"
-      : "Refund attempt closed";
-  if (r.paymentStatus === "expired") return "Payment expired";
-  return r.refundAmountZat > 0
-    ? r.status === "confirmed"
-      ? (r.remainingAmountZat ?? 0) > 0
-        ? "Partially refunded"
-        : "Refund confirmed"
-      : "Refund pending"
-    : r.paymentStatus === "confirmed"
-      ? "Paid"
-      : r.paymentStatus === "broadcast"
-        ? "Confirming"
-        : "Awaiting payment";
-}
+import {
+  type Dashboard,
+  paymentRecordStatus as status,
+} from "../../src/merchant-records.js";
 export default function Merchant() {
   const { data, loading, warning, refresh } = useRecord<Dashboard>(
     "/api/product/dashboard",
@@ -81,13 +54,25 @@ export default function Merchant() {
   });
   const current = records.find((r) => r.id === selected);
   const summary = paymentSummary(records);
+  const entryHandled = useRef(false);
+  useEffect(() => {
+    if (!data || entryHandled.current) return;
+    entryHandled.current = true;
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const paymentId = params.get("payment");
+    if (paymentId && data.records.some((record) => record.id === paymentId))
+      setSelected(paymentId);
+    if (params.has("new") && data.merchant.ready) setCreating(true);
+  }, [data]);
+
   useEffect(() => {
     if (!selected) {
       selectedRow.current?.focus();
       return;
     }
     detailRef.current?.focus();
-    detailRef.current?.scrollIntoView({ block: "start" });
+    if (window.matchMedia("(max-width: 900px)").matches)
+      detailRef.current?.scrollIntoView({ block: "start" });
   }, [selected]);
   function closeDetail() {
     setSelected("");

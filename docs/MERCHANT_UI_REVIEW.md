@@ -1,3 +1,33 @@
+# Merchant workspace: checkpoint 2
+
+Overview and Refunds now have real routes. The shared forest rail and phone menu
+link Overview, Payments, Refunds, Funds, and Settings, with the current screen
+marked. Sign out is in the header so five phone destinations remain usable.
+
+Overview derives received totals, fulfillment work, refund review work, and
+processing refunds from the existing dashboard response. It explicitly separates
+payment history totals from wallet funds. Refunds lists only recorded requests
+and refund activity, with review / processing / history filters. Active or unknown
+refund events take priority over older settled record status. No route validity
+is inferred from a confirmed payment. All review links open the existing payment
+details, where existing availability checks and send guards remain in force.
+
+Funds and Settings use the same workspace and light surfaces. Their action
+handlers, validation, password requirements, refund reserves, review step, and
+confirmation behavior are unchanged. Customer-facing screens remain for the next
+checkpoint. No backend or production changes are included.
+
+Validation includes the existing workflows plus the new routes, current-menu
+state, links to payment details, refund processing filters, and empty / loading /
+error states at six widths. Only two new images are requested: a desktop Overview
+and phone Refunds viewport. Captures reset scroll position and use viewport bounds
+to show the fixed rail or bottom menu accurately. Further checks should disable
+screenshots unless visual evidence of a defect requires a focused capture.
+
+The previous checkpoint reports follow as historical context.
+
+---
+
 # Approved direction: checkpoint 1
 
 This checkpoint replaces the Payments presentation with the second approved concept:

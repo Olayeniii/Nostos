@@ -714,3 +714,331 @@
     line-height: 1.6;
   }
 }
+/* Checkpoint 2: one workspace across merchant screens. */
+.studio-account {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.merchant-studio .studio-account button {
+  background: transparent;
+  color: #365944;
+  border: 0;
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 11px;
+}
+.studio-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 36px;
+  margin-bottom: 42px;
+}
+.studio-received {
+  padding: 32px;
+  background: #e6ebdc;
+  border-block: 1px solid #c9cec0;
+  position: relative;
+}
+.studio-received h2 {
+  font-family: Georgia, serif;
+  font-size: 25px;
+  font-weight: 400;
+  margin: 12px 0;
+}
+.studio-received > strong {
+  font-size: clamp(40px, 5vw, 64px);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  display: block;
+  margin: 16px 0 10px;
+}
+.studio-received strong small {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.studio-received > p:not(.eyebrow) {
+  color: #61705f;
+  font-size: 12px;
+}
+.studio-received > span {
+  font-size: 11px;
+  line-height: 1.8;
+  display: block;
+  margin-top: 28px;
+  color: #61705f;
+}
+.studio-received a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.studio-attention h2 {
+  font-family: Georgia, serif;
+  font-size: 25px;
+  font-weight: 400;
+  margin: 0 0 12px;
+}
+.studio-attention > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-bottom: 1px solid #d7d8cd;
+  font-size: 13px;
+}
+.studio-attention a small {
+  display: block;
+  margin-top: 6px;
+  color: #6b746c;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.studio-attention a strong {
+  font-size: 28px;
+  font-weight: 400;
+}
+.studio-record-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border-top: 1px solid #d7d8cd;
+}
+.studio-record-list li {
+  border-bottom: 1px solid #d7d8cd;
+}
+.studio-record-list a {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.6fr) minmax(100px, 0.7fr) minmax(140px, 1fr)
+    130px;
+  align-items: center;
+  gap: 24px;
+  padding: 22px 12px;
+  min-height: 82px;
+}
+.studio-record-list a:hover {
+  background: #e6ebdc;
+}
+.studio-record-name {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.studio-record-name strong {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.studio-record-name small {
+  font-size: 10px;
+  color: #77816d;
+  overflow-wrap: anywhere;
+}
+.studio-record-value {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.studio-record-value > small {
+  color: #6b746c;
+  font-size: 9px;
+}
+.studio-record-value > small:last-child:not(:first-of-type) {
+  display: block;
+  margin-top: 6px;
+}
+.studio-record-state {
+  display: grid;
+  gap: 8px;
+}
+.studio-record-state > small {
+  color: #6b746c;
+  font-size: 10px;
+}
+.studio-record-date {
+  font-size: 10px;
+  color: #77816d;
+  line-height: 1.8;
+}
+.studio-context {
+  max-width: 760px;
+  color: #61705f;
+  font-size: 13px;
+  line-height: 1.8;
+  margin-bottom: 28px;
+}
+.studio-tab-count {
+  margin-left: 7px;
+  font-size: 9px;
+  color: #77816d;
+}
+.studio-refresh {
+  margin-top: 24px;
+}
+.merchant-studio .settings-grid {
+  gap: 24px;
+  align-items: start;
+}
+.merchant-studio .settings-grid .panel {
+  padding: 26px;
+  min-width: 0;
+}
+.merchant-studio .settings-grid h2,
+.studio-funds h1,
+.studio-funds h2 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+.merchant-studio .settings-grid h2 {
+  margin-top: 0;
+  font-size: 25px;
+}
+.merchant-studio .settings-grid :is(p, .privacy) {
+  color: #61705f;
+  line-height: 1.8;
+  font-size: 12px;
+}
+.merchant-studio .settings-grid :is(input, textarea) {
+  max-width: 100%;
+}
+.merchant-studio .settings-grid dd {
+  overflow-wrap: anywhere;
+  margin-left: 0;
+  max-width: 58%;
+}
+.merchant-studio .settings-grid dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+.merchant-studio .studio-funds > h1 {
+  font-size: 46px;
+  margin: 12px 0;
+}
+.studio-funds > p {
+  color: #61705f;
+  font-size: 13px;
+  line-height: 1.8;
+  max-width: 800px;
+}
+.merchant-studio .studio-funds .payment-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 22px 26px;
+  background: #e6ebdc;
+  border: 1px solid #c9cec0;
+  border-radius: 3px;
+  max-width: 800px;
+  gap: 0 24px;
+}
+.merchant-studio .studio-funds .payment-summary :is(dt, dd) {
+  padding: 14px 0;
+  border-bottom: 1px solid #c9cec0;
+  font-size: 13px;
+  margin: 0;
+  background: transparent;
+}
+.merchant-studio .studio-funds .payment-summary dd {
+  text-align: right;
+  white-space: nowrap;
+}
+.merchant-studio
+  .studio-funds
+  .payment-summary
+  :is(dt, dd):nth-last-child(-n + 2) {
+  color: #192e29;
+  font-weight: 600;
+  border: 0;
+}
+.merchant-studio .funds-withdrawal,
+.merchant-studio .funds-review {
+  max-width: 800px;
+  padding: 26px;
+  margin: 26px 0;
+}
+.merchant-studio .funds-withdrawal h2,
+.merchant-studio .funds-review h2 {
+  font-size: 27px;
+  margin-top: 0;
+}
+.merchant-studio .funds-withdrawal > p,
+.merchant-studio .funds-review > p {
+  color: #61705f;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.merchant-studio .withdrawal-record {
+  max-width: 800px;
+  padding: 20px 26px;
+  margin: 16px 0;
+}
+@media (max-width: 1000px) {
+  .studio-record-list a {
+    grid-template-columns: minmax(0, 1.5fr) 100px minmax(110px, 1fr);
+    gap: 16px;
+  }
+  .studio-record-date {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .merchant-studio .studio-rail {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding-inline: 4px;
+  }
+  .studio-account {
+    gap: 12px;
+  }
+  .studio-identity > span {
+    display: none;
+  }
+  .studio-overview-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-bottom: 32px;
+  }
+  .studio-received {
+    padding: 24px;
+  }
+  .studio-received > strong {
+    font-size: 48px;
+  }
+  .studio-record-list a {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 20px 0;
+    gap: 12px;
+  }
+  .studio-record-value {
+    text-align: right;
+    font-size: 14px;
+  }
+  .studio-record-state {
+    grid-column: 1 / -1;
+  }
+  .merchant-studio .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .merchant-studio .settings-grid .panel,
+  .merchant-studio .funds-withdrawal,
+  .merchant-studio .funds-review {
+    padding: 20px 16px;
+  }
+  .merchant-studio .studio-funds .payment-summary {
+    padding: 12px 16px;
+    gap: 0 14px;
+  }
+  .merchant-studio .studio-funds .payment-summary :is(dt, dd) {
+    font-size: 11px;
+  }
+  .merchant-studio .studio-tabs {
+    gap: 16px;
+  }
+  .merchant-studio .studio-tabs button {
+    font-size: 10px;
+  }
+  .studio-tab-count {
+    margin-left: 4px;
+  }
+}

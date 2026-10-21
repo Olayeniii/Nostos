@@ -6,8 +6,9 @@ import { useState } from "react";
 import { requestJson } from "../../../src/requests.js";
 import Link from "next/link";
 import { useRecord } from "../../../src/use-record.js";
-import { AppHeader, AppFooter } from "../../../src/shell.js";
+import { AppFooter } from "../../../src/shell.js";
 import { StateLabel } from "../../../src/status-label.js";
+import { MerchantWorkspace } from "../../../src/merchant-workspace.js";
 export default function Settings() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -22,14 +23,7 @@ export default function Settings() {
     };
   }>("/api/product/me");
   return (
-    <main className="product-app">
-      <AppHeader role="Merchant" />
-      <nav className="workspace-nav">
-        <Link href="/merchant">Payments</Link>
-        <Link href="/merchant/settings" aria-current="page">
-          Store settings
-        </Link>
-      </nav>
+    <MerchantWorkspace name={data?.merchant.name}>
       <div className="dashboard-title">
         <div>
           <p className="eyebrow">STORE SETTINGS</p>
@@ -179,6 +173,6 @@ export default function Settings() {
         </section>
       )}
       <AppFooter />
-    </main>
+    </MerchantWorkspace>
   );
 }
