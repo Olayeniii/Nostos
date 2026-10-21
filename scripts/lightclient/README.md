@@ -1,8 +1,9 @@
 # Isolated light-client observer work
 
-This is tested observer source, not a deployed service. It has no real merchant
-key intake, listener, signing operation, send operation or production wallet path.
-The existing app and VPS continue to use their current configuration.
+This is tested observer source, not a deployed service. An opt-in authenticated
+preview listener and app adapter exist; no real merchant key has been supplied by
+this work. There is no signing or send interface. No VPS configuration change is
+included.
 
 ## Verified capabilities
 
@@ -109,11 +110,16 @@ a protected credential copy or mount. No production configuration was changed.
    recovery of committed and uncommitted SDK imports, SQLite integrity and writer
    lock reacquisition. It also rewound and rescanned persisted public-chain state
    at height 3,525,796. This is not a competing-chain fork or VPS recovery proof.
-2. Exercise SDK enhancement persistence with detected encrypted transactions.
-   Construct expected fields from persisted checkout/refund instructions, never
-   client-supplied match claims. Recheck chain context before committing results.
-3. Implement and restore a consistent encrypted backup, then inspect real VPS
-   storage, logs, WAL and backups. No live backup check is complete.
+2. Finish mined merchant enhancement and changing-anchor evidence. The offline
+   fixture now stores decrypted incoming memos and complete transactions in both
+   pools, reopens them, then encrypts/restores and reopens them through the SDK.
+   They remain unmined and cannot satisfy the confirmed-store guard. Construct
+   expected fields from persisted checkout/refund instructions, never client
+   match claims, and recheck current chain context before committing results.
+3. Verify the encrypted backup on real isolated storage, including an independent
+   offsite copy and recovery identity. `backup.py` and its tested procedure are
+   described in [SDK_OBSERVER_BACKUPS.md](../../docs/SDK_OBSERVER_BACKUPS.md).
+   Fixture recovery does not prove live VPS logs, WAL or backup hygiene.
 4. Package the pinned worker for Ubuntu ARM64 and verify isolated installation,
    private app credentials, merchant-authorized sync and the separately authorized
    funded payment/refund evidence. Preserve current testnet services and rollback.
@@ -121,3 +127,18 @@ a protected credential copy or mount. No production configuration was changed.
 The `prepare.py` helper changes only the CI checkout's features/provider selection
 and asserts unchanged dependency versions, sources and checksums. It does not
 modify or install the VPS wallet binary.
+
+## Ubuntu ARM64 package
+
+`.github/workflows/sdk-observer-arm64.yml` builds the pinned native worker on
+Ubuntu 24.04 ARM64 and runs the encrypted memo/restore tests on that platform.
+The package includes only `nostos-sdk-worker`, `service.mjs`, `run-service.mjs`,
+`backup.py` and provenance. Its outer SHA-256 and each fixed file's SHA-256 are
+recorded; the ELF header must identify AArch64. No wallet file, credential,
+configuration or recovery identity enters the artifact.
+
+This workflow does not install anything or start a VPS service. A successful
+build must be verified before an isolated deployment procedure selects a new
+private root, credentials and port. Existing wallet files and services stay outside
+that procedure. The native worker is not a Zallet/Zaino replacement executable;
+do not overwrite the earlier `zallet-zaino` binary with it.

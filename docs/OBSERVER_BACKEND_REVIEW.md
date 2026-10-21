@@ -174,6 +174,24 @@ at 18:14 UTC and application CI
 The final public fixture reached 3,525,799; mainnet merchant and payment proof
 remain explicitly false.
 
+## Decrypted persistence and encrypted restore, verified 21 October
+
+SDK [run 39659003901](https://github.com/Olayeniii/Nostos/actions/runs/39659003901)
+passed at 19:12 UTC with source `fed823db31db83da3e2686ec30b5f1f1e7127c91`;
+application CI also passed. The native SDK stored incoming decrypted memos and
+full transactions in both Orchard and Ironwood, reopened them, then reopened the
+same data after an age-encrypted SQLite snapshot and restore. Transactions remain
+unmined, and the confirmed-store guard still rejects them. The native worker lock
+also blocks the Python backup process. Three real-age backup tests cover WAL
+consistency and refusals for unsafe paths, overwrite, wrong merchant and corruption.
+
+This proves temporary fixture persistence and encrypted restore. It does not
+establish real merchant enhancement, funded settlement, an actual changing-chain
+fork, VPS privacy hygiene or an independent offsite recovery copy. The separate
+Ubuntu ARM64 package workflow builds only fixed source files and the pinned SDK
+worker; it has no service-start or installation action. See
+[SDK_OBSERVER_BACKUPS.md](SDK_OBSERVER_BACKUPS.md) for exact scope and operator inputs.
+
 ## Merchant signing remains separate
 
 ZODL Android's source changelog records full/incoming viewing-key export and
