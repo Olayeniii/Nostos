@@ -55,14 +55,14 @@ The latest published Android release inspected is `3.17.2-3157`, dated 20 Octobe
 2026, tree/commit `cb3fb2236056e0c3e3a6510964257584efb4ebd7`.
 Its app source shows:
 
-| Concern | Source evidence |
-| --- | --- |
-| Full versus incoming export | `GetVKUseCase.kt` reads the selected account; `AccountExt.kt` maps FULL to `account.ufvk` and INCOMING to `account.uivk`; FULL has a separate confirmation flow |
-| Account binding | `CreateProposalUseCase.kt` chooses the selected account; `ZashiProposalRepository.kt` uses it to create the proposal and local `ZashiSpendingKeyDataSource` for signing |
-| Memo/amount handoff | `ProposalDataSource.kt` parses ZIP-321 on the configured network, validates the recipient, keeps memo bytes and proposes fulfillment for the selected account |
-| Explicit review | Proposal creation enters the review screen; `SubmitProposalUseCase.kt` handles biometric approval and submission separately |
-| Pools | Business-account model includes separate Orchard and Ironwood balances; transaction/migration implementations distinguish the pools |
-| Uncertain broadcast | Proposal submission retains txids and SDK retry plans; some displayed failures can still be followed by background submission |
+| Concern                     | Source evidence                                                                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full versus incoming export | `GetVKUseCase.kt` reads the selected account; `AccountExt.kt` maps FULL to `account.ufvk` and INCOMING to `account.uivk`; FULL has a separate confirmation flow         |
+| Account binding             | `CreateProposalUseCase.kt` chooses the selected account; `ZashiProposalRepository.kt` uses it to create the proposal and local `ZashiSpendingKeyDataSource` for signing |
+| Memo/amount handoff         | `ProposalDataSource.kt` parses ZIP-321 on the configured network, validates the recipient, keeps memo bytes and proposes fulfillment for the selected account           |
+| Explicit review             | Proposal creation enters the review screen; `SubmitProposalUseCase.kt` handles biometric approval and submission separately                                             |
+| Pools                       | Business-account model includes separate Orchard and Ironwood balances; transaction/migration implementations distinguish the pools                                     |
+| Uncertain broadcast         | Proposal submission retains txids and SDK retry plans; some displayed failures can still be followed by background submission                                           |
 
 Upstream SDK source was inspected at
 `828874217a22bbf6ab7df4ea59b59f295d059ff4`. Its ordinary broadcaster defaults to
