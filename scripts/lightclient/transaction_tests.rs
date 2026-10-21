@@ -141,6 +141,7 @@ fn decrypted_memo_and_transaction_survive_wal_reopen_in_both_pools() {
         assert!(tx.store(wallet.db_mut()).is_err());
         super::super::storage::ProtectedWallet::audit(root).unwrap();
         let helper=std::env::var("NOSTOS_BACKUP_FIXTURE").expect("CI backup fixture path");
+        assert!(std::path::Path::new(&helper).is_absolute() && std::path::Path::new(&helper).is_file(),"absolute backup fixture script");
         let locked=std::process::Command::new("python3").arg(&helper).arg("--check-locked").arg(root)
             .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().unwrap();
         assert!(locked.success(),"backup must respect native writer lock");
