@@ -5,11 +5,14 @@ Branch: `feat/mainnet-wallet-compatibility`. No merge or deployment.
 
 ## Current result
 
-The operator reports **3.17.1**, a shielded receiving address, **Full** viewing
-key export and a Send **Message** field. Build number, network, distribution and
-selected-account type have not been reported. These are operator observations;
-Work has no connection to the phone. Orchard receiver ownership, memo bytes,
-signing and outgoing recovery are still unverified.
+The operator initially reported **3.17.1**, a shielded receiving address, **Full**
+viewing key export and a Send **Message** field, then updated the app and reported
+**3.17.2**. Build number, network, distribution and selected-account type have not
+been reported. The controls were reported before the update; account binding
+will use the updated app. These are operator observations; Work has no connection
+to the phone. Orchard receiver ownership, memo bytes, signing and outgoing
+recovery are still unverified. The missing build number does not block the
+non-funded, local offline check.
 
 The upstream 3.17.1 release source identifies build **3155**, commit
 `85784fd3d8b9e064895a95c9770415c6d6f922c7`, and SDK `5.2.1-SNAPSHOT`. That
@@ -21,11 +24,10 @@ and the SDK dependency (`5.2.2-SNAPSHOT`). This does not prove identical SDK or
 installed-binary behavior.
 
 The 3.17.2 release fixes Rust-layer server certificate trust, removing revoked
-eMudhra roots. Recommend an in-place update through the existing official app
-store listing before any online/funded control. Do not uninstall, restore,
-create a new account or move funds for this check. Record the resulting version
-and recheck the same account's controls if updated. The offline binding test can
-also test 3.17.1; an update alone cannot close the compatibility gate.
+eMudhra roots. The operator now reports that version after an update. Do not
+uninstall, restore, create a new account or move funds for this check. Confirm the
+same selected account when using the updated app for offline binding; an update
+alone cannot close the compatibility gate.
 
 The pinned app implements selected-account FULL UFVK export, distinct from
 INCOMING UIVK export, and native software-account proposal review and local
