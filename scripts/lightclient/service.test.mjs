@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { createObserverService } from "./service.mjs";
+import { mkdtempSync, chmodSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ObserverBroker, createObserverService } from "./service.mjs";
 
 test("HTTP authentication, scope and method restrictions precede worker access", async () => {
   const calls = [];
@@ -74,5 +77,56 @@ test("HTTP authentication, scope and method restrictions precede worker access",
     assert.equal((await send("x".repeat(16385))).status, 413);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("persisted account status resumes sync without another viewing-key import", async () => {
+  const root = mkdtempSync(join(tmpdir(), "nostos-public-broker-"));
+  chmodSync(root, 0o700);
+  const calls = [];
+  let finishSync;
+  const syncing = new Promise((resolve) => {
+    finishSync = resolve;
+  });
+  let syncStarted;
+  const started = new Promise((resolve) => {
+    syncStarted = resolve;
+  });
+  const worker = {
+    busy: false,
+    dead: false,
+    async request(method) {
+      calls.push(method);
+      if (method === "nostos_sync") {
+        this.busy = true;
+        syncStarted();
+        await syncing;
+        this.busy = false;
+      }
+      return {
+        account_connected: true,
+        payments_enabled: false,
+        locked: false,
+        node_tip: { height: 100 },
+      };
+    },
+    async close() {},
+  };
+  const broker = new ObserverBroker({ root, factory: () => worker });
+  const merchant = "4b723cba-3e4d-4536-9c2e-e8129e2fb731";
+  const timeout = setTimeout(() => syncStarted(), 1000);
+  try {
+    await broker.request(merchant, "getwalletstatus", []);
+    await started;
+    assert.deepEqual(calls, ["getwalletstatus", "nostos_sync"]);
+    const busy = await broker.request(merchant, "getwalletstatus", []);
+    assert.equal(busy.locked, true);
+    assert.equal(busy.payments_enabled, false);
+    assert.equal(calls.length, 2);
+  } finally {
+    clearTimeout(timeout);
+    finishSync();
+    await broker.close();
+    rmSync(root, { recursive: true, force: true });
   }
 });

@@ -155,7 +155,12 @@ export class ObserverBroker {
       };
     const result = await worker.request(method, params);
     if (method === "getwalletstatus") worker.cache = result;
-    if (method === "z_importviewingkey" && this.#autoSync) {
+    if (
+      this.#autoSync &&
+      !worker.connected &&
+      (method === "z_importviewingkey" ||
+        (method === "getwalletstatus" && result.account_connected === true))
+    ) {
       worker.connected = true;
       const timer = setTimeout(() => this.refresh(id).catch(() => {}), 0);
       timer.unref();
