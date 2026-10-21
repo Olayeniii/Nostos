@@ -131,9 +131,10 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const page = await context.newPage();
   const visit = async (url) => {
-    const options = { waitUntil: "domcontentloaded" };
-    if (page.url() === url) await page.reload(options);
-    else await page.goto(url, options);
+    // Hash-only changes can keep the old fixture mounted. Begin each scenario
+    // with a fresh document; real in-app links are still clicked below.
+    await page.goto("about:blank");
+    await page.goto(url);
   };
   let mode = "populated";
   let customerReceipt = base;
