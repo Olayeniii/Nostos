@@ -53,6 +53,14 @@ def audit(root):
     require((root / "wallet.sqlite").exists())
 
 
+def sync_directory(path):
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def open_private(path):
     fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     return os.fdopen(fd, "w+b")
@@ -113,6 +121,7 @@ def backup(root, destination, recipient, merchant):
             out.flush()
             os.fsync(out.fileno())
         private_file(destination)
+        sync_directory(destination.parent)
     except BaseException:
         if created:
             destination.unlink(missing_ok=True)
@@ -181,6 +190,8 @@ def restore(archive, destination, identity, merchant):
             os.fsync(fd)
         finally:
             os.close(fd)
+        sync_directory(destination)
+        sync_directory(destination.parent)
     except BaseException:
         if created:
             for name in FILES:

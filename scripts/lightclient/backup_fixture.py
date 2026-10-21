@@ -25,6 +25,12 @@ def check(root):
 
 if __name__ == "__main__":
     try:
+        if len(sys.argv) == 3 and sys.argv[1] == "--check-locked":
+            try:
+                backup.snapshot(Path(sys.argv[2]))
+            except BlockingIOError:
+                sys.exit(0)
+            sys.exit(1)
         backup.require(len(sys.argv) == 2)
         check(Path(sys.argv[1]))
     except Exception:
