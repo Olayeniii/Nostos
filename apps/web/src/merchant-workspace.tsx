@@ -20,34 +20,39 @@ function WorkspaceIcon({
       height="22"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
       {kind === "overview" ? (
         <>
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
+          <rect x="3" y="3" width="7" height="10" rx="2" />
+          <rect x="14" y="3" width="7" height="6" rx="2" />
+          <rect x="3" y="17" width="7" height="4" rx="1.5" />
+          <rect x="14" y="13" width="7" height="8" rx="2" />
         </>
       ) : kind === "refunds" ? (
         <>
-          <path d="M5 8h9a6 6 0 0 1 0 12h-3M5 8l4-4M5 8l4 4" />
+          <path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12h-3" />
         </>
       ) : kind === "payments" ? (
         <>
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <path d="M3 10h18M7 15h4" />
+          <rect x="3" y="4" width="18" height="16" rx="3" />
+          <path d="M3 9h18M7 15h3M16 14v3M14.5 15.5h3" />
         </>
       ) : kind === "funds" ? (
         <>
-          <ellipse cx="12" cy="6" rx="8" ry="3" />
-          <path d="M4 6v6c0 4 16 4 16 0V6M4 12v6c0 4 16 4 16 0v-6" />
+          <path d="M20 8V6a2 2 0 0 0-2-2H6a3 3 0 0 0 0 6h14v10H6a3 3 0 0 1-3-3V7" />
+          <path d="M20 12h-5a2 2 0 0 0 0 4h5" />
+          <circle cx="15" cy="14" r=".5" fill="currentColor" stroke="none" />
         </>
       ) : (
         <>
-          <circle cx="12" cy="12" r="3" />
-          <path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 3 3-1 1-3 3-1 2-3-2-2 1-3-3-2-3 1-2-3Z" />
+          <path d="M4 3v4m0 6v8M12 3v10m0 6v2M20 3v2m0 6v10" />
+          <rect x="1.5" y="7" width="5" height="6" rx="2" />
+          <rect x="9.5" y="13" width="5" height="6" rx="2" />
+          <rect x="17.5" y="5" width="5" height="6" rx="2" />
         </>
       )}
     </svg>
@@ -105,7 +110,11 @@ export function MerchantWorkspace({
       className={`product-app dashboard-app merchant-studio ${detailOpen ? "detail-open" : ""}`}
     >
       <nav className="studio-rail" aria-label="Merchant workspace">
-        <Link className="studio-mark" href="/" aria-label="NOSTOS home">
+        <Link
+          className="studio-mark"
+          href="/merchant/overview"
+          aria-label="NOSTOS overview"
+        >
           <Mark />
         </Link>
         <div className="studio-destinations">
@@ -138,7 +147,7 @@ export function MerchantWorkspace({
       <div className="studio-body">
         <header className="studio-header">
           <div className="studio-identity">
-            <Link href="/" className="studio-wordmark">
+            <Link href="/merchant/overview" className="studio-wordmark">
               NOSTOS
             </Link>
             <span>{name}</span>
