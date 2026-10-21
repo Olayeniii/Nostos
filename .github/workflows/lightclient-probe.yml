@@ -53,6 +53,7 @@ jobs:
           cp nostos/scripts/lightclient/transactions.rs zallet/zallet-core/examples/nostos_observer/transactions.rs
           cp nostos/scripts/lightclient/transaction_tests.rs zallet/zallet-core/examples/nostos_observer/transaction_tests.rs
           cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
+          cp nostos/scripts/lightclient/recovery_fixture.rs zallet/zallet-core/examples/nostos_recovery_fixture.rs
           python3 nostos/scripts/lightclient/prepare.py zallet
       - name: Test full viewing key decoding without a real key
         working-directory: zallet
@@ -68,6 +69,9 @@ jobs:
         run: cargo +1.95.0 build --locked -p zallet-core --example nostos_sdk_worker
       - name: Test local service authentication and boundaries
         run: node --test nostos/scripts/lightclient/service.test.mjs
+      - name: Prove committed and uncommitted WAL recovery after abrupt exit
+        working-directory: zallet
+        run: cargo +1.95.0 run --locked -p zallet-core --example nostos_recovery_fixture
       - name: Prove temporary view-only sync, reopen and authenticated service connection
         working-directory: zallet
         env:

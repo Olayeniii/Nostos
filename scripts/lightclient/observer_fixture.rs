@@ -3,7 +3,7 @@
 mod observer;
 use std::time::Duration;
 use tonic::transport::{ClientTlsConfig, Endpoint};
-use zcash_client_backend::{data_api::{AccountBirthday, WalletRead},
+use zcash_client_backend::{data_api::{AccountBirthday, WalletRead, WalletWrite},
     proto::service::{BlockId, Empty}};
 use zcash_keys::keys::{UnifiedSpendingKey, UnifiedFullViewingKey};
 use zcash_address::unified::{Container, Encoding, Fvk, Ufvk};
@@ -92,6 +92,15 @@ async fn check() -> Result<serde_json::Value, &'static str> {
         .await.map_err(|_| "resume_scan")?;
     observer::transactions::check_public_fetch(&mut client,db).await?;
     if observer::transactions::enhance_pending(&mut client,db).await? != 0 {return Err("unexpected_fixture_transactions");}
+    // Persisted scan rewind and rescan, not a real competing-chain fork proof.
+    let before_rewind=db.block_fully_scanned().map_err(|_| "rewind_status")?.ok_or("rewind_no_checkpoint")?.block_height();
+    let rewound=db.truncate_to_height(before_rewind-1).map_err(|_| "rewind_storage")?;
+    if rewound>=before_rewind {return Err("rewind_not_applied");}
+    zcash_client_backend::sync::run(&mut client,&MAIN_NETWORK,&observer::MemoryCache::default(),db,128)
+        .await.map_err(|_| "rewind_rescan")?;
+    if db.block_fully_scanned().map_err(|_| "rewind_recovery_status")?.ok_or("rewind_checkpoint_lost")?.block_height()<before_rewind {
+        return Err("rewind_recovery_incomplete");
+    }
     observer::storage::ProtectedWallet::audit(temp.path())?;
     let mut connection=observer::connection::Connection::new(wallet,client);
     let full=UnifiedSpendingKey::from_seed(&MAIN_NETWORK,&[9;32],zip32::AccountId::ZERO)
@@ -119,7 +128,7 @@ async fn check() -> Result<serde_json::Value, &'static str> {
             Some("namespace")=>"service_fixture_namespace",_=>"service_fixture_failed",
         });
     }
-    Ok(serde_json::json!({"service_pipe_e2e_passed":true,"protected_storage_checked":true,"public_transaction_fetch_passed":true,"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
+    Ok(serde_json::json!({"rewind_rescan_passed":true,"service_pipe_e2e_passed":true,"protected_storage_checked":true,"public_transaction_fetch_passed":true,"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
         "same_key_idempotent":true,"changed_key_rejected":true,"changed_birthday_rejected":true,
         "shielded_rpc_allowlist_enforced":true,"sampled_height":info.block_height,"fully_scanned_height":u32::from(reopened),"attempts":attempts}))
 }
