@@ -81,6 +81,32 @@ probe. Merchant sync, transaction decryption and a mainnet payment/refund remain
 unverified. Public hosted services learn the client's network address and queried
 chain ranges; using TLS is not a privacy certification.
 
+## View-only sync foundation, verified 21 October
+
+The CI-only observer foundation passed in
+[run 39518585162](https://github.com/Olayeniii/Nostos/actions/runs/39518585162)
+at 00:03 UTC on 21 October, source
+`bea4507ce8fa2ad56838bc18d4aa5246971bd55a`.
+A temporary public-test account synced to height 3,524,931 and reopened the same
+SQLite scan checkpoint. Same-key import remained idempotent; a changed key or
+birthday was rejected. Four cache/policy tests and the viewing-key decoding test
+passed. Application CI
+[39518584873](https://github.com/Olayeniii/Nostos/actions/runs/39518584873) passed.
+
+The foundation rejects transparent view access. The fixture creates an
+Orchard-only UFVK from public test material; it does not change a merchant key.
+Its gRPC interceptor permits only `GetLightdInfo`, `GetTreeState`, `GetLatestBlock`,
+`GetBlockRange` and `GetSubtreeRoots`. Other methods, including transparent address
+queries and sends, are denied before transport. Transient server errors have at
+most three attempts; storage, scan and unknown errors stop with fixed categories.
+
+This proves temporary view-only scan persistence, not production durability,
+mid-write crash recovery, reorg recovery, merchant sync or memo/refund matching.
+The fixture accepts no real key or persistent wallet path, exposes no service and
+is not connected to the app. No VPS command, production wallet import or send was
+requested. See `scripts/lightclient/README.md` for the remaining gates, especially
+full-transaction enhancement, exact output matching and protected storage.
+
 ## Merchant signing remains separate
 
 ZODL Android's source changelog records full/incoming viewing-key export and
