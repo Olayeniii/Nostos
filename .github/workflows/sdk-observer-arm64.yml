@@ -1,0 +1,91 @@
+name: Build isolated SDK observer for Ubuntu ARM64
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/lightclient/*.rs
+      - scripts/lightclient/*.py
+      - scripts/lightclient/*.mjs
+      - .github/workflows/sdk-observer-arm64.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_RELEASE_DEBUG: 0
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16
+      CARGO_PROFILE_RELEASE_STRIP: debuginfo
+      CARGO_TARGET_DIR: backends/zaino/target
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: nostos
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zcash/zallet
+          ref: 987382f67e622915228686e9f956c6a9c9a7514c
+          path: zallet
+          persist-credentials: false
+      - name: Install dependencies on GitHub runner only
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler age
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - uses: actions/cache/restore@v4
+        id: cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/backends/zaino/target
+          key: sdk-observer-arm64-v1-987382f
+          restore-keys: |
+            observer-arm64-release-v2-
+            observer-arm64-release-v1-
+      - name: Prepare pinned SDK sources
+        run: |
+          test "$(git -C zallet rev-parse HEAD)" = 987382f67e622915228686e9f956c6a9c9a7514c
+          mkdir -p zallet/zallet-core/examples/nostos_observer
+          cp nostos/scripts/lightclient/observer.rs zallet/zallet-core/examples/nostos_observer/mod.rs
+          for module in storage transactions transaction_tests connection; do
+            cp "nostos/scripts/lightclient/$module.rs" "zallet/zallet-core/examples/nostos_observer/$module.rs"
+          done
+          cp nostos/scripts/lightclient/worker.rs zallet/zallet-core/examples/nostos_sdk_worker.rs
+          cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
+          python3 nostos/scripts/lightclient/prepare.py zallet
+      - name: Check encrypted backup boundaries and native pipe service
+        run: |
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_backup.py
+          node --test nostos/scripts/lightclient/service.test.mjs
+      - name: Build native SDK worker
+        id: worker
+        working-directory: zallet
+        run: cargo +1.95.0 build --locked --release -p zallet-core --example nostos_sdk_worker
+      - name: Test SDK memo persistence and encrypted restore on ARM64
+        working-directory: zallet
+        env:
+          NOSTOS_BACKUP_FIXTURE: ${{ github.workspace }}/nostos/scripts/lightclient/backup_fixture.py
+        run: cargo +1.95.0 test --locked --release -p zallet-core --example nostos_observer_fixture
+      - name: Check native linkage
+        run: ldd zallet/backends/zaino/target/release/examples/nostos_sdk_worker
+      - uses: actions/cache/save@v4
+        if: success() && steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/backends/zaino/target
+          key: sdk-observer-arm64-v1-987382f
+      - name: Package fixed files and provenance
+        run: python3 nostos/scripts/lightclient/package-arm64.py zallet/backends/zaino/target/release/examples/nostos_sdk_worker zallet/Cargo.lock bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nostos-sdk-preview-ubuntu24-arm64-${{ github.sha }}
+          path: bundle/
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
