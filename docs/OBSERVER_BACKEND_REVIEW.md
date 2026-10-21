@@ -107,6 +107,36 @@ is not connected to the app. No VPS command, production wallet import or send wa
 requested. See `scripts/lightclient/README.md` for the remaining gates, especially
 full-transaction enhancement, exact output matching and protected storage.
 
+## Transaction and storage stage, verified 21 October
+
+[Run 39521214074](https://github.com/Olayeniii/Nostos/actions/runs/39521214074)
+passed at 00:27 UTC on 21 October with source
+`076955b68a5a06e436d7cdce075d30e0529175e7`. Thirteen observer tests plus the
+viewing-key test passed. The public-key fixture scanned through height 3,524,956,
+reopened protected storage and fetched/decoded a public full transaction whose
+block matched the stored chain anchor. Both metadata providers passed.
+
+New source handles the SDK enhancement queue and exact incoming/outgoing output
+matching. Actual SDK decryption of encrypted Orchard and Ironwood notes is covered
+by offline fixtures; their proof/signature placeholders are invalid and they are
+not funded or broadcastable transactions. Changed receiver, amount, memo, pool,
+direction or account, insufficient confirmations, missing outgoing viewing data
+and ambiguous matching outputs are rejected. Real merchant enhancement storage
+and an authenticated application service connection remain unverified.
+
+The isolated storage guard enforces private directory/file permissions, a writer
+lock and rejection of symlinks, hard links, exposed WAL and unexpected files.
+Actual WAL/SHM permissions were tested while SQLite was running. This does not
+prove VPS logs, live WAL contents, encrypted backups, crash recovery or reorg
+recovery. The SDK database remains plaintext behind filesystem permissions.
+
+`GetTransaction` and `GetBlock` are now allowed public read methods. Fetching full
+transactions reveals queried txids to the hosted service. Block membership is
+checked against the SDK's observed chain; this is not independent full-node
+consensus validation. See `scripts/lightclient/README.md` for current gates.
+No service was installed or started, no real key was imported and no send was
+requested by this work. Existing production/refund state is untouched by this code.
+
 ## Merchant signing remains separate
 
 ZODL Android's source changelog records full/incoming viewing-key export and
