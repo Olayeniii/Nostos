@@ -60,16 +60,31 @@ jobs:
           done
           cp nostos/scripts/lightclient/observer.rs zallet/zallet-core/examples/nostos_observer/mod.rs
           cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
+          cp nostos/scripts/lightclient/wallet_check.rs zallet/zallet-core/examples/nostos_wallet_check.rs
+          cp nostos/scripts/lightclient/operator_check.rs zallet/zallet-core/examples/nostos_operator_check.rs
           python3 nostos/scripts/lightclient/prepare.py zallet
       - name: Test public wallet export, account binding, memo and outgoing recovery
         working-directory: zallet
         env:
           NOSTOS_BACKUP_FIXTURE: ${{ github.workspace }}/nostos/scripts/lightclient/backup_fixture.py
         run: cargo +1.95.0 test --locked --release -p zallet-core --example nostos_observer_fixture
+      - name: Build and test isolated offline operator checker
+        working-directory: zallet
+        run: |
+          cargo +1.95.0 test --locked --release -p zallet-core --example nostos_operator_check
+          cargo +1.95.0 build --locked --release -p zallet-core --example nostos_operator_check
+          python3 ../nostos/scripts/lightclient/package-operator-check.py backends/zaino/target/release/examples/nostos_operator_check ../operator-check
       - name: Verify runner-only backup and broker boundaries
         run: |
           python3 -m unittest discover -s nostos/scripts/lightclient -p test_backup.py
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_operator_check.py
           node --test nostos/scripts/lightclient/service.test.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-operator-check-${{ runner.arch }}
+          path: operator-check/
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/cache/save@v4
         if: success()
         with:

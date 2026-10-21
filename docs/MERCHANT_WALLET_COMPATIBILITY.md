@@ -115,7 +115,7 @@ At `f0668a3fc152900c07e1d18719231804f5aae22b`, ARM64 job `119537411684`
 in [run 39691165545](https://github.com/Olayeniii/Nostos/actions/runs/39691165545)
 passed all 20 SDK observer tests, including all five new wallet checks. The three
 age backup tests and two HTTP/broker checks also passed. The x86_64 comparison
-job is separate; its status is available on that same run.
+job `119537411968` has also completed successfully on that run.
 
 Application [CI 39691165591](https://github.com/Olayeniii/Nostos/actions/runs/39691165591)
 passed for the same code revision. Local application checks passed 327 tests,
@@ -130,6 +130,11 @@ wallet proves full export, same-account shielded receipt, outgoing recovery with
 the exported key and memo preservation. Native observer ARM64 tests do not prove
 Android device behavior. A real key import, funded control transfer and later
 funded payment/refund require separate approval under the implementation rules.
+
+The next operator procedure, separately packaged offline binding checker,
+proposed funded control limits and pinned Zingo CLI alternative are in
+[ZODL_OPERATOR_TEST.md](ZODL_OPERATOR_TEST.md). This additional preparation
+does not prove the installed Android version or authorize live observer import.
 
 If actual full export is unavailable or the real refund uses Discard, do not
 weaken matching or fall back to an incoming key. The smallest alternate is a
