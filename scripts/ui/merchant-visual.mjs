@@ -130,9 +130,15 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   });
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const page = await context.newPage();
+  const visit = async (url) => {
+    const options = { waitUntil: "domcontentloaded" };
+    if (page.url() === url) await page.reload(options);
+    else await page.goto(url, options);
+  };
   let mode = "populated";
   let customerReceipt = base;
   let customerMode = "normal";
+  let releaseCheckout = () => {};
   const posts = [];
   await page.route("**/api/product/**", async (route) => {
     const action = new URL(route.request().url()).pathname.split("/").at(-1);
@@ -171,7 +177,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
           json: { error: "Fixture unavailable" },
         });
       if (customerMode === "loading")
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => {
+          releaseCheckout = resolve;
+        });
       return route.fulfill({
         json: { receipt: customerReceipt, syncWarning: false },
       });
@@ -229,7 +237,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     if (phase === "after")
       assert.equal(overflow, false, `${width} ${name} overflows`);
   };
-  await page.goto("http://127.0.0.1:3000/merchant");
+  await visit("http://127.0.0.1:3000/merchant");
   await page.getByRole("button", { name: /Studio commission/ }).waitFor();
   await capture("payments");
   assert.equal(
@@ -289,7 +297,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await capture("payment-link");
   if (phase === "after") {
     for (const record of records.slice(1)) {
-      await page.goto("http://127.0.0.1:3000/merchant");
+      await visit("http://127.0.0.1:3000/merchant");
       await page
         .getByRole("button", {
           name: new RegExp(
@@ -318,7 +326,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     }
   }
 
-  await page.goto("http://127.0.0.1:3000/merchant/overview");
+  await visit("http://127.0.0.1:3000/merchant/overview");
   await page
     .getByRole("heading", { name: "Your store, at a glance." })
     .waitFor();
@@ -333,7 +341,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByRole("heading", { name: "Studio commission", exact: true })
     .waitFor();
   await capture("linked-detail");
-  await page.goto("http://127.0.0.1:3000/merchant/refunds");
+  await visit("http://127.0.0.1:3000/merchant/refunds");
   await page.getByRole("heading", { name: "Refunds", exact: true }).waitFor();
   await page.locator(".studio-record-list a").first().waitFor();
   assert.equal(await page.locator(".studio-record-list a").count(), 3);
@@ -352,7 +360,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByRole("heading", { name: "Customer refund request", exact: true })
     .waitFor();
   await capture("linked-customer-request");
-  await page.goto("http://127.0.0.1:3000/merchant/refunds");
+  await visit("http://127.0.0.1:3000/merchant/refunds");
   await page.locator(".studio-record-list a").first().waitFor();
 
   await page.getByRole("button", { name: /Processing/ }).click();
@@ -370,20 +378,20 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     0,
   );
   await capture("linked-unknown-refund");
-  await page.goto("http://127.0.0.1:3000/merchant/settings");
+  await visit("http://127.0.0.1:3000/merchant/settings");
   await page.getByRole("heading", { name: "Merchant profile" }).waitFor();
   assert.equal(
     await page.locator('.studio-rail [aria-current="page"]').textContent(),
     "Settings",
   );
   await capture("settings");
-  await page.goto("http://127.0.0.1:3000/merchant/funds");
+  await visit("http://127.0.0.1:3000/merchant/funds");
   await page
     .getByRole("button", { name: "Review withdrawal", exact: true })
     .waitFor();
   await capture("funds");
   customerReceipt = records[1];
-  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await visit("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
   await page.getByRole("heading", { name: "JaraBot", exact: true }).waitFor();
   await capture("checkout");
   assert.equal(
@@ -418,7 +426,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   );
   await capture("checkout-prepared");
   customerReceipt = records[3];
-  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await visit("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
   await page
     .getByRole("heading", { name: "Ask for a new payment link." })
     .waitFor();
@@ -430,35 +438,36 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   );
   await capture("checkout-expired");
   customerReceipt = base;
-  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await visit("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
   await page
     .getByRole("heading", { name: "Your payment is complete." })
     .waitFor();
   await capture("checkout-confirmed");
   customerReceipt = records[1];
   customerMode = "loading";
-  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await visit("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
   await page.getByText("Checking payment request", { exact: true }).waitFor();
   await capture("checkout-loading");
+  releaseCheckout();
   customerMode = "error";
-  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await visit("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
   await page
     .getByRole("alert")
     .filter({ hasText: "Connection interrupted" })
     .waitFor();
   await capture("checkout-error");
   customerMode = "normal";
-  await page.goto("http://127.0.0.1:3000/checkout");
+  await visit("http://127.0.0.1:3000/checkout");
   await page.getByRole("heading", { name: "Payment link required" }).waitFor();
   await capture("checkout-missing-link");
 
   customerReceipt = base;
-  await page.goto("http://127.0.0.1:3000/receipt#" + "a".repeat(43));
+  await visit("http://127.0.0.1:3000/receipt#" + "a".repeat(43));
   await page.getByText("Private payment receipt").waitFor();
   await capture("receipt");
   for (const record of [records[2], records[4], records[5], records[6]]) {
     customerReceipt = record;
-    await page.goto("http://127.0.0.1:3000/receipt#" + "a".repeat(43));
+    await visit("http://127.0.0.1:3000/receipt#" + "a".repeat(43));
     await page.getByText("Private payment receipt").waitFor();
     if (!record.canRequestRefund) {
       assert.equal(
@@ -483,7 +492,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
         .waitFor();
     await capture(`receipt-${record.id}`);
   }
-  await page.goto("http://127.0.0.1:3000/receipt");
+  await visit("http://127.0.0.1:3000/receipt");
   await page
     .getByLabel("Private receipt link", { exact: true })
     .fill("invalid-link");
@@ -494,7 +503,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .waitFor();
   await capture("receipt-invalid-link");
 
-  await page.goto("http://127.0.0.1:3000/sign-up");
+  await visit("http://127.0.0.1:3000/sign-up");
   await page.getByRole("textbox", { name: "Email", exact: true }).waitFor();
   await capture("registration");
   await page
@@ -507,7 +516,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByRole("heading", { name: "Check your email", exact: true })
     .waitFor();
   await capture("registration-email-sent");
-  await page.goto("http://127.0.0.1:3000/sign-in");
+  await visit("http://127.0.0.1:3000/sign-in");
   await page
     .getByRole("heading", { name: "Welcome back", exact: true })
     .waitFor();
@@ -534,7 +543,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .waitFor();
   await capture("sign-in-error");
 
-  await page.goto("http://127.0.0.1:3000/account-help");
+  await visit("http://127.0.0.1:3000/account-help");
   await page
     .getByRole("heading", { name: "Verify your email", exact: true })
     .waitFor();
@@ -552,20 +561,20 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     )
     .waitFor();
   await capture("verification-error");
-  await page.goto("http://127.0.0.1:3000/account-help?purpose=reset");
+  await visit("http://127.0.0.1:3000/account-help?purpose=reset");
   await page
     .getByRole("heading", { name: "Reset your password", exact: true })
     .waitFor();
   await capture("password-reset");
 
-  await page.goto("http://127.0.0.1:3000/account-link#" + "a".repeat(43));
+  await visit("http://127.0.0.1:3000/account-link#" + "a".repeat(43));
   await page
     .getByRole("heading", { name: "Set your password", exact: true })
     .waitFor();
   await capture("set-password");
   for (const state of ["empty", "loading", "error"]) {
     mode = state;
-    await page.goto("http://127.0.0.1:3000/merchant");
+    await visit("http://127.0.0.1:3000/merchant");
     if (state === "empty")
       await page
         .getByRole("heading", { name: "Your first payment starts here." })
@@ -579,7 +588,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
         .waitFor();
     await capture(state);
     for (const routeName of ["overview", "refunds"]) {
-      await page.goto(`http://127.0.0.1:3000/merchant/${routeName}`);
+      await visit(`http://127.0.0.1:3000/merchant/${routeName}`);
       if (state === "empty")
         await page
           .getByRole("heading", {
