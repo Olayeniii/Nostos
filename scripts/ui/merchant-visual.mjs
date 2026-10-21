@@ -618,8 +618,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page
     .getByRole("alert")
-    .filter({ hasText: "Could not sign in" })
+    .filter({ hasText: "Sign in is temporarily unavailable" })
     .waitFor();
+  assert.equal(await page.getByRole("link", { name: "Resend verification email", exact: true }).count(), 0);
   await capture("sign-in-error");
 
   await visit("http://127.0.0.1:3000/account-help");
