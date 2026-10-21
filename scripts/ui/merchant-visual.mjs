@@ -137,6 +137,8 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     await page.goto(url);
   };
   let mode = "populated";
+  let fixtureNetwork = "testnet";
+  let setupView = false;
   let customerReceipt = base;
   let customerMode = "normal";
   let releaseCheckout = () => {};
@@ -146,7 +148,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     const action = new URL(route.request().url()).pathname.split("/").at(-1);
     if (route.request().method() === "POST") posts.push(action);
     if (action === "network")
-      return route.fulfill({ json: { network: "testnet" } });
+      return route.fulfill({ json: { network: fixtureNetwork } });
     if (action === "dashboard") {
       if (mode === "error")
         return route.fulfill({ status: 503, json: { error: "Unavailable" } });
@@ -170,13 +172,15 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
           merchant: {
             name: "JaraBot",
             email: "merchant@example.test",
-            ready: true,
+            ready: !setupView,
             setupPending: false,
             refundPolicy: "Refunds within 30 days.",
             refundWindowDays: 30,
           },
         },
       });
+    if (action === "wallet-connection" && route.request().method() === "GET")
+      return route.fulfill({ json: { connection: null } });
     if (action === "checkout") {
       if (customerMode === "error")
         return route.fulfill({
@@ -647,6 +651,28 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByRole("heading", { name: "Set your password", exact: true })
     .waitFor();
   await capture("set-password");
+
+  // Read the latest mainnet setup/consent form without importing view access.
+  fixtureNetwork = "mainnet";
+  setupView = true;
+  await visit("http://127.0.0.1:3000/setup");
+  await page
+    .getByRole("heading", { name: "Connect your business wallet", exact: true })
+    .waitFor();
+  await page.getByRole("checkbox", { name: /For SDK preview/ }).waitFor();
+  assert.equal(
+    await page
+      .getByLabel("Unified full viewing key", { exact: true })
+      .inputValue(),
+    "",
+  );
+  assert(
+    !posts.includes("wallet-connection"),
+    "Setup review must not import view access",
+  );
+  await capture("mainnet-setup-consent");
+  fixtureNetwork = "testnet";
+  setupView = false;
 
   // Connected review: every write below is intercepted above; no wallet send.
   await visit("http://127.0.0.1:3000/merchant/overview");

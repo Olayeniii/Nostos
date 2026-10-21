@@ -21,6 +21,12 @@ and confined to in-memory fixture records. No live financial or account operatio
 is part of this review. Screenshots are disabled; existing checkpoint artifacts
 provide visual evidence.
 
+Main advanced during this review with observer API and scope-consent updates.
+The final PR checks use GitHub's combined merge ref and record its source/parent
+commits. A read-only mainnet setup check covers the current consent form, leaving
+viewing keys empty and never submitting a wallet connection. The existing main
+backend changes are preserved; this UI branch adds no observer or signer behavior.
+
 The final checks cover 320, 375, 390, 430, 768 and 1440px, along with the existing
 populated, empty, loading, error, expired, partial, unknown and unavailable states.
 Unit/integration checks, source and production builds, lint, formatting, typecheck,

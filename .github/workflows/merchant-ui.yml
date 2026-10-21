@@ -21,6 +21,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Record reviewed source
+        run: git log -1 --format='Review source %H%nParents %P'
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
