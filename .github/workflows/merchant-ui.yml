@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   responsive-review:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       # Checkpoint 3: desktop checkout and phone receipt, two viewport images only.
