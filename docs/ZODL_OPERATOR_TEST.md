@@ -5,11 +5,27 @@ Branch: `feat/mainnet-wallet-compatibility`. No merge or deployment.
 
 ## Current result
 
-Installed Android version/build: **not yet supplied or verified**. Work has no
-connection to the phone. The inspected public release is **3.17.2 (3157)**,
-tag `3.17.2-3157`, app commit `cb3fb2236056e0c3e3a6510964257584efb4ebd7`.
-That does not establish what is installed. Do not update, reinstall, restore,
-create a new account or move funds for this initial check.
+The operator reports **3.17.1**, a shielded receiving address, **Full** viewing
+key export and a Send **Message** field. Build number, network, distribution and
+selected-account type have not been reported. These are operator observations;
+Work has no connection to the phone. Orchard receiver ownership, memo bytes,
+signing and outgoing recovery are still unverified.
+
+The upstream 3.17.1 release source identifies build **3155**, commit
+`85784fd3d8b9e064895a95c9770415c6d6f922c7`, and SDK `5.2.1-SNAPSHOT`. That
+build number is not a verified reading from the phone. Comparing it with the
+previously reviewed **3.17.2 (3157)**, commit
+`cb3fb2236056e0c3e3a6510964257584efb4ebd7`, shows no changes to the app's
+export, address, message or signing code. Changes are release notes, app version
+and the SDK dependency (`5.2.2-SNAPSHOT`). This does not prove identical SDK or
+installed-binary behavior.
+
+The 3.17.2 release fixes Rust-layer server certificate trust, removing revoked
+eMudhra roots. Recommend an in-place update through the existing official app
+store listing before any online/funded control. Do not uninstall, restore,
+create a new account or move funds for this check. Record the resulting version
+and recheck the same account's controls if updated. The offline binding test can
+also test 3.17.1; an update alone cannot close the compatibility gate.
 
 The pinned app implements selected-account FULL UFVK export, distinct from
 INCOMING UIVK export, and native software-account proposal review and local
@@ -232,13 +248,15 @@ These are public artifact hashes, not wallet identifiers. Review this code commi
 and match the manifest/log before handling a live export. The guide's later
 documentation-only commit does not change the tested artifact code.
 
-Next checkpoint: identify the actual Android build and full-export availability,
-then obtain only the private offline check's boolean result. A material mismatch
+Next checkpoint: record the actual Android build/network and native business
+account selection, then obtain only the private offline check's boolean result.
+Full-export and Message availability are now operator-reported. A material mismatch
 holds integration and triggers review of the pinned Zingo candidate. No funded
 test, production change, live observer import or mainnet-readiness claim is made.
 
 Primary sources:
 
+- [3.17.1 to 3.17.2 source comparison](https://github.com/zodl-inc/zodl-android/compare/85784fd3d8b9e064895a95c9770415c6d6f922c7...cb3fb2236056e0c3e3a6510964257584efb4ebd7)
 - [ZODL release](https://github.com/zodl-inc/zodl-android/releases/tag/3.17.2-3157)
 - [Version/build model](https://github.com/zodl-inc/zodl-android/blob/cb3fb2236056e0c3e3a6510964257584efb4ebd7/ui-lib/src/main/java/co/electriccoin/zcash/ui/common/model/VersionInfo.kt)
 - [Selected-account export](https://github.com/zodl-inc/zodl-android/blob/cb3fb2236056e0c3e3a6510964257584efb4ebd7/ui-lib/src/main/java/co/electriccoin/zcash/ui/common/usecase/GetVKUseCase.kt)
