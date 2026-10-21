@@ -4,12 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { PublicSurface } from "./public-surface.js";
 import { StateLabel } from "./status-label.js";
-import { requestJson } from "./requests.js";
+import { requestJson, RequestError } from "./requests.js";
 export function AccountForm({ signup = false }: { signup?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [verificationEmail, setVerificationEmail] = useState("");
+  const [verificationRequired, setVerificationRequired] = useState(false);
   return (
     <PublicSurface variant="account">
       <section className="account-layout">
@@ -101,6 +102,7 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
               const data = new FormData(e.currentTarget);
               setBusy(true);
               setError("");
+              setVerificationRequired(false);
               try {
                 const result = await requestJson<{ ready: boolean }>(
                   `/api/product/${signup ? "signup" : "login"}`,
@@ -119,11 +121,24 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
                   setBusy(false);
                 } else
                   window.location.assign(result.ready ? "/merchant" : "/setup");
-              } catch {
+              } catch (failure) {
+                setVerificationRequired(
+                  !signup &&
+                    failure instanceof RequestError &&
+                    failure.status === 403,
+                );
                 setError(
-                  signup
-                    ? "Could not create your account. Check the details, or sign in if you already registered."
-                    : "Could not sign in. Check your email, password, and connection.",
+                  !signup &&
+                    failure instanceof RequestError &&
+                    failure.status === 503
+                    ? "Sign in is temporarily unavailable. Please try again shortly."
+                    : !signup &&
+                        failure instanceof RequestError &&
+                        failure.status === 429
+                      ? "Too many attempts. Please wait ten minutes before trying again."
+                      : signup
+                        ? "Could not create your account. Check the details, or sign in if you already registered."
+                        : "Could not sign in. Check your email, password, and connection.",
                 );
                 setBusy(false);
               }
@@ -166,9 +181,9 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
                 {signup ? "Sign in" : "Create account"}
               </Link>
             </p>
-            {!signup && (
+            {!signup && verificationRequired && (
               <p className="account-switch">
-                <Link href="/account-help">Resend verification email</Link>
+                <Link href="/account-help">Verify your email</Link>
               </p>
             )}
           </form>
