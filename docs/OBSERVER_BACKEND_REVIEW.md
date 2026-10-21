@@ -166,7 +166,13 @@ These tests use fresh temporary directories and public deterministic material.
 They do not establish recovery of real merchant enhancements, competing-chain
 forks, encrypted backups or live VPS storage. A separate follow-up fixes background
 sync resumption after a stored account reopens; its regression test requires no
-reimported viewing key and keeps status locked while sync is busy.
+reimported viewing key and keeps status locked while sync is busy. That follow-up,
+`be34a2a71c03d667db50459db9ce0703f9e7b9be`, passed SDK
+[run 39650381264](https://github.com/Olayeniii/Nostos/actions/runs/39650381264)
+at 18:14 UTC and application CI
+[39650380790](https://github.com/Olayeniii/Nostos/actions/runs/39650380790).
+The final public fixture reached 3,525,799; mainnet merchant and payment proof
+remain explicitly false.
 
 ## Merchant signing remains separate
 
