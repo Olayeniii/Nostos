@@ -110,9 +110,20 @@ valid transaction signing nor a mined payment/refund.
 
 ## Gate result and next proof
 
-The candidate is supported by the inspected source. Offline/native test results
-must be recorded after the workflow completes. No fundamental signing-model
-change is justified by the available evidence.
+The candidate is supported by the inspected source and native ARM64 checks.
+At `f0668a3fc152900c07e1d18719231804f5aae22b`, ARM64 job `119537411684`
+in [run 39691165545](https://github.com/Olayeniii/Nostos/actions/runs/39691165545)
+passed all 20 SDK observer tests, including all five new wallet checks. The three
+age backup tests and two HTTP/broker checks also passed. The x86_64 comparison
+job is separate; its status is available on that same run.
+
+Application [CI 39691165591](https://github.com/Olayeniii/Nostos/actions/runs/39691165591)
+passed for the same code revision. Local application checks passed 327 tests,
+format/lint/typecheck/build/secret scan, and 56 web plus nine observer Python
+tests. The first native run caught a missing test-only `WalletWrite` import;
+the corrected ARM64 result above supersedes it. No validation requirement was
+removed to obtain a pass. No fundamental signing-model change is justified by
+the available evidence.
 
 The complete wallet compatibility gate remains open until the actual installed
 wallet proves full export, same-account shielded receipt, outgoing recovery with
