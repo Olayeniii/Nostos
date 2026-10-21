@@ -1,3 +1,37 @@
+# Final integrated review
+
+The approved visual direction is implemented across Overview, Payments, Refunds,
+Funds, Settings, checkout, receipts, refund requests, and account/setup screens.
+The existing NOSTOS identity, mark, backend, wallet behavior, and authorization
+boundaries are preserved. Main's newer observer work has no overlapping UI files.
+
+The final source review found a return-path defect: selecting Payments from linked
+details could retain the inspector, and closing details or creation left the entry
+hash in the URL. The Payments menu now resets those views; Back, Close and successful
+link creation clear only the payment entry hash. Busy operations retain their view.
+This changes page state, not transaction handling or persistence.
+
+The browser review now follows one connected fixture through new payment creation,
+link copy, checkout preparation, returned confirmation, private receipt, customer
+request, merchant fulfillment, approval review, returned partial refund settlement,
+and a withdrawal fee review that is cancelled. It checks that menu reset survives
+a reload, Back clears a linked detail, approval review does not submit a refund,
+and withdrawal review does not send. All mocked writes are intercepted, asserted,
+and confined to in-memory fixture records. No live financial or account operation
+is part of this review. Screenshots are disabled; existing checkpoint artifacts
+provide visual evidence.
+
+The final checks cover 320, 375, 390, 430, 768 and 1440px, along with the existing
+populated, empty, loading, error, expired, partial, unknown and unavailable states.
+Unit/integration checks, source and production builds, lint, formatting, typecheck,
+secret scan and Python checks remain required. Live wallet behavior and production
+state were not re-proved by this UI review. Merge and production rollout require
+separate approval; no merge or deployment is included.
+
+The previous checkpoint reports follow as historical context.
+
+---
+
 # Customer and account screens: checkpoint 3
 
 Checkout, receipts, refund requests, registration, sign in, email verification,

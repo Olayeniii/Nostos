@@ -74,8 +74,18 @@ export default function Merchant() {
     if (window.matchMedia("(max-width: 900px)").matches)
       detailRef.current?.scrollIntoView({ block: "start" });
   }, [selected]);
+  function clearPaymentHash() {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    if (params.has("payment") || params.has("new"))
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname + window.location.search,
+      );
+  }
   function closeDetail() {
     setSelected("");
+    clearPaymentHash();
   }
   const safe =
     !warning && !data?.syncWarning && !loading && !busy && !uncertain;
@@ -97,6 +107,7 @@ export default function Merchant() {
     }
   }, [share]);
   async function showLink(token: string) {
+    clearPaymentHash();
     setSelected("");
     setCopyNotice("");
     const link = `${window.location.origin}/checkout#${token}`;
@@ -113,6 +124,12 @@ export default function Merchant() {
     <MerchantWorkspace
       name={data?.merchant.name || "Merchant workspace"}
       detailOpen={!!current}
+      onPaymentsHome={() => {
+        if (busy) return;
+        closeDetail();
+        setCreating(false);
+        setShare("");
+      }}
       onSignOut={async () => {
         try {
           await post("logout", {});
@@ -194,7 +211,10 @@ export default function Merchant() {
             <h2>Create payment request</h2>
             <button
               className="text-button"
-              onClick={() => setCreating(false)}
+              onClick={() => {
+                setCreating(false);
+                clearPaymentHash();
+              }}
               disabled={busy}
             >
               Close

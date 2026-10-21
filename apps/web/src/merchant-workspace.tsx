@@ -57,11 +57,13 @@ export function MerchantWorkspace({
   name = "Merchant workspace",
   detailOpen = false,
   onSignOut,
+  onPaymentsHome,
   children,
 }: {
   name?: string;
   detailOpen?: boolean;
   onSignOut?: () => Promise<void>;
+  onPaymentsHome?: () => void;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -111,6 +113,20 @@ export function MerchantWorkspace({
             <Link
               key={item.href}
               href={item.href}
+              onClick={(event) => {
+                if (
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.shiftKey &&
+                  !event.altKey &&
+                  item.href === "/merchant" &&
+                  pathname === item.href &&
+                  onPaymentsHome
+                ) {
+                  event.preventDefault();
+                  onPaymentsHome();
+                }
+              }}
               aria-current={pathname === item.href ? "page" : undefined}
             >
               <WorkspaceIcon kind={item.kind} />

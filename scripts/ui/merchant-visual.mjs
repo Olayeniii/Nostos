@@ -141,6 +141,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   let customerMode = "normal";
   let releaseCheckout = () => {};
   const posts = [];
+  let flowRecord;
   await page.route("**/api/product/**", async (route) => {
     const action = new URL(route.request().url()).pathname.split("/").at(-1);
     if (route.request().method() === "POST") posts.push(action);
@@ -153,7 +154,12 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
       return route.fulfill({
         json: {
           merchant: { name: "JaraBot", ready: true },
-          records: mode === "empty" ? [] : records,
+          records:
+            mode === "empty"
+              ? []
+              : flowRecord
+                ? [flowRecord, ...records]
+                : records,
           syncWarning: false,
         },
       });
@@ -195,6 +201,74 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
           amountZat: 2000000,
         },
       });
+    if (action === "requests" && route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      assert.equal(body.description, "Integrated flow fixture");
+      assert.equal(body.amountZat, 2000000);
+      flowRecord = {
+        ...base,
+        id: "flow-order",
+        description: body.description,
+        orderReference: "n_integrated_flow",
+        paymentStatus: "unpaid",
+        paymentConfirmations: 0,
+        paidAt: null,
+        payment: undefined,
+        canRequestRefund: false,
+      };
+      return route.fulfill({
+        json: { id: flowRecord.id, token: "b".repeat(43) },
+      });
+    }
+    if (action === "refund-request" && route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      assert.equal(body.amountZat, 500000);
+      assert.equal(body.reason, "Wrong size received");
+      flowRecord = {
+        ...flowRecord,
+        canRequestRefund: false,
+        refundRequests: [
+          {
+            id: body.requestId,
+            amountZat: body.amountZat,
+            reason: body.reason,
+            status: "requested",
+            decisionReason: "",
+            approvedZat: null,
+            createdAt: "2026-10-18T13:00:00Z",
+            decidedAt: null,
+          },
+        ],
+      };
+      customerReceipt = flowRecord;
+      return route.fulfill({ json: { ok: true } });
+    }
+    if (action === "fulfillment" && route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      assert.equal(body.id, "flow-order");
+      assert.equal(body.state, "fulfilled");
+      flowRecord = { ...flowRecord, fulfillment: "fulfilled" };
+      customerReceipt = flowRecord;
+      return route.fulfill({ json: { ok: true } });
+    }
+    if (action === "withdrawal-quote" && route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      assert.equal(body.amountZat, 500000);
+      assert.equal(body.destination, "utest1" + "a".repeat(80));
+      assert.equal(body.password, "fixture-password-only");
+      return route.fulfill({
+        json: {
+          id: "flow-quote",
+          destination: body.destination,
+          amountZat: body.amountZat,
+          feeZat: 10000,
+          network: "testnet",
+          expiresAt: Date.now() + 120000,
+          status: "review",
+          txid: null,
+        },
+      });
+    }
     if (action === "signup") return route.fulfill({ json: { ready: false } });
     if (action === "funds")
       return route.fulfill({
@@ -573,6 +647,197 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByRole("heading", { name: "Set your password", exact: true })
     .waitFor();
   await capture("set-password");
+
+  // Connected review: every write below is intercepted above; no wallet send.
+  await visit("http://127.0.0.1:3000/merchant/overview");
+  await page.getByRole("link", { name: "New payment +", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Create payment request", exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  assert.equal(
+    new URL(page.url()).hash,
+    "",
+    "Closing creation clears the entry hash",
+  );
+  await page
+    .getByRole("button", { name: "New payment +", exact: true })
+    .click();
+  await page
+    .getByLabel("What is this payment for?", { exact: true })
+    .fill("Integrated flow fixture");
+  await page.getByLabel("Amount in ZEC", { exact: true }).fill("0.02");
+  await page
+    .getByRole("button", { name: "Create payment link", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Payment link ready", exact: true })
+    .waitFor();
+  const checkoutLink = await page
+    .getByLabel("Private payment link", { exact: true })
+    .inputValue();
+  assert.equal(
+    checkoutLink,
+    "http://127.0.0.1:3000/checkout#" + "b".repeat(43),
+  );
+  await page
+    .getByRole("button", { name: "Copy payment link", exact: true })
+    .click();
+  await page.getByText("Payment link copied.", { exact: true }).waitFor();
+  await capture("flow-created-link");
+  customerReceipt = flowRecord;
+  await visit(checkoutLink);
+  await page
+    .getByRole("textbox", { name: "Your fresh refund address", exact: true })
+    .fill("utest1" + "a".repeat(80));
+  await page
+    .getByRole("button", { name: "Prepare payment", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Copy complete payment request", exact: true })
+    .waitFor();
+  flowRecord = {
+    ...flowRecord,
+    paymentStatus: "confirmed",
+    paymentConfirmations: 12,
+    paidAt: base.paidAt,
+    payment: { ...base.payment },
+    canRequestRefund: true,
+  };
+  customerReceipt = flowRecord;
+  await page
+    .getByRole("button", { name: "Check payment", exact: true })
+    .click();
+  await page
+    .getByRole("link", { name: "Open your receipt", exact: true })
+    .click();
+  await page.getByText("Private payment receipt", { exact: true }).waitFor();
+  await page
+    .getByLabel("Requested refund in ZEC", { exact: true })
+    .fill("0.005");
+  await page.getByLabel("Reason", { exact: true }).fill("Wrong size received");
+  await page
+    .getByRole("button", { name: "Request refund", exact: true })
+    .click();
+  await page.getByText("Awaiting merchant decision", { exact: true }).waitFor();
+  await capture("flow-customer-request");
+  await visit("http://127.0.0.1:3000/merchant/refunds");
+  await page.getByRole("link", { name: /Integrated flow fixture/ }).click();
+  await page
+    .getByRole("heading", { name: "Integrated flow fixture", exact: true })
+    .waitFor();
+  await page
+    .locator(".studio-rail")
+    .getByRole("link", { name: "Payments", exact: true })
+    .click();
+  await page.getByRole("heading", { name: "Payments", exact: true }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("complementary", { name: "Payment details", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(
+    new URL(page.url()).hash,
+    "",
+    "Payments menu clears the linked detail",
+  );
+  await page.reload();
+  await page.getByRole("button", { name: /Integrated flow fixture/ }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("complementary", { name: "Payment details", exact: true })
+      .count(),
+    0,
+  );
+  await visit("http://127.0.0.1:3000/merchant#payment=flow-order");
+  await page
+    .getByRole("heading", { name: "Integrated flow fixture", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Mark fulfilled", exact: true })
+    .click();
+  await page
+    .getByText("Merchant-reported state: fulfilled.", { exact: false })
+    .waitFor();
+  const requestPanel = page.getByRole("region", {
+    name: "Customer refund request",
+    exact: true,
+  });
+  await requestPanel
+    .getByLabel("Reason for your decision", { exact: true })
+    .fill("Approved size return");
+  await requestPanel
+    .getByRole("button", { name: "Review approval", exact: true })
+    .click();
+  await requestPanel
+    .getByRole("button", { name: "Approve and send 0.005 ZEC", exact: true })
+    .waitFor();
+  assert(
+    !posts.includes("refund-decision"),
+    "Reviewing a request must not send a refund",
+  );
+  await capture("flow-merchant-review");
+  await page
+    .getByRole("button", { name: "Back to payments", exact: true })
+    .click();
+  assert.equal(new URL(page.url()).hash, "");
+  // Settlement is a returned fixture state, not a browser-triggered send.
+  flowRecord = {
+    ...flowRecord,
+    refundAmountZat: 500000,
+    confirmedRefundAmountZat: 500000,
+    pendingRefundAmountZat: 0,
+    remainingAmountZat: 1500000,
+    status: "confirmed",
+    refundRequests: flowRecord.refundRequests.map((request) => ({
+      ...request,
+      status: "settled",
+      approvedZat: 500000,
+      decisionReason: "Approved size return",
+    })),
+    refunds: [{ id: "flow-refund", amountZat: 500000, status: "confirmed" }],
+    payment: { ...base.payment, refundedZat: 500000, availableZat: 1500000 },
+  };
+  customerReceipt = flowRecord;
+  await visit("http://127.0.0.1:3000/receipt#" + "b".repeat(43));
+  await page
+    .getByRole("heading", { name: "Partially refunded", exact: true })
+    .waitFor();
+  await page
+    .getByText("fulfilled (merchant reported)", { exact: true })
+    .waitFor();
+  await page.getByText("Refund confirmed", { exact: true }).first().waitFor();
+  await capture("flow-settled-receipt");
+  await visit("http://127.0.0.1:3000/merchant/funds");
+  await page
+    .getByLabel("Shielded destination", { exact: true })
+    .fill("utest1" + "a".repeat(80));
+  await page.getByLabel("Amount in ZEC", { exact: true }).fill("0.005");
+  await page
+    .getByLabel("Current password", { exact: true })
+    .fill("fixture-password-only");
+  await page
+    .getByRole("button", { name: "Review withdrawal", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Confirm withdrawal", exact: true })
+    .waitFor();
+  await page
+    .getByText("Transaction fee: 0.0001 ZEC. Total debit: 0.0051 ZEC.", {
+      exact: true,
+    })
+    .waitFor();
+  await capture("flow-withdrawal-review");
+  await page
+    .getByRole("button", { name: "Cancel review", exact: true })
+    .click();
+  assert(
+    !posts.includes("withdrawal-confirm"),
+    "A withdrawal review must not authorize a send",
+  );
+  flowRecord = undefined;
+
   for (const state of ["empty", "loading", "error"]) {
     mode = state;
     await visit("http://127.0.0.1:3000/merchant");
@@ -618,9 +883,17 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   }
   assert(
     posts.every((action) =>
-      ["link", "prepare", "signup", "login", "resend-verification"].includes(
-        action,
-      ),
+      [
+        "link",
+        "prepare",
+        "signup",
+        "login",
+        "resend-verification",
+        "requests",
+        "refund-request",
+        "fulfillment",
+        "withdrawal-quote",
+      ].includes(action),
     ),
     "Review only permits explicitly mocked requests, never a refund or withdrawal",
   );
