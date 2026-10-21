@@ -70,7 +70,7 @@ impl VerifiedTransaction {
         decrypt_and_store_transaction(&MAIN_NETWORK,db,&self.tx,Some(BlockHeight::from_u32(self.height)))
             .map_err(|_| "transaction_store")
     }
-    pub fn matching_output<A: Copy+Eq>(&self, keys: &HashMap<A,UnifiedFullViewingKey>, expected: &Expected<A>)
+    pub fn matching_output<A: Copy+Eq+std::hash::Hash>(&self, keys: &HashMap<A,UnifiedFullViewingKey>, expected: &Expected<A>)
         -> Result<usize, &'static str> {
         if self.tip.checked_sub(self.height).and_then(|n| n.checked_add(1)).unwrap_or(0) < expected.confirmations {
             return Err("insufficient_confirmations");
@@ -86,8 +86,8 @@ impl VerifiedTransaction {
         let matches: Vec<_> = outputs.iter().filter(|out|
             *out.account()==expected.account && out.value_pool()==expected.pool
             && out.transfer_type()==expected.direction
-            && out.note().recipient().to_raw_address_bytes()==expected.receiver.0
-            && out.note().value().inner()==expected.amount && out.memo()==&expected.memo
+            && out.note().0.recipient().to_raw_address_bytes()==expected.receiver.0
+            && out.note().0.value().inner()==expected.amount && out.memo()==&expected.memo
         ).map(|out|out.index()).collect();
         match matches.as_slice() {
             [index] => Ok(*index), [] => Err("exact_output_not_found"), _ => Err("ambiguous_output_match"),
@@ -122,7 +122,7 @@ pub async fn enhance(client: &mut Client, db: &Database, requested: TxId)
     let block = client.get_block(BlockId{height:raw.height,hash:vec![]})
         .await.map_err(|_| "transaction_block_rpc")?.into_inner();
     if block.height!=raw.height || block.hash.as_slice()!=anchor.0
-        || block.vtx.iter().filter(|t|t.hash.as_slice()==requested.as_ref()).count()!=1 {
+        || block.vtx.iter().filter(|t|t.txid.as_slice()==requested.as_ref()).count()!=1 {
         return Err("transaction_block_mismatch");
     }
     Ok(VerifiedTransaction{tx,height,tip:u32::from(tip),anchor})
@@ -152,7 +152,7 @@ pub async fn check_public_fetch(client: &mut Client, db: &Database) -> Result<()
     let block = client.get_block(BlockId{height:u64::from(height),hash:vec![]})
         .await.map_err(|_| "public_block_rpc")?.into_inner();
     if block.height!=u64::from(height) || block.hash.as_slice()!=anchor.0 {return Err("public_block_anchor");}
-    let hash: [u8;32] = block.vtx.first().ok_or("public_block_empty")?.hash.as_slice().try_into().map_err(|_| "public_txid")?;
+    let hash: [u8;32] = block.vtx.first().ok_or("public_block_empty")?.txid.as_slice().try_into().map_err(|_| "public_txid")?;
     let id = TxId::from_bytes(hash);
     let raw = client.get_transaction(TxFilter{block:None,index:0,hash:hash.to_vec()})
         .await.map_err(|_| "public_transaction_rpc")?.into_inner();

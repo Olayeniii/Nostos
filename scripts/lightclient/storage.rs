@@ -1,0 +1,103 @@
+//! Linux-only protected SQLite opening. No real-key intake or backup export.
+use std::{fs::{self,File,OpenOptions}, os::unix::fs::{MetadataExt,OpenOptionsExt}, path::Path};
+use super::Database;
+
+pub struct ProtectedWallet {db: Database, _lock: File}
+const FILES: [&str;5] = ["wallet.sqlite","wallet.sqlite-wal","wallet.sqlite-shm","wallet.sqlite-journal","writer.lock"];
+
+fn private_file(meta: &fs::Metadata, uid: u32) -> Result<(), &'static str> {
+    if !meta.is_file() || meta.uid()!=uid || meta.mode()&0o077!=0 || meta.nlink()!=1 {
+        return Err("unsafe_wallet_file");
+    }
+    Ok(())
+}
+fn validate(root: &Path) -> Result<u32, &'static str> {
+    let uid = fs::metadata("/proc/self").map_err(|_| "process_identity")?.uid();
+    if !root.is_absolute() || fs::canonicalize(root).map_err(|_| "storage_path")?!=root {
+        return Err("storage_path_not_canonical");
+    }
+    let meta=fs::symlink_metadata(root).map_err(|_| "storage_directory")?;
+    if !meta.is_dir() || meta.uid()!=uid || meta.mode()&0o077!=0 {return Err("unsafe_storage_directory");}
+    for parent in root.ancestors().skip(1) {
+        let m=fs::symlink_metadata(parent).map_err(|_| "storage_ancestor")?;
+        // A root-owned sticky directory such as /tmp cannot be used by other users
+        // to replace this process's private child directory. Other writable
+        // ancestors and ancestors controlled by another user are rejected.
+        if !m.is_dir() || (m.uid()!=0 && m.uid()!=uid)
+            || (m.mode()&0o022!=0 && !(m.uid()==0 && m.mode()&0o1000!=0)) {
+            return Err("unsafe_storage_ancestor");
+        }
+    }
+    for name in FILES {
+        match fs::symlink_metadata(root.join(name)) {
+            Ok(meta) => private_file(&meta,uid)?,
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound => (),
+            Err(_) => return Err("wallet_file_metadata"),
+        }
+    }
+    // Unexpected copies, exported keys or raw logs are not accepted in this root.
+    for entry in fs::read_dir(root).map_err(|_| "storage_listing")? {
+        let name=entry.map_err(|_| "storage_entry")?.file_name();
+        if !FILES.iter().any(|n|name==*n) {return Err("unexpected_storage_file");}
+    }
+    Ok(uid)
+}
+fn open_private(root: &Path, name: &str, uid: u32) -> Result<File, &'static str> {
+    let file=OpenOptions::new().read(true).write(true).create(true).truncate(false).mode(0o600)
+        .custom_flags(nix::libc::O_NOFOLLOW).open(root.join(name)).map_err(|_| "protected_file_open")?;
+    private_file(&file.metadata().map_err(|_| "protected_file_metadata")?,uid)?;
+    Ok(file)
+}
+impl ProtectedWallet {
+    pub fn open(root: &Path) -> Result<Self, &'static str> {
+        let uid=validate(root)?;
+        let lock=open_private(root,"writer.lock",uid)?;
+        lock.try_lock().map_err(|_| "wallet_writer_locked")?;
+        // Pre-create with 0600 before SQLite can create a journal. SQLite derives
+        // WAL/SHM permissions from the database; audit them again after writes.
+        let _file=open_private(root,"wallet.sqlite",uid)?;
+        let db=super::open_fixture(&root.join("wallet.sqlite"))?;
+        validate(root)?;
+        Ok(Self{db,_lock:lock})
+    }
+    pub fn db(&self) -> &Database {&self.db}
+    pub fn db_mut(&mut self) -> &mut Database {&mut self.db}
+    pub fn audit(root: &Path) -> Result<(), &'static str> {validate(root).map(|_|())}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::{symlink,PermissionsExt};
+    #[test]
+    fn lock_excludes_a_second_writer_and_releases_on_close() {
+        let root=tempfile::tempdir().unwrap();
+        let first=ProtectedWallet::open(root.path()).unwrap();
+        assert!(ProtectedWallet::open(root.path()).is_err());
+        assert_eq!(fs::metadata(root.path().join("wallet.sqlite")).unwrap().mode()&0o777,0o600);
+        drop(first);
+        assert!(ProtectedWallet::open(root.path()).is_ok());
+    }
+    #[test]
+    fn exposed_directory_is_rejected_without_chmod_or_database_creation() {
+        let root=tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(),fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(ProtectedWallet::open(root.path()).is_err());
+        assert!(!root.path().join("wallet.sqlite").exists());
+    }
+    #[test]
+    fn symlinks_hardlinks_and_exposed_wal_are_rejected() {
+        let root=tempfile::tempdir().unwrap();
+        let other=tempfile::NamedTempFile::new().unwrap();
+        let path=root.path().join("wallet.sqlite-wal");
+        symlink(other.path(),&path).unwrap();
+        assert!(ProtectedWallet::open(root.path()).is_err());
+        fs::remove_file(&path).unwrap();
+        fs::hard_link(other.path(),&path).unwrap();
+        assert!(ProtectedWallet::open(root.path()).is_err());
+        fs::remove_file(&path).unwrap();
+        fs::write(&path,[]).unwrap();
+        fs::set_permissions(&path,fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(ProtectedWallet::open(root.path()).is_err());
+    }
+}

@@ -4,7 +4,7 @@ mod observer;
 use std::time::Duration;
 use tonic::transport::{ClientTlsConfig, Endpoint};
 use zcash_client_backend::{data_api::{AccountBirthday, WalletRead},
-    proto::service::{compact_tx_streamer_client::CompactTxStreamerClient, BlockId, Empty}};
+    proto::service::{BlockId, Empty}};
 use zcash_keys::keys::{UnifiedSpendingKey, UnifiedFullViewingKey};
 use zcash_address::unified::{Container, Encoding, Fvk, Ufvk};
 use zcash_protocol::consensus::MAIN_NETWORK;
@@ -18,6 +18,7 @@ fn fixture_key(seed: u8) -> Result<UnifiedFullViewingKey, &'static str> {
     UnifiedFullViewingKey::decode(&MAIN_NETWORK,&orchard_only.encode(&network)).map_err(|_| "fixture_key_decode")
 }
 
+#[cfg(test)]
 fn only_shielded_reads(request: tonic::Request<()>) -> Result<tonic::Request<()>,tonic::Status> {
     observer::transactions::shielded_reads(request)
 }
@@ -39,26 +40,26 @@ async fn check() -> Result<serde_json::Value, &'static str> {
     // Public deterministic test material only. Never export the address or fund it.
     let key = fixture_key(9)?;
     let temp = tempfile::tempdir().map_err(|_| "fixture_directory")?;
-    let path = temp.path().join("fixture.sqlite");
-    let mut db = observer::open_fixture(&path)?;
+    let mut wallet = observer::storage::ProtectedWallet::open(temp.path())?;
+    let db = wallet.db_mut();
     let unscoped = UnifiedSpendingKey::from_seed(&MAIN_NETWORK,&[9;32],zip32::AccountId::ZERO)
         .map_err(|_| "fixture_key")?.to_unified_full_viewing_key();
-    if observer::import_once(&mut db,&unscoped,&birthday,birthday_height).is_ok()
+    if observer::import_once(db,&unscoped,&birthday,birthday_height).is_ok()
         || !db.get_account_ids().map_err(|_| "account_count")?.is_empty() {
         return Err("transparent_key_not_rejected_before_import");
     }
-    if !observer::import_once(&mut db,&key,&birthday,birthday_height)? { return Err("initial_import"); }
-    if observer::import_once(&mut db,&key,&birthday,birthday_height)? { return Err("duplicate_import"); }
-    if observer::import_once(&mut db,&key,&birthday,birthday_height+1).is_ok() { return Err("birthday_conflict_allowed"); }
+    if !observer::import_once(db,&key,&birthday,birthday_height)? { return Err("initial_import"); }
+    if observer::import_once(db,&key,&birthday,birthday_height)? { return Err("duplicate_import"); }
+    if observer::import_once(db,&key,&birthday,birthday_height+1).is_ok() { return Err("birthday_conflict_allowed"); }
     let other = fixture_key(10)?;
-    if observer::import_once(&mut db,&other,&birthday,birthday_height).is_ok() { return Err("different_key_allowed"); }
+    if observer::import_once(db,&other,&birthday,birthday_height).is_ok() { return Err("different_key_allowed"); }
     // Retry only public reads. A new in-memory cache cannot overwrite durable account identity.
     let mut synced = false;
     let mut attempts = 0;
     for attempt in 0..3 {
         attempts += 1;
         let cache = observer::MemoryCache::default();
-        match zcash_client_backend::sync::run(&mut client,&MAIN_NETWORK,&cache,&mut db,128).await {
+        match zcash_client_backend::sync::run(&mut client,&MAIN_NETWORK,&cache,db,128).await {
             Ok(()) => { synced = true; break; },
             Err(zcash_client_backend::sync::Error::Server(status)) if matches!(status.code(),
                 tonic::Code::Unavailable | tonic::Code::DeadlineExceeded | tonic::Code::ResourceExhausted) => {
@@ -77,17 +78,20 @@ async fn check() -> Result<serde_json::Value, &'static str> {
     if !synced { return Err("fixture_scan"); }
     let first = db.block_fully_scanned().map_err(|_| "scan_status")?.ok_or("no_scanned_block")?.block_height();
     if u32::from(first) < info.block_height as u32 { return Err("fixture_not_synced"); }
-    drop(db);
-    let mut db = observer::open_fixture(&path)?;
-    if observer::import_once(&mut db,&key,&birthday,birthday_height)? { return Err("reopen_reimported"); }
+    observer::storage::ProtectedWallet::audit(temp.path())?;
+    drop(wallet);
+    let mut wallet = observer::storage::ProtectedWallet::open(temp.path())?;
+    let db = wallet.db_mut();
+    if observer::import_once(db,&key,&birthday,birthday_height)? { return Err("reopen_reimported"); }
     if db.get_account_ids().map_err(|_| "account_count")?.len() != 1 { return Err("duplicate_account"); }
     let reopened = db.block_fully_scanned().map_err(|_| "reopen_status")?.ok_or("lost_scan_checkpoint")?.block_height();
     if reopened != first { return Err("changed_scan_checkpoint"); }
-    zcash_client_backend::sync::run(&mut client,&MAIN_NETWORK,&observer::MemoryCache::default(),&mut db,128)
+    zcash_client_backend::sync::run(&mut client,&MAIN_NETWORK,&observer::MemoryCache::default(),db,128)
         .await.map_err(|_| "resume_scan")?;
-    observer::transactions::check_public_fetch(&mut client,&db).await?;
-    if observer::transactions::enhance_pending(&mut client,&mut db).await? != 0 {return Err("unexpected_fixture_transactions");}
-    Ok(serde_json::json!({"public_transaction_fetch_passed":true,"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
+    observer::transactions::check_public_fetch(&mut client,db).await?;
+    if observer::transactions::enhance_pending(&mut client,db).await? != 0 {return Err("unexpected_fixture_transactions");}
+    observer::storage::ProtectedWallet::audit(temp.path())?;
+    Ok(serde_json::json!({"protected_storage_checked":true,"public_transaction_fetch_passed":true,"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
         "same_key_idempotent":true,"changed_key_rejected":true,"changed_birthday_rejected":true,
         "shielded_rpc_allowlist_enforced":true,"sampled_height":info.block_height,"fully_scanned_height":u32::from(reopened),"attempts":attempts}))
 }

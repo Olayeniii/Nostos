@@ -145,3 +145,6 @@ mod tests {
 
 #[path = "transactions.rs"]
 pub mod transactions;
+
+#[path = "storage.rs"]
+pub mod storage;
