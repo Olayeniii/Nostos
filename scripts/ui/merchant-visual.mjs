@@ -620,7 +620,12 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .getByRole("alert")
     .filter({ hasText: "Sign in is temporarily unavailable" })
     .waitFor();
-  assert.equal(await page.getByRole("link", { name: "Resend verification email", exact: true }).count(), 0);
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Resend verification email", exact: true })
+      .count(),
+    0,
+  );
   await capture("sign-in-error");
 
   await visit("http://127.0.0.1:3000/account-help");
