@@ -9,6 +9,8 @@
   color: #192e29;
   max-width: none;
   min-height: 100svh;
+  display: flex;
+  flex-direction: column;
   margin: 0;
   padding: 0;
 }
@@ -32,6 +34,8 @@
   font-size: 11px;
 }
 .public-body {
+  width: 100%;
+  flex: 1;
   max-width: 1240px;
   margin: auto;
   padding: 44px 36px 56px;
@@ -163,6 +167,8 @@
   color: #9c442f;
 }
 .public-surface > footer {
+  width: 100%;
+  flex-shrink: 0;
   max-width: 1240px;
   margin: 0 auto;
   padding: 24px 36px 32px;
