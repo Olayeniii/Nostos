@@ -160,8 +160,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
       content: "nextjs-portal { display: none !important; }",
     });
     if (
-      (width === 1440 && name === "detail") ||
-      (width === 390 && name === "payments")
+      process.env.UI_SCREENSHOTS !== "0" &&
+      ((width === 1440 && name === "detail") ||
+        (width === 390 && name === "payments"))
     ) {
       await page.screenshot({
         path: `${out}/${width}-${name}.png`,
@@ -178,6 +179,18 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await page.goto("http://127.0.0.1:3000/merchant");
   await page.getByRole("button", { name: /Studio commission/ }).waitFor();
   await capture("payments");
+  assert.equal(
+    await page
+      .locator(".summary-grid article")
+      .evaluateAll((items) =>
+        items.every(
+          (item) => window.getComputedStyle(item).display === "block",
+        ),
+      ),
+    true,
+    "Summary labels and values must stack inside each metric",
+  );
+
   if (phase === "after") {
     const search = page.getByRole("searchbox", { name: "Find a payment" });
     await search.fill("no-such-order-reference");

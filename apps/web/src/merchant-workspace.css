@@ -162,6 +162,7 @@
   overflow: visible;
 }
 .merchant-studio .summary-grid article {
+  display: block;
   background: transparent;
   color: #192e29;
   padding: 23px 26px;
@@ -562,6 +563,7 @@
     margin-bottom: 28px;
   }
   .merchant-studio .summary-grid article {
+    display: block;
     padding: 18px 12px;
   }
   .merchant-studio .summary-grid article:first-child {
@@ -690,4 +692,25 @@
 }
 .merchant-studio .empty-state::before {
   border-color: #537847;
+}
+
+@media (max-width: 900px) {
+  .merchant-studio .dashboard-title {
+    text-align: left;
+    justify-content: space-between;
+  }
+  .merchant-studio .ledger-row .ledger-amount {
+    display: block;
+    white-space: nowrap;
+  }
+  .merchant-studio .ledger-row .ledger-amount small {
+    display: inline;
+  }
+  .merchant-studio .summary-grid article + article strong {
+    display: block;
+    margin: 12px 0 8px;
+  }
+  .merchant-studio .summary-grid article + article p {
+    line-height: 1.6;
+  }
 }

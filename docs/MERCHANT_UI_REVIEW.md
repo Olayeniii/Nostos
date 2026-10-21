@@ -11,9 +11,12 @@ Scope is the shared workspace component and Payments only. Funds, Settings,
 Overview, Refunds, and customer-facing refinements remain for later checkpoints.
 Links point only to existing screens; no placeholder destinations are presented.
 
-The browser job now saves exactly two images: 390px Payments and 1440px payment
+The initial browser job saved exactly two images (run 39518231585): 390px Payments and 1440px payment
 details. The existing baseline is retained in previous PR artifacts; it is not
-recaptured. Layout and workflow assertions still run at 320, 375, 390, 430, 768,
+recaptured. Visual review caught an inherited grid rule in the phone totals; the
+metrics now explicitly stack their labels, amounts, and helper text. Follow-up
+verification runs with screenshots disabled to preserve the two-image budget.
+Layout and workflow assertions still run at 320, 375, 390, 430, 768,
 and 1440px, including populated, empty, loading, error, and detail states. Search,
 filter reset, refund review, and unavailable-route guards are checked without
 sending a payment, refund, or withdrawal. Browser data is explicitly fixture data.
