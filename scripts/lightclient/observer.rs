@@ -142,3 +142,6 @@ mod tests {
         assert_eq!(cache.get_tip_height(None).unwrap(),None);
     }
 }
+
+#[path = "transactions.rs"]
+pub mod transactions;

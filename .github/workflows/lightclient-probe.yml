@@ -47,6 +47,8 @@ jobs:
           cp nostos/scripts/lightclient/probe.rs zallet/zallet-core/examples/nostos_lightclient_probe.rs
           mkdir -p zallet/zallet-core/examples/nostos_observer
           cp nostos/scripts/lightclient/observer.rs zallet/zallet-core/examples/nostos_observer/mod.rs
+          cp nostos/scripts/lightclient/transactions.rs zallet/zallet-core/examples/nostos_observer/transactions.rs
+          cp nostos/scripts/lightclient/transaction_tests.rs zallet/zallet-core/examples/nostos_observer/transaction_tests.rs
           cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
           python3 nostos/scripts/lightclient/prepare.py zallet
       - name: Test full viewing key decoding without a real key

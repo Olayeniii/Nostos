@@ -19,17 +19,14 @@ fn fixture_key(seed: u8) -> Result<UnifiedFullViewingKey, &'static str> {
 }
 
 fn only_shielded_reads(request: tonic::Request<()>) -> Result<tonic::Request<()>,tonic::Status> {
-    let allowed = request.extensions().get::<tonic::GrpcMethod>().is_some_and(|m| matches!(m.method(),
-        "GetLightdInfo" | "GetTreeState" | "GetLatestBlock" | "GetBlockRange" | "GetSubtreeRoots"));
-    if allowed { Ok(request) } else { Err(tonic::Status::permission_denied("method_not_allowlisted")) }
+    observer::transactions::shielded_reads(request)
 }
 
 async fn check() -> Result<serde_json::Value, &'static str> {
     let endpoint = Endpoint::from_static("https://zec.rocks:443")
         .connect_timeout(Duration::from_secs(5)).timeout(Duration::from_secs(30))
         .tls_config(ClientTlsConfig::new().with_webpki_roots()).map_err(|_| "tls_configuration")?;
-    let mut client = CompactTxStreamerClient::with_interceptor(
-        endpoint.connect().await.map_err(|_| "tls_connection")?, only_shielded_reads);
+    let mut client = observer::transactions::client(endpoint.connect().await.map_err(|_| "tls_connection")?);
     let info = client.get_lightd_info(Empty{}).await.map_err(|_| "chain_metadata")?.into_inner();
     if info.chain_name != "main" || info.block_height < 3_428_200 || info.block_height > u64::from(u32::MAX-100) {
         return Err("mainnet_identity");
@@ -88,7 +85,9 @@ async fn check() -> Result<serde_json::Value, &'static str> {
     if reopened != first { return Err("changed_scan_checkpoint"); }
     zcash_client_backend::sync::run(&mut client,&MAIN_NETWORK,&observer::MemoryCache::default(),&mut db,128)
         .await.map_err(|_| "resume_scan")?;
-    Ok(serde_json::json!({"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
+    observer::transactions::check_public_fetch(&mut client,&db).await?;
+    if observer::transactions::enhance_pending(&mut client,&mut db).await? != 0 {return Err("unexpected_fixture_transactions");}
+    Ok(serde_json::json!({"public_transaction_fetch_passed":true,"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
         "same_key_idempotent":true,"changed_key_rejected":true,"changed_birthday_rejected":true,
         "shielded_rpc_allowlist_enforced":true,"sampled_height":info.block_height,"fully_scanned_height":u32::from(reopened),"attempts":attempts}))
 }
