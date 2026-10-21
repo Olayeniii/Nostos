@@ -209,3 +209,56 @@ it("requires session and origin, and connection status does not return the viewi
   expect(body).not.toContain(account);
   expect(body).toContain('"paymentsEnabled":false');
 });
+
+it("keeps SDK preview mainnet-only and requires an authenticated merchant namespace", () => {
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RPC_URL", "http://127.0.0.1:38235");
+  vi.stubEnv(
+    "NOSTOS_MAINNET_OBSERVER_RPC_COOKIE_FILE",
+    "/preview/service.cookie",
+  );
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  expect(() => observerWallet(merchantId)).toThrow();
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  expect(() => observerWallet()).toThrow();
+  expect(() => observerWallet(merchantId)).not.toThrow();
+});
+it("requires SDK scope consent before saving or importing view access", async () => {
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  await expect(
+    connectObserver(store, merchantId, input(), rpc, node),
+  ).rejects.toThrow();
+  expect(calls).toHaveLength(0);
+  expect(observerConnection(store, merchantId)).toBeNull();
+  const result = await connectObserver(
+    store,
+    merchantId,
+    { ...input(), scopeConsent: true },
+    rpc,
+    node,
+  );
+  expect(result.paymentsEnabled).toBe(false);
+  expect(
+    store.db
+      .prepare(
+        "SELECT consent_version FROM merchant_observers WHERE merchant_id=?",
+      )
+      .get(merchantId)?.consent_version,
+  ).toBe("sdk-orchard-view-access-v1");
+});
+it("does not silently convert a prior observer claim to SDK consent", async () => {
+  await connectObserver(store, merchantId, input(), rpc, node);
+  calls.length = 0;
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  await expect(
+    connectObserver(
+      store,
+      merchantId,
+      { ...input(), scopeConsent: true },
+      rpc,
+      node,
+    ),
+  ).rejects.toThrow();
+  expect(calls).toHaveLength(0);
+});

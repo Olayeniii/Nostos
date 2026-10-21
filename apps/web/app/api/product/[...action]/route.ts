@@ -429,8 +429,9 @@ async function handle(request: Request) {
             viewingKey: body.viewingKey,
             birthday: body.birthday,
             consent: body.consent,
+            scopeConsent: body.scopeConsent,
           },
-          observerWallet(),
+          observerWallet(merchant.id),
           chainWallet(),
         ),
       });

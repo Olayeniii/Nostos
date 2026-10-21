@@ -8,6 +8,7 @@ import { prepareOrchardRefundRoute } from "../../../packages/zcash-adapter/src/r
 import { type ProductStore } from "./product-store.js";
 import { reauthenticated } from "./merchant-identity.js";
 import { assertWalletChainIdentity, type WalletRpc } from "./wallet-runtime.js";
+import { SdkObserverClient } from "./sdk-observer.js";
 
 export class ObserverError extends Error {
   constructor() {
@@ -21,7 +22,19 @@ export type ObserverRpc = Pick<
   "call" | "decodeUnifiedAddress"
 >;
 const consentVersion = "business-full-viewing-key-v1";
-export function observerWallet() {
+export function sdkObserverSelected() {
+  const backend = runtimeValue("NOSTOS_OBSERVER_BACKEND");
+  if (backend && backend !== "zallet" && backend !== "sdk-preview")
+    throw new ObserverError();
+  if (
+    backend === "sdk-preview" &&
+    (runtimeNetwork() !== "mainnet" ||
+      runtimeValue("NOSTOS_WALLET_MODE") !== "observer-preview")
+  )
+    throw new ObserverError();
+  return backend === "sdk-preview";
+}
+export function observerWallet(merchantId?: string) {
   const url = runtimeValue("NOSTOS_OBSERVER_RPC_URL"),
     cookieFile = runtimeValue("NOSTOS_OBSERVER_RPC_COOKIE_FILE");
   if (
@@ -31,6 +44,11 @@ export function observerWallet() {
     cookieFile === runtimeValue("NOSTOS_MERCHANT_WALLET_RPC_COOKIE_FILE")
   )
     throw new ObserverError();
+  if (sdkObserverSelected())
+    return new SdkObserverClient(
+      { url, cookieFile, timeoutMs: 15000 },
+      merchantId ?? "",
+    );
   return new ZalletRpcClient({ url, cookieFile, timeoutMs: 15000 });
 }
 function schema(store: ProductStore) {
@@ -68,11 +86,13 @@ export async function connectObserver(
     viewingKey: unknown;
     birthday: unknown;
     consent: unknown;
+    scopeConsent?: unknown;
   },
   rpc: ObserverRpc,
   node: Pick<WalletRpc, "call">,
 ) {
   const network = runtimeNetwork();
+  const sdk = sdkObserverSelected();
   const merchant = store.merchant(merchantId);
   if (
     typeof input.password !== "string" ||
@@ -86,6 +106,7 @@ export async function connectObserver(
     merchant.wallet ||
     merchant.destination ||
     input.consent !== true ||
+    (sdk && input.scopeConsent !== true) ||
     typeof input.viewingKey !== "string" ||
     !new RegExp(
       `^${network === "mainnet" ? "uview1" : "uviewtest1"}[a-z0-9]{20,3000}$`,
@@ -106,10 +127,15 @@ export async function connectObserver(
   try {
     const row = store.db
       .prepare(
-        "SELECT key_hash,birthday FROM merchant_observers WHERE merchant_id=?",
+        "SELECT key_hash,birthday,consent_version FROM merchant_observers WHERE merchant_id=?",
       )
       .get(merchantId);
-    if (row && (row.key_hash !== fingerprint || row.birthday !== birthday))
+    if (
+      row &&
+      (row.key_hash !== fingerprint ||
+        row.birthday !== birthday ||
+        (sdk && row.consent_version !== "sdk-orchard-view-access-v1"))
+    )
       throw new ObserverError();
     if (!row)
       store.db
@@ -122,7 +148,7 @@ export async function connectObserver(
           fingerprint,
           store.encrypt(key),
           birthday,
-          consentVersion,
+          sdk ? "sdk-orchard-view-access-v1" : consentVersion,
           new Date().toISOString(),
         );
     store.db.exec("COMMIT");

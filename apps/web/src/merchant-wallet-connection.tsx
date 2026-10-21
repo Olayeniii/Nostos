@@ -19,7 +19,9 @@ export function MerchantWalletConnection() {
       <p className="privacy">
         A full viewing key reveals account activity and payment memos. It cannot
         spend. Use a dedicated business account. Never enter a recovery phrase
-        or spending key here.
+        or spending key here. Hosted chain services may see the server network
+        address and requested transaction IDs. SDK preview observes only the
+        Orchard pool family; it does not import transparent view access.
       </p>
       {data?.connection && (
         <p role="status">
@@ -45,6 +47,7 @@ export function MerchantWalletConnection() {
             birthday: Number(fields.get("birthday")),
             password: String(fields.get("password") ?? ""),
             consent: fields.get("consent") === "on",
+            scopeConsent: fields.get("consent") === "on",
           };
           form.reset();
           setBusy(true);
@@ -111,7 +114,8 @@ export function MerchantWalletConnection() {
           <input name="consent" type="checkbox" required disabled={busy} /> I
           grant NOSTOS view access to this dedicated business account and
           understand that account activity and memos are visible to its
-          operator.
+          operator. For SDK preview, I authorize Orchard-family view access and
+          the hosted chain queries described above.
         </label>
         <button className="primary" disabled={busy}>
           {busy ? "Checking view access" : "Connect view access"}

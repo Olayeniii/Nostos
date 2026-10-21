@@ -93,7 +93,33 @@ async fn check() -> Result<serde_json::Value, &'static str> {
     observer::transactions::check_public_fetch(&mut client,db).await?;
     if observer::transactions::enhance_pending(&mut client,db).await? != 0 {return Err("unexpected_fixture_transactions");}
     observer::storage::ProtectedWallet::audit(temp.path())?;
-    Ok(serde_json::json!({"protected_storage_checked":true,"public_transaction_fetch_passed":true,"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
+    let mut connection=observer::connection::Connection::new(wallet,client);
+    let full=UnifiedSpendingKey::from_seed(&MAIN_NETWORK,&[9;32],zip32::AccountId::ZERO)
+        .map_err(|_| "fixture_key")?.to_unified_full_viewing_key().encode(&MAIN_NETWORK);
+    let params=vec![serde_json::json!(full),serde_json::json!("whenkeyisnew"),serde_json::json!(birthday_height)];
+    let imported=connection.handle("z_importviewingkey",&params).await?;
+    let repeated=connection.handle("z_importviewingkey",&params).await?;
+    if imported.get("nostos_sdk_preview_v1")!=Some(&serde_json::json!(true)) || imported!=repeated {return Err("connection_identity");}
+    if connection.handle("z_sendfromaccount",&[]).await.is_ok() {return Err("connection_send_allowed");}
+    let script=std::env::var("NOSTOS_SERVICE_E2E_SCRIPT").map_err(|_| "service_fixture_script")?;
+    let worker=std::env::current_exe().map_err(|_| "fixture_executable")?.with_file_name("nostos_sdk_worker");
+    let mut child=std::process::Command::new("node").arg(script).arg(worker)
+        .stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null())
+        .spawn().map_err(|_| "service_fixture_start")?;
+    use std::io::Write;
+    let payload=serde_json::to_vec(&serde_json::json!({"public_fixture_only":true,"key":full,"birthday":birthday_height}))
+        .map_err(|_| "service_fixture_payload")?;
+    child.stdin.take().ok_or("service_fixture_input")?.write_all(&payload).map_err(|_| "service_fixture_input")?;
+    let result=child.wait_with_output().map_err(|_| "service_fixture_wait")?;
+    let proof:serde_json::Value=serde_json::from_slice(&result.stdout).map_err(|_| "service_fixture_result")?;
+    if !result.status.success() || proof.get("service_pipe_e2e_passed")!=Some(&serde_json::json!(true)) {
+        return Err(match proof.get("failed_stage").and_then(serde_json::Value::as_str) {
+            Some("authentication")=>"service_fixture_authentication",Some("initial_status")=>"service_fixture_initial_status",
+            Some("import")=>"service_fixture_import",Some("receivers")=>"service_fixture_receivers",
+            Some("namespace")=>"service_fixture_namespace",_=>"service_fixture_failed",
+        });
+    }
+    Ok(serde_json::json!({"service_pipe_e2e_passed":true,"protected_storage_checked":true,"public_transaction_fetch_passed":true,"fixture_scan_passed":true,"reopen_checkpoint_passed":true,
         "same_key_idempotent":true,"changed_key_rejected":true,"changed_birthday_rejected":true,
         "shielded_rpc_allowlist_enforced":true,"sampled_height":info.block_height,"fully_scanned_height":u32::from(reopened),"attempts":attempts}))
 }

@@ -110,7 +110,7 @@ pub fn import_once(db: &mut Database, key: &UnifiedFullViewingKey, birthday: &Ac
     if !db.get_account_ids().map_err(|_| "account_lookup")?.is_empty() {
         return Err("different_account_exists");
     }
-    db.import_account_ufvk("observer-fixture", key, birthday, AccountPurpose::ViewOnly, None)
+    db.import_account_ufvk("nostos-observer", key, birthday, AccountPurpose::ViewOnly, None)
         .map_err(|_| "view_only_import")?;
     Ok(true)
 }
@@ -148,3 +148,6 @@ pub mod transactions;
 
 #[path = "storage.rs"]
 pub mod storage;
+
+#[path = "connection.rs"]
+pub mod connection;

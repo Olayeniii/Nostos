@@ -46,6 +46,8 @@ jobs:
           mkdir -p zallet/zallet-core/examples
           cp nostos/scripts/lightclient/probe.rs zallet/zallet-core/examples/nostos_lightclient_probe.rs
           mkdir -p zallet/zallet-core/examples/nostos_observer
+          cp nostos/scripts/lightclient/connection.rs zallet/zallet-core/examples/nostos_observer/connection.rs
+          cp nostos/scripts/lightclient/worker.rs zallet/zallet-core/examples/nostos_sdk_worker.rs
           cp nostos/scripts/lightclient/observer.rs zallet/zallet-core/examples/nostos_observer/mod.rs
           cp nostos/scripts/lightclient/storage.rs zallet/zallet-core/examples/nostos_observer/storage.rs
           cp nostos/scripts/lightclient/transactions.rs zallet/zallet-core/examples/nostos_observer/transactions.rs
@@ -61,8 +63,15 @@ jobs:
       - name: Test observer cache gaps and rewind behavior
         working-directory: zallet
         run: cargo +1.95.0 test --locked -p zallet-core --example nostos_observer_fixture
-      - name: Prove temporary view-only sync and database reopen
+      - name: Build private pipe worker
         working-directory: zallet
+        run: cargo +1.95.0 build --locked -p zallet-core --example nostos_sdk_worker
+      - name: Test local service authentication and boundaries
+        run: node --test nostos/scripts/lightclient/service.test.mjs
+      - name: Prove temporary view-only sync, reopen and authenticated service connection
+        working-directory: zallet
+        env:
+          NOSTOS_SERVICE_E2E_SCRIPT: ../nostos/scripts/lightclient/service-e2e.mjs
         run: cargo +1.95.0 run --locked -p zallet-core --example nostos_observer_fixture
       - uses: actions/cache/save@v4
         if: always() && steps.cache.outputs.cache-hit != 'true'
