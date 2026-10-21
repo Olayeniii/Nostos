@@ -1,10 +1,12 @@
 import { Mark } from "../src/mark.js";
 import Link from "next/link";
 import { AppHeader, AppFooter } from "../src/shell.js";
-export default function Home() {
+import { accountWorkspace } from "../src/account-workspace.server.js";
+export default async function Home() {
+  const accountHref = await accountWorkspace();
   return (
     <main className="product-app">
-      <AppHeader />
+      <AppHeader accountHref={accountHref} />
       <section className="product-home">
         <div className="home-hero">
           <div className="home-intro">
@@ -20,11 +22,11 @@ export default function Home() {
               payment.
             </p>
             <div className="home-actions">
-              <Link className="primary" href="/sign-up">
+              <Link className="primary" href={accountHref ?? "/sign-up"}>
                 Accept ZEC payments
               </Link>
-              <Link className="secondary" href="/sign-in">
-                Sign in
+              <Link className="secondary" href={accountHref ?? "/sign-in"}>
+                {accountHref ? "Open workspace" : "Sign in"}
               </Link>
             </div>
           </div>
