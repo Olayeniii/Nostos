@@ -60,7 +60,6 @@ impl ProtectedWallet {
         validate(root)?;
         Ok(Self{db,_lock:lock})
     }
-    pub fn db(&self) -> &Database {&self.db}
     pub fn db_mut(&mut self) -> &mut Database {&mut self.db}
     pub fn audit(root: &Path) -> Result<(), &'static str> {validate(root).map(|_|())}
 }
@@ -69,9 +68,14 @@ impl ProtectedWallet {
 mod tests {
     use super::*;
     use std::os::unix::fs::{symlink,PermissionsExt};
+    fn private_root() -> tempfile::TempDir {
+        let root=tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(),fs::Permissions::from_mode(0o700)).unwrap();
+        root
+    }
     #[test]
     fn lock_excludes_a_second_writer_and_releases_on_close() {
-        let root=tempfile::tempdir().unwrap();
+        let root=private_root();
         let first=ProtectedWallet::open(root.path()).unwrap();
         assert!(ProtectedWallet::open(root.path()).is_err());
         assert_eq!(fs::metadata(root.path().join("wallet.sqlite")).unwrap().mode()&0o777,0o600);
@@ -80,14 +84,29 @@ mod tests {
     }
     #[test]
     fn exposed_directory_is_rejected_without_chmod_or_database_creation() {
-        let root=tempfile::tempdir().unwrap();
+        let root=private_root();
         fs::set_permissions(root.path(),fs::Permissions::from_mode(0o755)).unwrap();
         assert!(ProtectedWallet::open(root.path()).is_err());
         assert!(!root.path().join("wallet.sqlite").exists());
     }
     #[test]
+    fn wal_and_shm_inherit_private_database_permissions() {
+        let root=private_root();
+        let mut wallet=ProtectedWallet::open(root.path()).unwrap();
+        let connection=rusqlite::Connection::open(root.path().join("wallet.sqlite")).unwrap();
+        connection.pragma_update(None,"journal_mode","WAL").unwrap();
+        let height=zcash_protocol::consensus::BlockHeight::from_u32(3_524_931);
+        let birthday=zcash_client_backend::data_api::AccountBirthday::from_parts(
+            zcash_client_backend::data_api::chain::ChainState::empty(height-1,zcash_primitives::block::BlockHash([0;32])),None);
+        super::super::import_once(wallet.db_mut(),&crate::fixture_key(9).unwrap(),&birthday,u32::from(height)).unwrap();
+        for name in ["wallet.sqlite-wal","wallet.sqlite-shm"] {
+            assert_eq!(fs::metadata(root.path().join(name)).unwrap().mode()&0o777,0o600);
+        }
+        ProtectedWallet::audit(root.path()).unwrap();
+    }
+    #[test]
     fn symlinks_hardlinks_and_exposed_wal_are_rejected() {
-        let root=tempfile::tempdir().unwrap();
+        let root=private_root();
         let other=tempfile::NamedTempFile::new().unwrap();
         let path=root.path().join("wallet.sqlite-wal");
         symlink(other.path(),&path).unwrap();

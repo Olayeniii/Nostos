@@ -40,6 +40,8 @@ async fn check() -> Result<serde_json::Value, &'static str> {
     // Public deterministic test material only. Never export the address or fund it.
     let key = fixture_key(9)?;
     let temp = tempfile::tempdir().map_err(|_| "fixture_directory")?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(temp.path(),std::fs::Permissions::from_mode(0o700)).map_err(|_| "fixture_directory_mode")?;
     let mut wallet = observer::storage::ProtectedWallet::open(temp.path())?;
     let db = wallet.db_mut();
     let unscoped = UnifiedSpendingKey::from_seed(&MAIN_NETWORK,&[9;32],zip32::AccountId::ZERO)
