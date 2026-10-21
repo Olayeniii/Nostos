@@ -19,7 +19,9 @@ fn receiver(k: &UnifiedFullViewingKey) -> OrchardReceiver {
     OrchardReceiver(k.orchard().unwrap().address_at(0u32,Scope::External).to_raw_address_bytes())
 }
 fn fixture(pool: ShieldedPool, ovk_present: bool, duplicate: bool) -> (VerifiedTransaction, UnifiedFullViewingKey, UnifiedFullViewingKey) {
-    let sender = key(31);
+    fixture_from_sender(pool,ovk_present,duplicate,key(31))
+}
+fn fixture_from_sender(pool: ShieldedPool, ovk_present: bool, duplicate: bool, sender: UnifiedFullViewingKey) -> (VerifiedTransaction, UnifiedFullViewingKey, UnifiedFullViewingKey) {
     let customer = key(32);
     let recipient = customer.orchard().unwrap().address_at(0u32,Scope::External);
     let rho = Rho::from_bytes(&[0;32]).unwrap();
@@ -57,6 +59,113 @@ fn fixture(pool: ShieldedPool, ovk_present: bool, duplicate: bool) -> (VerifiedT
     let mut bytes = vec![]; tx.write(&mut bytes).unwrap();
     let parsed = decode(&bytes,tx.txid(),height,height+5).unwrap();
     (VerifiedTransaction{tx:parsed,height,tip:height+5,anchor:zcash_primitives::block::BlockHash([0;32])},sender,customer)
+}
+
+// Public, already-published SDK regression vectors. Never fund this account.
+// Source: zodl-inc/zodl-android-wallet-sdk @ 828874217a22bbf6ab7df4ea59b59f295d059ff4,
+// backend-lib/src/main/rust/unified_r0.rs, MAINNET_PRE_PORT. No mnemonic is copied.
+const PUBLIC_WALLET_EXPORT: &str = "uview188kc3e0wkwlv2qrke9wskcqz4qwj5sx0h8te0jgnfzyarwxm6ymzmsu9jzcl72pyamvj8whnvpfqahhx7nga2qgcv9zn9xsppym2vpcmw3204u57r5ygan9y3pllvv8wgk29ef34uycks9gee2plsa82v0g2dzdcve0g4y8ym4nmax9hnge4v9azw0hdzqr2pqr5uxq62x9p9vucdppq3f3u9z24jqx7envsh6tweu7a5xvrecxk7axjfad4pmtupsr76kvrqsjuqz3hpfdru5p6ty8qwjlfjr7p06u3dmmaap43k0fshcr3994a4l5cce2z3ef6ejdztqtqhd70xl43lmx938z56lz3d4w8twkjhx3en0up8dzqsjh5llmgxtdge3ux2lpxnr3f2e45enda2pa3qxx5pq2wjahj0k7vqfzqltkn3j0d5lxwppaqazyyfm5e5s93j4jzu25k663t8hwj6tq53mjagspzvl2y6fszhgvuudzt";
+const PUBLIC_WALLET_ADDRESS: &str = "u1ppm8qyhws4mrs2m2puq2nyyrcpzfrj8hynw00355wy7vapzw5f84udl5qs5xf9lh9antxyvqfcgh76h87946q7vw5d6rrmze8x2c6p7vw59uy6mkadgz2467358z3ar7edyjcm7gkpqhdlaxhdzhqhxfacff0fud38zyyzakkscdmwvee59xzf36rhm5xvc893wewsrfe5svcmg4l85";
+fn wallet_export() -> UnifiedFullViewingKey {
+    UnifiedFullViewingKey::decode(&MAIN_NETWORK,PUBLIC_WALLET_EXPORT).unwrap()
+}
+
+#[test]
+fn merchant_wallet_export_binds_visible_receiver_and_view_only_import() {
+    use zcash_client_backend::data_api::{Account, AccountBirthday, AccountPurpose, chain::ChainState};
+    let full=wallet_export();
+    assert_eq!(full.encode(&MAIN_NETWORK),PUBLIC_WALLET_EXPORT);
+    let scoped=super::super::connection::scoped_key(PUBLIC_WALLET_EXPORT).unwrap();
+    let (_,visible)=unified::Address::decode(PUBLIC_WALLET_ADDRESS).unwrap();
+    let bytes=visible.items().iter().find_map(|r|match r {
+        unified::Receiver::Orchard(bytes)=>Some(*bytes),_=>None,
+    }).unwrap();
+    let address=orchard::Address::from_raw_address_bytes(&bytes).unwrap();
+    assert_eq!(scoped.orchard().unwrap().scope_for_address(&address),Some(Scope::External));
+    assert!(key(51).orchard().unwrap().scope_for_address(&address).is_none());
+    assert!(scoped.transparent().is_none() && scoped.sapling().is_none());
+    assert_eq!(scoped.orchard().unwrap().to_bytes(),full.orchard().unwrap().to_bytes());
+    // Derive a shielded-only business destination, not a transparent fallback
+    // from the wallet's mixed display address. Receipt scanning covers the same account.
+    let destination=unified::Address::try_from_items(vec![unified::Receiver::Orchard(bytes)])
+        .unwrap().encode(&MAIN_NETWORK.network_type());
+    assert!(OrchardReceiver::parse_mainnet(&destination).is_ok());
+    assert!(OrchardReceiver::parse_mainnet(PUBLIC_WALLET_ADDRESS).is_err());
+    let temp=tempfile::tempdir().unwrap();
+    let path=temp.path().join("fixture.sqlite");
+    let birthday=AccountBirthday::from_parts(ChainState::empty(BlockHeight::from_u32(3_524_930),
+        zcash_primitives::block::BlockHash([0;32])),None);
+    let mut db=super::super::open_fixture(&path).unwrap();
+    assert!(super::super::import_once(&mut db,&scoped,&birthday,3_524_931).unwrap());
+    assert!(!super::super::import_once(&mut db,&scoped,&birthday,3_524_931).unwrap());
+    let account=db.get_account_for_ufvk(&scoped).unwrap().unwrap();
+    assert!(matches!(account.purpose(),AccountPurpose::ViewOnly));
+    drop(db);
+    let db=super::super::open_fixture(&path).unwrap();
+    assert!(matches!(db.get_account_for_ufvk(&scoped).unwrap().unwrap().purpose(),AccountPurpose::ViewOnly));
+}
+
+#[test]
+fn merchant_wallet_incoming_only_and_wrong_network_exports_are_rejected() {
+    let full=wallet_export();
+    assert!(super::super::connection::scoped_key(
+        &full.to_unified_incoming_viewing_key().encode(&MAIN_NETWORK)).is_err());
+    assert!(super::super::connection::scoped_key(
+        &full.encode(&zcash_protocol::consensus::TEST_NETWORK)).is_err());
+}
+
+#[test]
+fn merchant_wallet_scoped_export_recovers_exact_outgoing_after_reopen() {
+    use zcash_client_backend::data_api::{AccountBirthday, chain::ChainState};
+    for pool in [ShieldedPool::Orchard,ShieldedPool::Ironwood] {
+        let (tx,_,customer)=fixture_from_sender(pool,true,false,wallet_export());
+        let scoped=super::super::connection::scoped_key(PUBLIC_WALLET_EXPORT).unwrap();
+        let temp=tempfile::tempdir().unwrap();
+        let path=temp.path().join("fixture.sqlite");
+        let birthday=AccountBirthday::from_parts(ChainState::empty(BlockHeight::from_u32(tx.height-1),tx.anchor),None);
+        let mut db=super::super::open_fixture(&path).unwrap();
+        super::super::import_once(&mut db,&scoped,&birthday,tx.height).unwrap();
+        db.update_chain_tip(BlockHeight::from_u32(tx.tip)).unwrap();
+        decrypt_and_store_transaction(&MAIN_NETWORK,&mut db,&tx.tx,None).unwrap();
+        assert_eq!(db.get_tx_height(tx.txid()).unwrap(),None);
+        assert!(tx.store(&mut db).is_err());
+        drop(db);
+        let db=super::super::open_fixture(&path).unwrap();
+        let stored=db.get_transaction(tx.txid()).unwrap().unwrap();
+        let mut raw=vec![];stored.write(&mut raw).unwrap();
+        let reparsed=decode(&raw,tx.txid(),tx.height,tx.tip).unwrap();
+        let recovered=VerifiedTransaction{tx:reparsed,height:tx.height,tip:tx.tip,anchor:tx.anchor};
+        let keys=HashMap::from([(1,scoped)]);
+        assert_eq!(recovered.matching_output(&keys,&expected(1,&customer,pool,TransferType::Outgoing)).unwrap(),0);
+        assert!(recovered.matching_output(&keys,&expected(1,&key(53),pool,TransferType::Outgoing)).is_err());
+        // Synthetic mined context exists only in this test; SQLite remains unmined.
+        assert_eq!(db.get_tx_height(tx.txid()).unwrap(),None);
+    }
+}
+
+#[test]
+fn merchant_wallet_discarded_ovk_cannot_confirm_refund() {
+    for pool in [ShieldedPool::Orchard,ShieldedPool::Ironwood] {
+        let (tx,_,customer)=fixture_from_sender(pool,false,false,wallet_export());
+        let scoped=super::super::connection::scoped_key(PUBLIC_WALLET_EXPORT).unwrap();
+        assert!(tx.matching_output(&HashMap::from([(1,scoped)]),
+            &expected(1,&customer,pool,TransferType::Outgoing)).is_err());
+    }
+}
+
+#[test]
+fn merchant_wallet_zip321_keeps_exact_amount_receiver_and_memo() {
+    use zcash_client_backend::zip321::TransactionRequest;
+    let ua=unified::Address::try_from_items(vec![unified::Receiver::Orchard(receiver(&key(32)).0)])
+        .unwrap().encode(&MAIN_NETWORK.network_type());
+    // A short instruction reference identifies the exact external refund. Payment
+    // return routes stay in the existing NOSTOS v1 paying memo.
+    let uri=format!("zcash:{ua}?amount=0.01800000&memo=bm9zdG9zOnJlZnVuZDpwdWJsaWMtZml4dHVyZQ");
+    let request=TransactionRequest::from_uri(&uri).unwrap();
+    let payment=request.payments().values().next().unwrap();
+    assert_eq!(payment.amount().unwrap().into_u64(),1800000);
+    assert_eq!(payment.recipient_address().encode(),ua);
+    assert_eq!(payment.memo().unwrap().as_array(),MemoBytes::from_bytes(b"nostos:refund:public-fixture").unwrap().as_array());
 }
 fn expected(account: u8, k: &UnifiedFullViewingKey, pool: ShieldedPool, direction: TransferType) -> Expected<u8> {
     Expected::new(account,receiver(k),1800000,memo(),pool,direction,2).unwrap()
