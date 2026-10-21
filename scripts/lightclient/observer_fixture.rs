@@ -74,6 +74,7 @@ async fn check() -> Result<serde_json::Value, &'static str> {
             Err(zcash_client_backend::sync::Error::Wallet(_)) => return Err("fixture_wallet_storage"),
             Err(zcash_client_backend::sync::Error::WalletTrees(_)) => return Err("fixture_wallet_trees"),
             Err(zcash_client_backend::sync::Error::MisbehavingServer) => return Err("fixture_server_invalid"),
+            Err(_) => return Err("fixture_unclassified_stop"),
         }
     }
     if !synced { return Err("fixture_scan"); }

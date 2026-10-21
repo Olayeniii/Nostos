@@ -30,13 +30,15 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler
       - run: rustup toolchain install 1.95.0 --profile minimal
       - uses: actions/cache/restore@v4
+        id: cache
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             zallet/target
-          key: lightclient-probe-v1-987382f
+          key: lightclient-observer-v2-987382f
           restore-keys: |
+            lightclient-probe-v1-987382f
             observer-Linux-987382f-
       - name: Add only the public-chain SDK example
         run: |
@@ -60,10 +62,10 @@ jobs:
         working-directory: zallet
         run: cargo +1.95.0 run --locked -p zallet-core --example nostos_observer_fixture
       - uses: actions/cache/save@v4
-        if: always()
+        if: always() && steps.cache.outputs.cache-hit != 'true'
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             zallet/target
-          key: lightclient-probe-v1-987382f
+          key: lightclient-observer-v2-987382f
