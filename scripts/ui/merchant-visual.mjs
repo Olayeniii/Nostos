@@ -318,6 +318,13 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await capture("refunds");
   await page.getByRole("button", { name: /Needs review/ }).click();
   assert.equal(await page.locator(".studio-record-list a").count(), 1);
+  assert(
+    await page
+      .locator(".studio-record-state .status-chip")
+      .first()
+      .evaluate((el) => el.classList.contains("pending")),
+    "An unreviewed request must use the waiting state",
+  );
   await page.getByRole("link", { name: /Customer request to review/ }).click();
   await page
     .getByRole("heading", { name: "Customer refund request", exact: true })

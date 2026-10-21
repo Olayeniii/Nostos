@@ -12,8 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # One desktop Overview and one phone Refunds viewport, no baseline capture.
-      UI_SCREENSHOTS: "2"
+      # Two checkpoint viewports were reviewed in run 39520327791.
+      # Further verification does not capture screenshots.
+      UI_SCREENSHOTS: "0"
       PLAYWRIGHT_MODULES: /tmp/nostos-ui/node_modules
       NEXT_TELEMETRY_DISABLED: 1
       NOSTOS_RETENTION_ENABLED: 0

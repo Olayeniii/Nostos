@@ -24,6 +24,12 @@ and phone Refunds viewport. Captures reset scroll position and use viewport boun
 to show the fixed rail or bottom menu accurately. Further checks should disable
 screenshots unless visual evidence of a defect requires a focused capture.
 
+Initial checkpoint 2 validation passed: 321 unit/integration tests, production
+build, lint, typecheck, formatting, secret scan, Python checks, and 186 browser
+state checks with no page overflow. The two viewport images are in run
+39520327791. Visual review caught a request inheriting the confirmed payment's
+green color; it now uses the waiting state. Follow-up checks disable screenshots.
+
 The previous checkpoint reports follow as historical context.
 
 ---

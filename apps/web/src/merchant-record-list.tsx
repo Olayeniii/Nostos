@@ -55,7 +55,7 @@ export function MerchantRecordList({
               </span>
               <span className="studio-record-state">
                 <span
-                  className={`status-chip ${record.status === "no_refund" ? record.paymentStatus : record.status}`}
+                  className={`status-chip ${refunds && refundBucket(record) === "review" ? "pending" : record.status === "no_refund" ? record.paymentStatus : record.status}`}
                 >
                   {refunds
                     ? refundRecordLabel(record)
