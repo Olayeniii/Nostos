@@ -87,6 +87,7 @@ const records = [
     refundAmountZat: 500000,
     pendingRefundAmountZat: 500000,
     status: "broadcast_unknown",
+    canRequestRefund: false,
     refunds: [{ id: "f1", status: "broadcast_unknown", amountZat: 500000 }],
     payment: {
       ...base.payment,
@@ -108,6 +109,7 @@ records.push({
   ...base,
   id: "order-7",
   description: "Customer request to review",
+  canRequestRefund: false,
   refundRequests: [
     {
       id: "request-7",
@@ -130,6 +132,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   const page = await context.newPage();
   let mode = "populated";
   let customerReceipt = base;
+  let customerMode = "normal";
   const posts = [];
   await page.route("**/api/product/**", async (route) => {
     const action = new URL(route.request().url()).pathname.split("/").at(-1);
@@ -161,10 +164,29 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
           },
         },
       });
-    if (action === "checkout")
+    if (action === "checkout") {
+      if (customerMode === "error")
+        return route.fulfill({
+          status: 503,
+          json: { error: "Fixture unavailable" },
+        });
+      if (customerMode === "loading")
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       return route.fulfill({
         json: { receipt: customerReceipt, syncWarning: false },
       });
+    }
+    if (action === "prepare")
+      return route.fulfill({
+        json: {
+          network: "testnet",
+          uri: "zcash:fixture_only?amount=0.02&memo=fixture_memo",
+          destination: "utest1" + "a".repeat(250),
+          memo: "fixture_memo_" + "m".repeat(300),
+          amountZat: 2000000,
+        },
+      });
+    if (action === "signup") return route.fulfill({ json: { ready: false } });
     if (action === "funds")
       return route.fulfill({
         json: {
@@ -191,8 +213,8 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     });
     if (
       process.env.UI_SCREENSHOTS !== "0" &&
-      ((width === 1440 && name === "overview") ||
-        (width === 390 && name === "refunds"))
+      ((width === 1440 && name === "checkout") ||
+        (width === 390 && name === "receipt"))
     ) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({
@@ -364,18 +386,178 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
   await page.getByRole("heading", { name: "JaraBot", exact: true }).waitFor();
   await capture("checkout");
+  assert.equal(
+    await page.getByRole("textbox", { name: "Email", exact: true }).count(),
+    0,
+    "Checkout stays accountless",
+  );
+  await page
+    .getByRole("textbox", { name: "Your fresh refund address", exact: true })
+    .fill("utest1" + "a".repeat(80));
+  await page
+    .getByRole("button", { name: "Prepare payment", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Copy complete payment request", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Copy complete payment request", exact: true })
+    .click();
+  await page.getByText("Payment request copied.", { exact: true }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("textbox", { name: "Payment memo", exact: true })
+      .inputValue(),
+    "fixture_memo_" + "m".repeat(300),
+  );
+  assert.equal(
+    await page
+      .getByRole("textbox", { name: "Merchant payment address", exact: true })
+      .inputValue(),
+    "utest1" + "a".repeat(250),
+  );
+  await capture("checkout-prepared");
+  customerReceipt = records[3];
+  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await page
+    .getByRole("heading", { name: "Ask for a new payment link." })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Prepare payment", exact: true })
+      .count(),
+    0,
+  );
+  await capture("checkout-expired");
+  customerReceipt = base;
+  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await page
+    .getByRole("heading", { name: "Your payment is complete." })
+    .waitFor();
+  await capture("checkout-confirmed");
+  customerReceipt = records[1];
+  customerMode = "loading";
+  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await page.getByText("Checking payment request", { exact: true }).waitFor();
+  await capture("checkout-loading");
+  customerMode = "error";
+  await page.goto("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Connection interrupted" })
+    .waitFor();
+  await capture("checkout-error");
+  customerMode = "normal";
+  await page.goto("http://127.0.0.1:3000/checkout");
+  await page.getByRole("heading", { name: "Payment link required" }).waitFor();
+  await capture("checkout-missing-link");
+
   customerReceipt = base;
   await page.goto("http://127.0.0.1:3000/receipt#" + "a".repeat(43));
   await page.getByText("Private payment receipt").waitFor();
   await capture("receipt");
+  for (const record of [records[2], records[4], records[5], records[6]]) {
+    customerReceipt = record;
+    await page.goto("http://127.0.0.1:3000/receipt#" + "a".repeat(43));
+    await page.getByText("Private payment receipt").waitFor();
+    if (!record.canRequestRefund) {
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Request refund", exact: true })
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page
+          .getByText(
+            "Request a full or partial refund from the merchant. No new address is needed. Refunds use the route supplied with this payment.",
+            { exact: true },
+          )
+          .count(),
+        0,
+      );
+    }
+    if (record.id === "order-3")
+      await page
+        .getByRole("heading", { name: "Partially refunded", exact: true })
+        .waitFor();
+    await capture(`receipt-${record.id}`);
+  }
+  await page.goto("http://127.0.0.1:3000/receipt");
+  await page
+    .getByLabel("Private receipt link", { exact: true })
+    .fill("invalid-link");
+  await page.getByRole("button", { name: "Open receipt", exact: true }).click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Enter the private receipt link" })
+    .waitFor();
+  await capture("receipt-invalid-link");
+
   await page.goto("http://127.0.0.1:3000/sign-up");
   await page.getByRole("textbox", { name: "Email", exact: true }).waitFor();
   await capture("registration");
+  await page
+    .getByRole("textbox", { name: "Email", exact: true })
+    .fill("review@example.test");
+  await page
+    .getByRole("button", { name: "Send verification email", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Check your email", exact: true })
+    .waitFor();
+  await capture("registration-email-sent");
+  await page.goto("http://127.0.0.1:3000/sign-in");
+  await page
+    .getByRole("heading", { name: "Welcome back", exact: true })
+    .waitFor();
+  await page
+    .getByRole("textbox", { name: "Email", exact: true })
+    .fill("review@example.test");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("fixture-password-only");
+  await page
+    .getByRole("button", { name: "Show password", exact: true })
+    .click();
+  assert.equal(
+    await page.getByLabel("Password", { exact: true }).getAttribute("type"),
+    "text",
+  );
+  await page
+    .getByRole("button", { name: "Hide password", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Could not sign in" })
+    .waitFor();
+  await capture("sign-in-error");
+
   await page.goto("http://127.0.0.1:3000/account-help");
   await page
     .getByRole("heading", { name: "Verify your email", exact: true })
     .waitFor();
   await capture("verification");
+  await page
+    .getByRole("textbox", { name: "Email", exact: true })
+    .fill("review@example.test");
+  await page
+    .getByRole("button", { name: "Send verification email", exact: true })
+    .click();
+  await page
+    .getByText(
+      "Could not complete the request. Check the email and try again later.",
+      { exact: true },
+    )
+    .waitFor();
+  await capture("verification-error");
+  await page.goto("http://127.0.0.1:3000/account-help?purpose=reset");
+  await page
+    .getByRole("heading", { name: "Reset your password", exact: true })
+    .waitFor();
+  await capture("password-reset");
+
   await page.goto("http://127.0.0.1:3000/account-link#" + "a".repeat(43));
   await page
     .getByRole("heading", { name: "Set your password", exact: true })
@@ -425,8 +607,12 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     }
   }
   assert(
-    posts.every((action) => action === "link"),
-    "Review must not submit spending or account changes",
+    posts.every((action) =>
+      ["link", "prepare", "signup", "login", "resend-verification"].includes(
+        action,
+      ),
+    ),
+    "Review only permits explicitly mocked requests, never a refund or withdrawal",
   );
   await context.close();
 }

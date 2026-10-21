@@ -2,7 +2,7 @@
 import { MerchantWalletConnection } from "../../src/merchant-wallet-connection.js";
 import { useNetwork } from "../../src/network-context.js";
 import { useEffect, useState } from "react";
-import { AppHeader, AppFooter } from "../../src/shell.js";
+import { PublicSurface } from "../../src/public-surface.js";
 import { requestJson, RequestError } from "../../src/requests.js";
 import { StateLabel } from "../../src/status-label.js";
 export default function Setup() {
@@ -28,8 +28,7 @@ export default function Setup() {
       });
   }, []);
   return (
-    <main className="product-app">
-      <AppHeader role="Merchant" />
+    <PublicSurface variant="setup" role="Merchant">
       <section className="setup-card">
         <p className="eyebrow">STORE SETUP</p>
         <h1>Your store, ready for ZEC.</h1>
@@ -108,7 +107,6 @@ export default function Setup() {
           )}
         </form>
       </section>
-      <AppFooter />
-    </main>
+    </PublicSurface>
   );
 }

@@ -39,7 +39,9 @@ export function ReceiptCard({
       ? "Partially refunded"
       : "Refund attempt closed"
     : refundConfirmed
-      ? "Refund confirmed"
+      ? (receipt.remainingAmountZat ?? 0) > 0
+        ? "Partially refunded"
+        : "Refund confirmed"
       : refundUnknown
         ? "Refund state being checked"
         : receipt.status === "broadcast"
@@ -76,9 +78,11 @@ export function ReceiptCard({
         <span className={`receipt-pill ${paid ? "success" : ""}`}>
           {paid
             ? "Confirmed"
-            : receipt.paymentStatus === "broadcast"
-              ? "Confirming payment"
-              : "Awaiting payment"}
+            : receipt.paymentStatus === "expired"
+              ? "Payment request expired"
+              : receipt.paymentStatus === "broadcast"
+                ? "Confirming payment"
+                : "Awaiting payment"}
         </span>
       </div>
       <div className="receipt-divider" />
@@ -93,6 +97,14 @@ export function ReceiptCard({
             <dd>{receipt.description}</dd>
           </div>
         )}
+        <div>
+          <dt>Fulfillment</dt>
+          <dd>
+            {receipt.fulfillment
+              ? `${receipt.fulfillment} (merchant reported)`
+              : "Not reported"}
+          </dd>
+        </div>
         <div>
           <dt>{receipt.paidAt ? "Confirmed at" : "Created"}</dt>
           <dd>{date(receipt.paidAt ?? receipt.createdAt)}</dd>

@@ -1,3 +1,32 @@
+# Customer and account screens: checkpoint 3
+
+Checkout, receipts, refund requests, registration, sign in, email verification,
+password recovery, and store setup now share the approved warm paper canvas,
+forest controls, thin rules, editorial headings, and readable helper text.
+A small PublicSurface component keeps their header, page spacing and footer
+consistent without changing the merchant workspace or homepage.
+
+Checkout remains accountless. Its existing address validation, payment memo,
+wallet handoff, copy values and RPC behavior are unchanged. Expired requests
+show a closed state and no preparation control. Receipts distinguish merchant
+reported fulfillment and partial confirmed refunds. Refund request copy only
+says a route can be used when the API explicitly permits a request; unavailable,
+expired, and open-request states retain their existing explanations and guards.
+No new address fallback or exposure is added.
+
+Account and refund request submit handlers, token handling, polling, password
+rules and verification behavior remain unchanged. The browser review uses
+controlled responses for preparation and signup, never an actual payment,
+email, refund, withdrawal or account mutation. Long payment fields, copy feedback,
+expired/confirmed/loading/error/missing checkout links, partial/unknown/closed
+refund states, invalid receipt links and account feedback are checked at six
+widths. Only desktop checkout and phone receipt viewport images are captured;
+previous baselines and merchant images are not recaptured.
+
+The previous checkpoint reports follow as historical context.
+
+---
+
 # Merchant workspace: checkpoint 2
 
 Overview and Refunds now have real routes. The shared forest rail and phone menu

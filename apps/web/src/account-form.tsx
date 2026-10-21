@@ -2,7 +2,7 @@
 import { EmailField, PasswordField } from "./account-fields.js";
 import { useState } from "react";
 import Link from "next/link";
-import { AppHeader, AppFooter } from "./shell.js";
+import { PublicSurface } from "./public-surface.js";
 import { StateLabel } from "./status-label.js";
 import { requestJson } from "./requests.js";
 export function AccountForm({ signup = false }: { signup?: boolean }) {
@@ -11,8 +11,7 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
   const [error, setError] = useState("");
   const [verificationEmail, setVerificationEmail] = useState("");
   return (
-    <main className="product-app">
-      <AppHeader />
+    <PublicSurface variant="account">
       <section className="account-layout">
         <div className="account-context">
           <p className="eyebrow">NOSTOS FOR MERCHANTS</p>
@@ -175,7 +174,6 @@ export function AccountForm({ signup = false }: { signup?: boolean }) {
           </form>
         )}
       </section>
-      <AppFooter />
-    </main>
+    </PublicSurface>
   );
 }

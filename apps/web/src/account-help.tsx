@@ -2,7 +2,7 @@
 import { EmailField, PasswordField } from "./account-fields.js";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AppHeader, AppFooter } from "./shell.js";
+import { PublicSurface } from "./public-surface.js";
 import { requestJson } from "./requests.js";
 export function AccountHelp({
   link = false,
@@ -21,8 +21,7 @@ export function AccountHelp({
     }
   }, [link]);
   return (
-    <main className="product-app">
-      <AppHeader />
+    <PublicSurface variant="help">
       <section className="account-card account-help">
         <h1>
           {link
@@ -105,7 +104,6 @@ export function AccountHelp({
           </p>
         )}
       </section>
-      <AppFooter />
-    </main>
+    </PublicSurface>
   );
 }

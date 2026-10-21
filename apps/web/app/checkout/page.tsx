@@ -7,7 +7,7 @@ import {
   NoirHandoff,
   NoirHandoffError,
 } from "../../src/noir-handoff.js";
-import { AppHeader, AppFooter } from "../../src/shell.js";
+import { PublicSurface } from "../../src/public-surface.js";
 import { StateLabel } from "../../src/status-label.js";
 import { requestJson } from "../../src/requests.js";
 import { useRecord } from "../../src/use-record.js";
@@ -60,8 +60,7 @@ export default function Checkout() {
     }
   }
   return (
-    <main className="product-app">
-      <AppHeader role="Customer" />
+    <PublicSurface variant="checkout" role="Customer">
       <section className="checkout-layout">
         <aside className="checkout-summary">
           <p className="eyebrow">PRIVATE PAYMENT</p>
@@ -91,9 +90,9 @@ export default function Checkout() {
           <div className="checkout-assurance">
             <strong>A private route back.</strong>
             <p>
-              The refund route you supply travels inside the shielded payment
-              memo. The merchant can refund to that route without asking for
-              another address.
+              Your shielded payment can carry a refund route in its memo. A
+              usable route lets the merchant refund without asking for another
+              address.
             </p>
           </div>
           <p className="privacy">
@@ -129,6 +128,17 @@ export default function Checkout() {
               <a className="primary" href={`/receipt#${token}`}>
                 Open your receipt
               </a>
+            </>
+          ) : r.paymentStatus === "expired" ? (
+            <>
+              <span className="status-chip expired">
+                Payment request expired
+              </span>
+              <h2>Ask for a new payment link.</h2>
+              <p>
+                This request is closed. Contact the merchant before making a
+                payment.
+              </p>
             </>
           ) : (
             <>
@@ -435,7 +445,6 @@ export default function Checkout() {
           )}
         </section>
       </section>
-      <AppFooter />
-    </main>
+    </PublicSurface>
   );
 }

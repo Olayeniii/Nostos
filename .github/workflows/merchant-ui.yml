@@ -12,9 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # Two checkpoint viewports were reviewed in run 39520327791.
-      # Further verification does not capture screenshots.
-      UI_SCREENSHOTS: "0"
+      # Checkpoint 3: desktop checkout and phone receipt, two viewport images only.
+      UI_SCREENSHOTS: "2"
       PLAYWRIGHT_MODULES: /tmp/nostos-ui/node_modules
       NEXT_TELEMETRY_DISABLED: 1
       NOSTOS_RETENTION_ENABLED: 0
