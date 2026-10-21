@@ -116,7 +116,7 @@ fn merchant_wallet_incoming_only_and_wrong_network_exports_are_rejected() {
 
 #[test]
 fn merchant_wallet_scoped_export_recovers_exact_outgoing_after_reopen() {
-    use zcash_client_backend::data_api::{AccountBirthday, chain::ChainState};
+    use zcash_client_backend::data_api::{AccountBirthday, WalletWrite, chain::ChainState};
     for pool in [ShieldedPool::Orchard,ShieldedPool::Ironwood] {
         let (tx,_,customer)=fixture_from_sender(pool,true,false,wallet_export());
         let scoped=super::super::connection::scoped_key(PUBLIC_WALLET_EXPORT).unwrap();
