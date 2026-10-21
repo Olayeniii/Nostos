@@ -110,6 +110,11 @@ the same account can be classified as change and is insufficient. No customer
 funds, real refund-route memo, public fixture key or old testnet wallet is used.
 The recipient must privately demonstrate its receiver is not in the sender key's
 scope. Verify an Orchard-only mainnet UA before generating the payment request.
+Before signing, establish that the selected business account has only shielded
+spendable funds in the required pool, with no transparent balance or pending
+shielding/migration. Use a dedicated account with a verified funding history;
+otherwise pause for a private input-selection review. A shielded destination
+alone does not prove shielded inputs. Do not sign an opaque cross-pool plan.
 
 | Item                           | Proposed cap                             |
 | ------------------------------ | ---------------------------------------- |
@@ -205,6 +210,27 @@ broker tests per architecture. These remain synthetic/public-fixture evidence.
 This preparation adds a separately packaged offline checker and failure/privacy
 boundary tests; it does not integrate an external signer. The reconciliation
 contract above is wallet-independent lifecycle preparation.
+
+The checker code at `50e95633e39100716fbd7a5d2dfaa8d88eeb41c9` passed
+[native CI 39694509200](https://github.com/Olayeniii/Nostos/actions/runs/39694509200)
+on both architectures: 20 observer tests, three binding tests, six terminal
+wrapper tests, three backup tests and two broker checks per runner. Both
+artifacts are attached to that run. Application
+[CI 39694509191](https://github.com/Olayeniii/Nostos/actions/runs/39694509191)
+also passed. No live key or funded transaction was involved.
+
+Verified SHA-256 values from the successful packaging logs:
+
+| Artifact                       | `nostos-operator-check` SHA-256                                    |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `offline-operator-check-X64`   | `7e40eaf56e9254b0efe541183177305a115d05488f7d90b5352f116118514915` |
+| `offline-operator-check-ARM64` | `84dba9ee14b2e014cad041012a0ee57d29812ad1efa629bbf6f548301dd1d367` |
+
+The wrapper SHA-256 is identical in both packages:
+`f97bfeac2905820ac9b582478629ec63ed9888fa576056973804f024810fd40a`.
+These are public artifact hashes, not wallet identifiers. Review this code commit
+and match the manifest/log before handling a live export. The guide's later
+documentation-only commit does not change the tested artifact code.
 
 Next checkpoint: identify the actual Android build and full-export availability,
 then obtain only the private offline check's boolean result. A material mismatch
