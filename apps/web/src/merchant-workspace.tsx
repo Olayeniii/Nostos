@@ -105,7 +105,11 @@ export function MerchantWorkspace({
       className={`product-app dashboard-app merchant-studio ${detailOpen ? "detail-open" : ""}`}
     >
       <nav className="studio-rail" aria-label="Merchant workspace">
-        <Link className="studio-mark" href="/" aria-label="NOSTOS home">
+        <Link
+          className="studio-mark"
+          href="/merchant/overview"
+          aria-label="NOSTOS overview"
+        >
           <Mark />
         </Link>
         <div className="studio-destinations">
@@ -138,7 +142,7 @@ export function MerchantWorkspace({
       <div className="studio-body">
         <header className="studio-header">
           <div className="studio-identity">
-            <Link href="/" className="studio-wordmark">
+            <Link href="/merchant/overview" className="studio-wordmark">
               NOSTOS
             </Link>
             <span>{name}</span>
