@@ -27,7 +27,7 @@ jobs:
           ref: 987382f67e622915228686e9f956c6a9c9a7514c
           path: zallet
           persist-credentials: false
-      - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler
+      - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler age
       - run: rustup toolchain install 1.95.0 --profile minimal
       - uses: actions/cache/restore@v4
         id: cache
@@ -61,8 +61,12 @@ jobs:
       - name: Check two hosted mainnet services with the pinned SDK
         working-directory: zallet
         run: cargo +1.95.0 run --locked -p zallet-core --example nostos_lightclient_probe
+      - name: Test encrypted backups and refusal boundaries
+        run: python3 -m unittest discover -s nostos/scripts/lightclient -p test_backup.py
       - name: Test observer cache gaps and rewind behavior
         working-directory: zallet
+        env:
+          NOSTOS_BACKUP_FIXTURE: ../nostos/scripts/lightclient/backup_fixture.py
         run: cargo +1.95.0 test --locked -p zallet-core --example nostos_observer_fixture
       - name: Build private pipe worker
         working-directory: zallet

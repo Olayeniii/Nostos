@@ -112,3 +112,56 @@ fn routes_require_canonical_mainnet_orchard_only() {
     assert!(OrchardReceiver::parse_mainnet("t1invalid").is_err());
     assert!(Expected::new(1,receiver(&k),1800000,memo(),ShieldedPool::Ironwood,TransferType::Outgoing,0).is_err());
 }
+
+#[test]
+fn decrypted_memo_and_transaction_survive_wal_reopen_in_both_pools() {
+    use std::os::unix::fs::PermissionsExt;
+    use zcash_client_backend::{data_api::{AccountBirthday, WalletWrite, chain::ChainState}, wallet::NoteId};
+    for pool in [ShieldedPool::Orchard,ShieldedPool::Ironwood] {
+        let (tx,_,customer)=fixture(pool,true,false);
+        let temp=tempfile::tempdir().unwrap();
+        std::fs::set_permissions(temp.path(),std::fs::Permissions::from_mode(0o700)).unwrap();
+        let path=temp.path().join("4b723cba-3e4d-4536-9c2e-e8129e2fb731");
+        std::fs::create_dir(&path).unwrap();
+        std::fs::set_permissions(&path,std::fs::Permissions::from_mode(0o700)).unwrap();
+        let root=path.as_path();
+        let mut wallet=super::super::storage::ProtectedWallet::open(root).unwrap();
+        let connection=rusqlite::Connection::open(root.join("wallet.sqlite")).unwrap();
+        connection.pragma_update(None,"journal_mode","WAL").unwrap();
+        let scoped=super::super::connection::scoped_key(&customer.encode(&MAIN_NETWORK)).unwrap();
+        let birthday=AccountBirthday::from_parts(ChainState::empty(BlockHeight::from_u32(tx.height-1),tx.anchor),None);
+        super::super::import_once(wallet.db_mut(),&scoped,&birthday,tx.height).unwrap();
+        wallet.db_mut().update_chain_tip(BlockHeight::from_u32(tx.tip)).unwrap();
+        // Offline unmined enhancement only: never invent mined-chain evidence.
+        decrypt_and_store_transaction(&MAIN_NETWORK,wallet.db_mut(),&tx.tx,None).unwrap();
+        let note=NoteId::new(tx.txid(),pool,0);
+        assert_eq!(wallet.db_mut().get_memo(note).unwrap().unwrap().encode(),memo());
+        assert_eq!(wallet.db_mut().get_tx_height(tx.txid()).unwrap(),None);
+        assert!(wallet.db_mut().get_transaction(tx.txid()).unwrap().is_some());
+        assert!(tx.store(wallet.db_mut()).is_err());
+        super::super::storage::ProtectedWallet::audit(root).unwrap();
+        drop(connection);
+        drop(wallet);
+        let mut reopened=super::super::storage::ProtectedWallet::open(root).unwrap();
+        assert_eq!(reopened.db_mut().get_memo(note).unwrap().unwrap().encode(),memo());
+        assert_eq!(reopened.db_mut().get_tx_height(tx.txid()).unwrap(),None);
+        let stored=reopened.db_mut().get_transaction(tx.txid()).unwrap().unwrap();
+        let mut expected_raw=vec![];tx.tx.write(&mut expected_raw).unwrap();
+        let mut actual_raw=vec![];stored.write(&mut actual_raw).unwrap();
+        assert_eq!(actual_raw,expected_raw);
+        assert!(tx.store(reopened.db_mut()).is_err());
+        super::super::storage::ProtectedWallet::audit(root).unwrap();
+        drop(reopened);
+        let helper=std::env::var("NOSTOS_BACKUP_FIXTURE").expect("CI backup fixture path");
+        let result=std::process::Command::new("python3").arg(helper).arg(root)
+            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().unwrap();
+        assert!(result.success(),"encrypted backup/restore fixture");
+        let recovered=temp.path().join("restored").join(root.file_name().unwrap());
+        let mut restored=super::super::storage::ProtectedWallet::open(&recovered).unwrap();
+        assert_eq!(restored.db_mut().get_memo(note).unwrap().unwrap().encode(),memo());
+        assert_eq!(restored.db_mut().get_tx_height(tx.txid()).unwrap(),None);
+        assert!(restored.db_mut().get_transaction(tx.txid()).unwrap().is_some());
+        assert!(tx.store(restored.db_mut()).is_err());
+        super::super::storage::ProtectedWallet::audit(&recovered).unwrap();
+    }
+}
