@@ -430,7 +430,10 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await page.locator(".studio-record-list a").first().waitFor();
   assert.equal(await page.locator(".studio-record-list a").count(), 3);
   await capture("refunds");
-  await page.getByRole("button", { name: /Needs review/ }).click();
+  await page
+    .locator(".studio-tabs")
+    .getByRole("button", { name: /Needs review/ })
+    .click();
   assert.equal(await page.locator(".studio-record-list a").count(), 1);
   assert(
     await page
@@ -447,7 +450,10 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await visit("http://127.0.0.1:3000/merchant/refunds");
   await page.locator(".studio-record-list a").first().waitFor();
 
-  await page.getByRole("button", { name: /Processing/ }).click();
+  await page
+    .locator(".studio-tabs")
+    .getByRole("button", { name: /Processing/ })
+    .click();
   assert.equal(await page.locator(".studio-record-list a").count(), 1);
   await page
     .getByRole("link", { name: /Refund awaiting confirmation/ })
