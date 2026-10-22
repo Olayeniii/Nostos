@@ -546,3 +546,8 @@
     font-size: 10px;
   }
 }
+.overview-workspace .studio-wordmark {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
