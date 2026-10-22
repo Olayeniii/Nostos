@@ -526,3 +526,23 @@
   color: #243e2e;
   font-weight: 650;
 }
+.overview-mobile-brand {
+  display: none;
+}
+.overview-workspace .studio-network {
+  font-size: 11px;
+}
+.overview-workspace .studio-account button {
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .overview-desktop-brand {
+    display: none;
+  }
+  .overview-mobile-brand {
+    display: inline;
+  }
+  .overview-workspace .studio-network {
+    font-size: 10px;
+  }
+}
