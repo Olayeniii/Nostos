@@ -300,8 +300,8 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     });
     if (
       process.env.UI_SCREENSHOTS !== "0" &&
-      ((width === 1440 && name === "overview") ||
-        (width === 390 && name === "home"))
+      width === 1440 &&
+      name === "overview"
     ) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({
@@ -687,7 +687,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
 
   // Connected review: every write below is intercepted above; no wallet send.
   await visit("http://127.0.0.1:3000/merchant/overview");
-  await page.getByRole("link", { name: "New payment +", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Create payment link", exact: true })
+    .click();
   await page
     .getByRole("heading", { name: "Create payment request", exact: true })
     .waitFor();

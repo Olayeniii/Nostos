@@ -2,16 +2,19 @@
 import Link from "next/link";
 import { AppFooter } from "../../../src/shell.js";
 import { MerchantWorkspace } from "../../../src/merchant-workspace.js";
-import { MerchantRecordList } from "../../../src/merchant-record-list.js";
+import { OverviewIcon } from "../../../src/overview-icon.js";
 import {
   type Dashboard,
   refundBucket,
   hasRefundActivity,
+  paymentHref,
+  paymentRecordStatus,
 } from "../../../src/merchant-records.js";
 import { useRecord } from "../../../src/use-record.js";
 import { paymentSummary } from "../../../src/payment-summary.js";
-import { zec } from "../../../src/receipt-card.js";
+import { zec, date } from "../../../src/receipt-card.js";
 import { StateLabel } from "../../../src/status-label.js";
+import "../../../src/overview.css";
 export default function Overview() {
   const { data, loading, warning, refresh } = useRecord<Dashboard>(
     "/api/product/dashboard",
@@ -30,19 +33,28 @@ export default function Overview() {
     (record) =>
       hasRefundActivity(record) && refundBucket(record) === "processing",
   );
+  const attention = new Set(
+    [...fulfillment, ...review, ...processing].map((record) => record.id),
+  ).size;
+  const awaiting = records.filter((record) =>
+    ["unpaid", "awaiting_payment", "pending"].includes(record.paymentStatus),
+  ).length;
   return (
-    <MerchantWorkspace name={data?.merchant.name}>
-      <div className="dashboard-title">
+    <MerchantWorkspace
+      name={data?.merchant.name}
+      className="overview-workspace"
+    >
+      <div className="overview-title">
         <div>
-          <p className="eyebrow">WORKSPACE / OVERVIEW</p>
           <h1>Your payments, in order.</h1>
           <p>Track payments. Fulfill orders. Handle refunds.</p>
         </div>
         <Link
-          className="primary"
+          className="primary overview-create"
           href={data?.merchant.ready ? "/merchant#new" : "/setup"}
         >
-          {data?.merchant.ready ? "New payment +" : "Set up store"}
+          <span aria-hidden="true">+</span>
+          {data?.merchant.ready ? "Create payment link" : "Set up store"}
         </Link>
       </div>
       {(warning || data?.syncWarning) && (
@@ -52,91 +64,103 @@ export default function Overview() {
         </p>
       )}
       {loading && <StateLabel state="loading" text="Checking store activity" />}
-      <section className="studio-overview-grid" aria-label="Store summary">
-        <article className="studio-received">
-          <p className="eyebrow">CONFIRMED PAYMENTS</p>
-          <h2>Total received</h2>
+      <section className="overview-metrics" aria-label="Store summary">
+        <article className="overview-metric overview-total">
+          <h2>Confirmed payments</h2>
           <strong>
-            {data ? zec(summary.receivedZat) : "..."} <small>ZEC</small>
+            {data ? zec(summary.receivedZat) : "..."}
+            <small>ZEC</small>
           </strong>
+          <span className="overview-metric-icon">
+            <OverviewIcon kind="receipt" />
+          </span>
           <p>
             {data
               ? `${summary.confirmedPayments} confirmed payments`
               : "Waiting for payment records"}
           </p>
-          <span>
-            Payment history total. For wallet funds, see{" "}
-            <Link href="/merchant/funds">Funds</Link>.
-          </span>
         </article>
-        <article className="studio-stat">
+        <article className="overview-metric">
           <h2>Awaiting payment</h2>
-          <strong>
-            {data
-              ? records.filter((record) =>
-                  ["unpaid", "awaiting_payment", "pending"].includes(
-                    record.paymentStatus,
-                  ),
-                ).length
-              : "..."}
-          </strong>
-          <p>Requests waiting for payment confirmation</p>
-          <Link href="/merchant">View payments</Link>
+          <strong>{data ? awaiting : "..."}</strong>
+          <span className="overview-metric-icon">
+            <OverviewIcon kind="clock" />
+          </span>
+          <p>Open payment requests</p>
         </article>
-        <article className="studio-stat">
+        <article className="overview-metric">
           <h2>Needs attention</h2>
-          <strong>
-            {data
-              ? new Set(
-                  [...fulfillment, ...review, ...processing].map(
-                    (record) => record.id,
-                  ),
-                ).size
-              : "..."}
-          </strong>
-          <p>Orders with fulfillment or refund work open</p>
-          <a href="#attention-title">See next steps</a>
+          <strong>{data ? attention : "..."}</strong>
+          <span className="overview-metric-icon">
+            <OverviewIcon kind="attention" />
+          </span>
+          <p>Orders with open work</p>
         </article>
       </section>
-      <section className="studio-attention" aria-labelledby="attention-title">
-        <h2 id="attention-title">Needs your attention</h2>
-        <div className="studio-attention-items">
-          <Link href="/merchant">
-            <span>
-              Orders to fulfill
-              <small>Confirmed payments, fulfillment still open</small>
+      <p className="overview-accounting">
+        Confirmed payments is a history total.{" "}
+        <Link href="/merchant/funds">
+          Open Funds for your withdrawable balance.
+        </Link>
+      </p>
+      <section className="overview-attention" aria-labelledby="attention-title">
+        <div className="overview-panel-heading">
+          <h2 id="attention-title">
+            <OverviewIcon kind="attention" />
+            Needs your attention
+          </h2>
+          <Link href="/merchant/refunds">View refunds</Link>
+        </div>
+        <div className="overview-attention-grid">
+          <Link href="/merchant" className="overview-task">
+            <span className="overview-task-icon">
+              <OverviewIcon kind="package" />
             </span>
-            <strong>{data ? fulfillment.length : "..."}</strong>
+            <span>
+              <strong>
+                {data ? fulfillment.length : "..."}{" "}
+                {fulfillment.length === 1
+                  ? "order to fulfill"
+                  : "orders to fulfill"}
+              </strong>
+              <small>Payment received, fulfillment still open.</small>
+            </span>
+            <span className="overview-chevron" aria-hidden="true">
+              ›
+            </span>
           </Link>
-          <Link href="/merchant/refunds">
-            <span>
-              Refund reviews<small>Customer requests awaiting a decision</small>
+          <Link href="/merchant/refunds" className="overview-task">
+            <span className="overview-task-icon">
+              <OverviewIcon kind="return" />
             </span>
-            <strong>{data ? review.length : "..."}</strong>
-          </Link>
-          <Link href="/merchant/refunds">
             <span>
-              Refunds processing
-              <small>Awaiting confirmation or reconciliation</small>
+              <strong>
+                {data ? review.length : "..."}{" "}
+                {review.length === 1 ? "refund request" : "refund requests"}
+              </strong>
+              <small>
+                {processing.length
+                  ? `${processing.length} also processing or awaiting reconciliation.`
+                  : "Customer requests awaiting your decision."}
+              </small>
             </span>
-            <strong>{data ? processing.length : "..."}</strong>
+            <span className="overview-chevron" aria-hidden="true">
+              ›
+            </span>
           </Link>
         </div>
       </section>
-      <section className="studio-recent" aria-labelledby="recent-title">
-        <div className="section-head">
-          <div>
-            <h2 className="studio-list-heading" id="recent-title">
-              Recent payments
-            </h2>
-            <p>From your merchant payment records</p>
-          </div>
-          <Link className="text-button" href="/merchant">
-            View payments
-          </Link>
+      <section className="overview-recent" aria-labelledby="recent-title">
+        <div className="overview-panel-heading">
+          <h2 id="recent-title">
+            <OverviewIcon kind="receipt" />
+            Recent payments
+          </h2>
+          <Link href="/merchant">View all payments</Link>
         </div>
         {data && records.length === 0 ? (
           <div className="empty-state">
+            <OverviewIcon kind="receipt" />
             <h3>Ready for your first payment.</h3>
             <p>
               Create a request and share the checkout link. Your customer needs
@@ -150,8 +174,104 @@ export default function Overview() {
             </Link>
           </div>
         ) : (
-          <MerchantRecordList records={records.slice(0, 6)} />
+          <>
+            <div className="overview-columns" aria-hidden="true">
+              <span>Order</span>
+              <span>Amount</span>
+              <span>Payment</span>
+              <span>Next step</span>
+            </div>
+            <ul className="studio-record-list overview-records">
+              {records.slice(0, 4).map((record) => {
+                const bucket = hasRefundActivity(record)
+                  ? refundBucket(record)
+                  : undefined;
+                const action =
+                  bucket === "processing"
+                    ? "Check refund"
+                    : bucket === "review"
+                      ? "Review refund"
+                      : record.paymentStatus === "confirmed" &&
+                          record.fulfillment !== "fulfilled"
+                        ? "Mark fulfilled"
+                        : "View payment";
+                return (
+                  <li key={record.id}>
+                    <Link href={paymentHref(record.id)}>
+                      <span className="overview-order">
+                        <span className="overview-record-icon">
+                          <OverviewIcon kind="receipt" />
+                        </span>
+                        <span>
+                          <strong>
+                            {record.description || record.orderReference}
+                          </strong>
+                          <small>{record.orderReference}</small>
+                        </span>
+                      </span>
+                      <span className="overview-value">
+                        {zec(record.paymentAmountZat)} <small>ZEC</small>
+                      </span>
+                      <span className="overview-payment">
+                        <span
+                          className={`overview-payment-label ${record.paymentStatus === "confirmed" ? "is-confirmed" : record.paymentStatus === "expired" ? "is-expired" : "is-pending"}`}
+                        >
+                          {paymentRecordStatus(record)}
+                        </span>
+                        <small>{date(record.createdAt)}</small>
+                      </span>
+                      <span
+                        className={`overview-row-action ${action === "Mark fulfilled" ? "is-actionable" : ""}`}
+                      >
+                        {action}
+                        <span aria-hidden="true">›</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
+      </section>
+      <section
+        className="overview-lifecycle"
+        aria-label="The payment lifecycle"
+      >
+        <h2>The payment lifecycle</h2>
+        <ol>
+          <li>
+            <span className="overview-stage-icon">
+              <OverviewIcon kind="check" />
+            </span>
+            <span>
+              <strong>PAY</strong>
+              <small>Payment confirmed</small>
+            </span>
+          </li>
+          <li>
+            <span className="overview-stage-icon">
+              <OverviewIcon kind="bag" />
+            </span>
+            <span>
+              <strong>FULFILL</strong>
+              <small>Merchant reported</small>
+            </span>
+          </li>
+          <li>
+            <span className="overview-stage-icon">
+              <OverviewIcon kind="return" />
+            </span>
+            <span>
+              <strong>REFUND IF NEEDED</strong>
+              <small>Usable route required</small>
+            </span>
+          </li>
+        </ol>
+        <p>
+          A refund requires a valid shielded return route and eligibility under
+          the merchant's terms.
+        </p>
       </section>
       <button
         className="text-button studio-refresh"
