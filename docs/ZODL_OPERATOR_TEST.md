@@ -7,12 +7,38 @@ Branch: `feat/mainnet-wallet-compatibility`. No merge or deployment.
 
 The operator initially reported **3.17.1**, a shielded receiving address, **Full**
 viewing key export and a Send **Message** field, then updated the app and reported
-**3.17.2**. Build number, network, distribution and selected-account type have not
-been reported. The controls were reported before the update; account binding
-will use the updated app. These are operator observations; Work has no connection
-to the phone. Orchard receiver ownership, memo bytes, signing and outgoing
-recovery are still unverified. The missing build number does not block the
-non-funded, local offline check.
+**3.17.2**. On 22 October the operator subsequently reported this successful
+offline binding result:
+
+```json
+{
+  "key_imported": false,
+  "nostos_offline_binding_v1": true,
+  "offline": true,
+  "outgoing_recovery_proven": false,
+  "passed": true,
+  "spending_control_proven": false
+}
+```
+
+The report matches the reviewed wrapper's exact success schema. For that
+checker, success means a canonical mainnet FULL UFVK with Orchard viewing access
+and a canonical receive UA whose external Orchard receiver belongs to that
+account. Record the non-funded export/address-binding subgate as
+**operator-reported passed**. This is not a new observer account import.
+
+Work has no connection to the phone or local test terminal. No key, address or
+memo was provided to Work. The actual build number, distribution, native software
+account selection and successful artifact checksum verification have not been
+separately reported. The check enforces mainnet encoding; the app's displayed
+network has not been independently reported. Its fixed `offline` flag describes
+the tool; it does not attest the computer's network state. Do not request another
+key entry merely to collect this metadata.
+
+Signing, actual Ironwood transaction behavior, outgoing recovery, memo
+preservation and durable reconciliation after reopening remain unverified. The
+result does not authorize a transfer or live observer import, and does not prove
+that the bound account is backed by a merchant-held spending key.
 
 The upstream 3.17.1 release source identifies build **3155**, commit
 `85784fd3d8b9e064895a95c9770415c6d6f922c7`, and SDK `5.2.1-SNAPSHOT`. That
@@ -276,11 +302,16 @@ the transport policy hash is
 The manifest must identify h2 0.4.16, rustls 0.23.46, rustls-webpki 0.103.16 and
 webpki-roots 1.0.10. These hashes are public build metadata, not wallet data.
 
-Next checkpoint: record the actual Android build/network and native business
-account selection, then obtain only the private offline check's boolean result.
-Full-export and Message availability are now operator-reported. A material mismatch
-holds integration and triggers review of the pinned Zingo candidate. No funded
-test, production change, live observer import or mainnet-readiness claim is made.
+Next checkpoint: retain the successful operator-reported binding result above;
+collect only build/distribution, native business-account selection and whether
+both artifact checksums returned `OK`. Do not repeat the private key entry.
+Prepare and validate the missing live control/recovery harness without real
+keys before requesting a funded run. The funded gate must recover the sender's
+actual outgoing output and exact memo, verify note-spend ownership, and preserve
+the reconciled record after reopening. Major signer integration stays on hold
+until that evidence exists. A material mismatch triggers review of the pinned
+Zingo candidate. No funded test, production change, live observer import or
+mainnet-readiness claim is made.
 
 Primary sources:
 

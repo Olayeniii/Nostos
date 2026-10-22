@@ -125,11 +125,24 @@ the corrected ARM64 result above supersedes it. No validation requirement was
 removed to obtain a pass. No fundamental signing-model change is justified by
 the available evidence.
 
+On 22 October the operator, after reporting ZODL **3.17.2**, supplied a private
+offline checker report with `passed: true`, `key_imported: false`, and both
+spending-control and outgoing-recovery proof flags false. The exact report and
+its evidence limits are in [ZODL_OPERATOR_TEST.md](ZODL_OPERATOR_TEST.md).
+This closes the non-funded export/address-binding subgate on operator-reported
+evidence. The check binds the external Orchard receiver to the full mainnet
+export; it does not prove a funded receipt or signing-key possession. Artifact
+checksum confirmation and the actual build/account-type metadata remain to be
+recorded without another private key entry.
+
 The complete wallet compatibility gate remains open until the actual installed
-wallet proves full export, same-account shielded receipt, outgoing recovery with
-the exported key and memo preservation. Native observer ARM64 tests do not prove
-Android device behavior. A real key import, funded control transfer and later
-funded payment/refund require separate approval under the implementation rules.
+wallet proves merchant signing, outgoing recovery with the exported key, actual
+Ironwood behavior, memo preservation and durable reconciliation after reopening.
+The live control harness and note-spend ownership check remain implementation
+blockers before asking the operator to spend. Native observer ARM64 tests do not
+prove Android device behavior. A live observer import, funded control transfer
+and later funded payment/refund require separate approval under the
+implementation rules. No signing-wallet replacement is justified by this pass.
 
 The next operator procedure, separately packaged offline binding checker,
 proposed funded control limits and pinned Zingo CLI alternative are in
