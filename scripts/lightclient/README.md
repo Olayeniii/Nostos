@@ -1,5 +1,14 @@
 # Isolated light-client observer work
 
+## Private control harness candidate
+
+The wallet compatibility branch adds `control.py` and the pipe-only
+`nostos_control` method. See [CONTROL_TEST.md](CONTROL_TEST.md) for its fixed
+limits, private ledger, exact outgoing/owned-spend checks, normal observer reopen
+check and remaining live gates. The HTTP broker cannot call this method. No
+product settlement or mainnet payment enablement is included. Build artifacts
+and offline tests do not establish a funded merchant-wallet proof.
+
 This is tested observer source, not a deployed service. An opt-in authenticated
 preview listener and app adapter exist; no real merchant key has been supplied by
 this work. There is no signing or send interface. No VPS configuration change is
@@ -142,3 +151,4 @@ build must be verified before an isolated deployment procedure selects a new
 private root, credentials and port. Existing wallet files and services stay outside
 that procedure. The native worker is not a Zallet/Zaino replacement executable;
 do not overwrite the earlier `zallet-zaino` binary with it.
+

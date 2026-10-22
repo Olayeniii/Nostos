@@ -62,6 +62,7 @@ jobs:
           cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
           cp nostos/scripts/lightclient/wallet_check.rs zallet/zallet-core/examples/nostos_wallet_check.rs
           cp nostos/scripts/lightclient/operator_check.rs zallet/zallet-core/examples/nostos_operator_check.rs
+          cp nostos/scripts/lightclient/worker.rs zallet/zallet-core/examples/nostos_sdk_worker.rs
           python3 nostos/scripts/lightclient/prepare.py zallet
       - name: Test public wallet export, account binding, memo and outgoing recovery
         working-directory: zallet
@@ -78,7 +79,22 @@ jobs:
         run: |
           python3 -m unittest discover -s nostos/scripts/lightclient -p test_backup.py
           python3 -m unittest discover -s nostos/scripts/lightclient -p test_operator_check.py
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_control.py
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_control_package.py
           node --test nostos/scripts/lightclient/service.test.mjs
+      - name: Build control worker without live wallet access
+        working-directory: zallet
+        run: cargo +1.95.0 build --locked --release -p zallet-core --example nostos_sdk_worker
+      - name: Check control worker native linkage
+        run: ldd zallet/backends/zaino/target/release/examples/nostos_sdk_worker
+      - name: Package private operator control harness
+        run: python3 nostos/scripts/lightclient/package-control.py zallet/backends/zaino/target/release/examples/nostos_sdk_worker control-harness '${{ github.sha }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: control-harness-${{ runner.arch }}
+          path: control-harness/
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: offline-operator-check-${{ runner.arch }}
@@ -93,3 +109,4 @@ jobs:
             ~/.cargo/git
             zallet/backends/zaino/target
           key: merchant-wallet-gate-${{ runner.arch }}-987382f-v1
+
