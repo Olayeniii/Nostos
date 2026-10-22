@@ -182,7 +182,7 @@ export default function Overview() {
               <span>Next step</span>
             </div>
             <ul className="studio-record-list overview-records">
-              {records.slice(0, 4).map((record) => {
+              {records.slice(0, 3).map((record) => {
                 const bucket = hasRefundActivity(record)
                   ? refundBucket(record)
                   : undefined;

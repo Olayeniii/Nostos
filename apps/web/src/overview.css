@@ -1,11 +1,11 @@
 /* Overview follows the approved composition. Other screens keep their current layout. */
 .overview-workspace .studio-page {
   max-width: 1360px;
-  padding: 28px 30px;
+  padding: 24px 30px;
 }
 .overview-workspace .studio-header {
   padding: 16px 30px;
-  min-height: 72px;
+  min-height: 64px;
 }
 .overview-workspace .studio-wordmark {
   font-size: 14px;
@@ -19,7 +19,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 .overview-workspace .overview-title h1 {
   font-size: clamp(27px, 2.5vw, 36px);
@@ -37,7 +37,7 @@
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 18px;
+  padding: 10px 18px;
   white-space: nowrap;
   background: #53e3a6;
   border-color: #53e3a6;
@@ -109,7 +109,7 @@
   font-size: 11px;
   line-height: 1.6;
   color: #647065;
-  margin: 10px 0 20px;
+  margin: 8px 0 16px;
 }
 .overview-accounting a {
   color: #365944;
@@ -125,7 +125,7 @@
   box-shadow:
     0 1px 0 #fff inset,
     0 2px 5px #192e2904;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   overflow: hidden;
 }
 .overview-panel-heading {
@@ -133,7 +133,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 20px;
+  padding: 12px 20px;
 }
 .overview-workspace .overview-panel-heading h2 {
   display: flex;
@@ -234,8 +234,8 @@
     minmax(0, 1.5fr) minmax(90px, 0.7fr) minmax(130px, 1fr)
     minmax(130px, 0.9fr);
   gap: 16px;
-  min-height: 68px;
-  padding: 12px 18px;
+  min-height: 60px;
+  padding: 10px 18px;
 }
 .overview-order {
   display: flex;
@@ -341,7 +341,7 @@
   line-height: 1;
 }
 .overview-workspace .overview-lifecycle {
-  padding: 16px 20px;
+  padding: 12px 20px;
 }
 .overview-workspace .overview-lifecycle h2 {
   font-size: 12px;
