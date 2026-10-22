@@ -300,8 +300,8 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     });
     if (
       process.env.UI_SCREENSHOTS !== "0" &&
-      ((width === 1440 && name === "checkout") ||
-        (width === 390 && name === "receipt"))
+      ((width === 1440 && name === "overview") ||
+        (width === 390 && name === "home"))
     ) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({
@@ -316,6 +316,11 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     if (phase === "after")
       assert.equal(overflow, false, `${width} ${name} overflows`);
   };
+  await visit("http://127.0.0.1:3000/");
+  await page
+    .getByRole("heading", { name: "Private payments. A way back." })
+    .waitFor();
+  await capture("home");
   await visit("http://127.0.0.1:3000/merchant");
   await page.getByRole("button", { name: /Studio commission/ }).waitFor();
   await capture("payments");
@@ -407,7 +412,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
 
   await visit("http://127.0.0.1:3000/merchant/overview");
   await page
-    .getByRole("heading", { name: "Your store, at a glance." })
+    .getByRole("heading", { name: "Your payments, in order." })
     .waitFor();
   await page.locator(".studio-record-list a").first().waitFor();
   assert.equal(

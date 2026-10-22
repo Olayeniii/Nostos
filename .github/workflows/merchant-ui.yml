@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      # Final flow review reuses existing images and takes no screenshots.
-      UI_SCREENSHOTS: "0"
+      # This revision captures only desktop overview and phone homepage.
+      UI_SCREENSHOTS: "1"
       PLAYWRIGHT_MODULES: /tmp/nostos-ui/node_modules
       NEXT_TELEMETRY_DISABLED: 1
       NOSTOS_RETENTION_ENABLED: 0

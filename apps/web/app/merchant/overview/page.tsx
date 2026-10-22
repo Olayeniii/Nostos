@@ -35,8 +35,8 @@ export default function Overview() {
       <div className="dashboard-title">
         <div>
           <p className="eyebrow">WORKSPACE / OVERVIEW</p>
-          <h1>Your store, at a glance.</h1>
-          <p>Payments received. Orders to fulfill. Refunds to review.</p>
+          <h1>Your payments, in order.</h1>
+          <p>Track payments. Fulfill orders. Handle refunds.</p>
         </div>
         <Link
           className="primary"
@@ -69,8 +69,38 @@ export default function Overview() {
             <Link href="/merchant/funds">Funds</Link>.
           </span>
         </article>
-        <section className="studio-attention" aria-labelledby="attention-title">
-          <h2 id="attention-title">Up next</h2>
+        <article className="studio-stat">
+          <h2>Awaiting payment</h2>
+          <strong>
+            {data
+              ? records.filter((record) =>
+                  ["unpaid", "awaiting_payment", "pending"].includes(
+                    record.paymentStatus,
+                  ),
+                ).length
+              : "..."}
+          </strong>
+          <p>Requests waiting for payment confirmation</p>
+          <Link href="/merchant">View payments</Link>
+        </article>
+        <article className="studio-stat">
+          <h2>Needs attention</h2>
+          <strong>
+            {data
+              ? new Set(
+                  [...fulfillment, ...review, ...processing].map(
+                    (record) => record.id,
+                  ),
+                ).size
+              : "..."}
+          </strong>
+          <p>Orders with fulfillment or refund work open</p>
+          <a href="#attention-title">See next steps</a>
+        </article>
+      </section>
+      <section className="studio-attention" aria-labelledby="attention-title">
+        <h2 id="attention-title">Needs your attention</h2>
+        <div className="studio-attention-items">
           <Link href="/merchant">
             <span>
               Orders to fulfill
@@ -91,9 +121,9 @@ export default function Overview() {
             </span>
             <strong>{data ? processing.length : "..."}</strong>
           </Link>
-        </section>
+        </div>
       </section>
-      <section aria-labelledby="recent-title">
+      <section className="studio-recent" aria-labelledby="recent-title">
         <div className="section-head">
           <div>
             <h2 className="studio-list-heading" id="recent-title">

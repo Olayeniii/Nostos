@@ -116,6 +116,7 @@ export function MerchantWorkspace({
           aria-label="NOSTOS overview"
         >
           <Mark />
+          <span className="studio-brand-name">NOSTOS</span>
         </Link>
         <div className="studio-destinations">
           {destinations.map((item) => (
@@ -142,6 +143,10 @@ export function MerchantWorkspace({
               <span>{item.label}</span>
             </Link>
           ))}
+        </div>
+        <div className="studio-business">
+          <strong>{name}</strong>
+          <small>Merchant account</small>
         </div>
       </nav>
       <div className="studio-body">
