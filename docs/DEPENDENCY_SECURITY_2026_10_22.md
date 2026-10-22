@@ -89,6 +89,12 @@ requires a separate read-only inventory and operator-approved change window.
 Passing package audits does not prove current deployment versions or funded
 mainnet behavior. Existing isolation and payment/refund approval gates remain.
 
+The later operator-approved host-only Node update and the still-pending web
+runtime change are recorded in
+[VPS_NODE_SECURITY_2026_10_22.md](VPS_NODE_SECURITY_2026_10_22.md). The host now
+reports Node 22.23.4; the web container still reports 24.21.0. That operational
+checkpoint does not change the source/CI-only scope of this dependency release.
+
 ## Validation
 
 Local checks use a separately downloaded Node 24.22.1 runtime, verified against
