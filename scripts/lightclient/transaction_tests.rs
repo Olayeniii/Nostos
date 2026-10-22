@@ -278,3 +278,24 @@ fn decrypted_memo_and_transaction_survive_wal_reopen_in_both_pools() {
         super::super::storage::ProtectedWallet::audit(&recovered).unwrap();
     }
 }
+
+#[test]
+fn confirmed_store_requires_the_same_fully_scanned_chain_context() {
+    let anchor = zcash_primitives::block::BlockHash([7;32]);
+    let changed = zcash_primitives::block::BlockHash([8;32]);
+    assert!(require_current_context(100,105,anchor,Some(105),Some(105),Some(anchor)).is_ok());
+    for (tip, scanned, block) in [
+        (None,Some(105),Some(anchor)),
+        (Some(104),Some(105),Some(anchor)),
+        (Some(106),Some(105),Some(anchor)),
+        (Some(105),None,Some(anchor)),
+        (Some(105),Some(104),Some(anchor)),
+        (Some(105),Some(105),None),
+        (Some(105),Some(105),Some(changed)),
+    ] {
+        assert_eq!(require_current_context(100,105,anchor,tip,scanned,block),
+            Err("wallet_context_changed"));
+    }
+    assert!(require_current_context(0,105,anchor,Some(105),Some(105),Some(anchor)).is_err());
+    assert!(require_current_context(106,105,anchor,Some(105),Some(105),Some(anchor)).is_err());
+}
