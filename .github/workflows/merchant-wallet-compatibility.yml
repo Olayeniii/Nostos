@@ -109,4 +109,3 @@ jobs:
             ~/.cargo/git
             zallet/backends/zaino/target
           key: merchant-wallet-gate-${{ runner.arch }}-987382f-v1
-

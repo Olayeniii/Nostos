@@ -151,4 +151,3 @@ build must be verified before an isolated deployment procedure selects a new
 private root, credentials and port. Existing wallet files and services stay outside
 that procedure. The native worker is not a Zallet/Zaino replacement executable;
 do not overwrite the earlier `zallet-zaino` binary with it.
-

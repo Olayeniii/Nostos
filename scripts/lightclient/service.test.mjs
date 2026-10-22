@@ -56,7 +56,17 @@ test("HTTP authentication, scope and method restrictions precede worker access",
       -32601,
     );
     assert.equal(
-      (await send(body("nostos_control", [merchant, null, "private", "private", merchant]))).body.error.code,
+      (
+        await send(
+          body("nostos_control", [
+            merchant,
+            null,
+            "private",
+            "private",
+            merchant,
+          ]),
+        )
+      ).body.error.code,
       -32601,
     );
     assert.ok(
@@ -134,4 +144,3 @@ test("persisted account status resumes sync without another viewing-key import",
     rmSync(root, { recursive: true, force: true });
   }
 });
-
