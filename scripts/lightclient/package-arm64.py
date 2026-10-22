@@ -6,9 +6,10 @@ import os
 from pathlib import Path
 import struct
 import tarfile
+from transport_security import provenance as transport_provenance
 
 PIN = "987382f67e622915228686e9f956c6a9c9a7514c"
-FILES = ("service.mjs", "run-service.mjs", "backup.py")
+FILES = ("service.mjs", "run-service.mjs", "node-runtime.mjs", "backup.py")
 
 
 def digest(path):
@@ -31,9 +32,9 @@ def package(binary, lock, output):
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     manifest = dict(format="nostos-sdk-preview-arm64-v1", architecture="aarch64", build_os="ubuntu-24.04",
                     upstream_pin=PIN, nostos_revision=os.environ["GITHUB_SHA"], workflow_run_id=os.environ["GITHUB_RUN_ID"],
-                    prepared_lock_sha256=digest(lock), files={name: digest(path) for name, path in files.items()},
+                    files={name: digest(path) for name, path in files.items()},
                     wallet_files_included=False, credentials_included=False, services_changed=False,
-                    production_enabled=False, sends_requested=0)
+                    production_enabled=False, sends_requested=0, **transport_provenance(lock))
     metadata = output / "provenance.json"
     metadata.write_text(json.dumps(manifest, indent=2) + "\n")
     archive = output / "nostos-sdk-preview-arm64.tar.gz"

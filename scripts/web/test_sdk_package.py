@@ -6,6 +6,7 @@ import io
 import os
 from pathlib import Path
 import struct
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -21,6 +22,8 @@ def module(name, path):
     return result
 
 
+security = module("transport_security", ROOT / "scripts/lightclient/transport_security.py")
+sys.modules['transport_security'] = security
 packager = module("sdk_packager", ROOT / "scripts/lightclient/package-arm64.py")
 inspector = module("sdk_inspector", ROOT / "scripts/web/inspect-sdk-package.py")
 
@@ -35,7 +38,11 @@ class PackageTests(unittest.TestCase):
             struct.pack_into("<H", header, 18, 183)
             binary.write_bytes(header)
             lock = root / "lock"
-            lock.write_text("public fixture")
+            lock.write_text('version = 4\n' + ''.join(
+                '\n[[package]]\nname = "' + name + '"\nversion = "' + version + '"\n'
+                'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+                'checksum = "' + checksum + '"\n'
+                for name, (_, version, _, checksum) in security.PINS.items()))
             with patch.dict(os.environ, GITHUB_SHA="1" * 40, GITHUB_RUN_ID="123"), contextlib.redirect_stdout(io.StringIO()):
                 packager.package(binary, lock, root / "bundle")
             artifact = root / "fixture.zip"
@@ -45,6 +52,7 @@ class PackageTests(unittest.TestCase):
             digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
             proof = inspector.verify(artifact, "1" * 40, digest)
             self.assertTrue(proof["artifact_verified"])
+            self.assertEqual(proof['transport_versions']['rustls'], '0.23.46')
             self.assertFalse(proof["extracted"])
             for revision, checksum in [("2" * 40, digest), ("1" * 40, "0" * 64)]:
                 with self.assertRaises(ValueError):

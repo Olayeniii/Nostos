@@ -2,20 +2,22 @@
 import pathlib
 import sys
 import tomllib
+from transport_security import prepare as prepare_transport
 
 root = pathlib.Path(sys.argv[1])
+prepare_transport(root)
 manifest = root / "zallet-core/Cargo.toml"
 lock = root / "Cargo.lock"
 before = tomllib.loads(lock.read_text())
 versions = {p["name"]: p["version"] for p in before["package"]}
-assert versions["rustls"] == "0.23.41"
+assert versions["rustls"] == "0.23.46"
 assert versions["ring"] == "0.17.14"
 text = manifest.read_text()
 assert text.count("[dependencies]\n") == 1
 text = text.replace('    "sync-decryptor",', '    "sync",\n    "sync-decryptor",')
 manifest.write_text(text.replace(
     "[dependencies]\n",
-    '[dependencies]\nrustls = { version = "=0.23.41", default-features = false, features = ["ring", "std"] }\n',
+    '[dependencies]\nrustls = { version = "=0.23.46", default-features = false, features = ["ring", "std"] }\n',
 ))
 parts = lock.read_text().split("[[package]]")
 for index, part in enumerate(parts):

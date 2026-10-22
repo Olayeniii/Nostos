@@ -158,7 +158,7 @@ def run(mainnet=False):
         # No wallet cookies, application tokens, or databases enter the build container.
         build_config = {'Image': base['Config']['Image'], 'WorkingDir': '/app',
                         'Env': ['NEXT_TELEMETRY_DISABLED=1', 'NODE_OPTIONS=--max-old-space-size=768'],
-                        'Cmd': ['sh', '-c', 'npm install -g pnpm@11.25.0 && pnpm install --frozen-lockfile --store-dir /pnpm-store && pnpm check && pnpm --filter @nostos/web build'],
+                        'Cmd': ['sh', '-c', 'node scripts/quality/check-node.mjs && npm install -g pnpm@11.28.7 && pnpm install --frozen-lockfile --store-dir /pnpm-store && pnpm check && pnpm --filter @nostos/web build'],
                         'HostConfig': {'Binds': [str(release)+':/app'], 'Memory': 1610612736}}
         docker('POST', '/containers/create?name='+builder, build_config)
         docker('POST', '/containers/'+builder+'/start')

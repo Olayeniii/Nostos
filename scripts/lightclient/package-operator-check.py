@@ -7,6 +7,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from transport_security import provenance as transport_provenance
 
 binary, output = map(Path, sys.argv[1:])
 output.mkdir(mode=0o700, exist_ok=False)
@@ -25,6 +26,7 @@ provenance = {
     "machine": platform.machine(), "libc": platform.libc_ver(),
     "sha256": hashes, "network_required": False, "wallet_database_created": False,
     "signing_supported": False,
+    **transport_provenance(Path("Cargo.lock")),
 }
 (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
 # This is fixed packaging metadata, safe for the CI log. Never accepts user data.

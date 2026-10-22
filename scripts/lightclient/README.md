@@ -124,16 +124,20 @@ a protected credential copy or mount. No production configuration was changed.
    private app credentials, merchant-authorized sync and the separately authorized
    funded payment/refund evidence. Preserve current testnet services and rollback.
 
-The `prepare.py` helper changes only the CI checkout's features/provider selection
-and asserts unchanged dependency versions, sources and checksums. It does not
-modify or install the VPS wallet binary.
+The `prepare.py` helper applies the reviewed transport security policy before
+selecting the Rustls ring provider and sync features. `transport_security.py`
+allows only the exact h2, Rustls, rustls-webpki and webpki-roots version/checksum
+changes; wallet/consensus sources and all other package fields remain pinned.
+Cargo must accept the resulting graph with `--locked`. An OSV check reports
+informational notices separately and rejects vulnerability findings or incomplete
+results. No helper modifies or installs a VPS wallet binary.
 
 ## Ubuntu ARM64 package
 
 `.github/workflows/sdk-observer-arm64.yml` builds the pinned native worker on
 Ubuntu 24.04 ARM64 and runs the encrypted memo/restore tests on that platform.
 The package includes only `nostos-sdk-worker`, `service.mjs`, `run-service.mjs`,
-`backup.py` and provenance. Its outer SHA-256 and each fixed file's SHA-256 are
+`node-runtime.mjs`, `backup.py` and provenance. Its outer SHA-256 and each fixed file's SHA-256 are
 recorded; the ELF header must identify AArch64. No wallet file, credential,
 configuration or recovery identity enters the artifact.
 
@@ -142,3 +146,7 @@ build must be verified before an isolated deployment procedure selects a new
 private root, credentials and port. Existing wallet files and services stay outside
 that procedure. The native worker is not a Zallet/Zaino replacement executable;
 do not overwrite the earlier `zallet-zaino` binary with it.
+
+New broker releases require Node 24.22.1 or a newer Node 24 patch. The startup
+guard runs before configuration, credentials, storage or ports are opened.
+Updating an existing host runtime or service still needs operator approval.

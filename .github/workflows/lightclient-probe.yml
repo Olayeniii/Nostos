@@ -28,6 +28,9 @@ jobs:
           path: zallet
           persist-credentials: false
       - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler age
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
       - run: rustup toolchain install 1.95.0 --profile minimal
       - uses: actions/cache/restore@v4
         id: cache
@@ -55,6 +58,8 @@ jobs:
           cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
           cp nostos/scripts/lightclient/recovery_fixture.rs zallet/zallet-core/examples/nostos_recovery_fixture.rs
           python3 nostos/scripts/lightclient/prepare.py zallet
+      - name: Audit resolved SDK transport and dependency inventory
+        run: python3 nostos/scripts/quality/audit-cargo.py zallet/Cargo.lock
       - name: Test full viewing key decoding without a real key
         working-directory: zallet
         run: cargo +1.95.0 test --locked -p zallet-core --example nostos_lightclient_probe

@@ -58,6 +58,12 @@ do not prove signing, outgoing recovery, Ironwood selection or memo bytes.
 
 ## Private offline binding check: no funds or observer import
 
+**Artifact hold, 22 October:** the earlier run `39694509200` and its hashes below
+are historical evidence. Do not use that package for the next operator test.
+The security branch rebuilds with reviewed transport patches; record the new
+successful run and hashes before handling a live export. No funded test is
+authorized by this dependency update.
+
 Use the merchant's own trusted Linux computer, not the VPS, CI or Work terminal.
 The separate CI artifact `offline-operator-check-X64` or `-ARM64` contains only
 the checker binary, terminal wrapper and public provenance. It is built on

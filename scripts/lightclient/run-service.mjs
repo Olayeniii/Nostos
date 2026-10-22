@@ -3,6 +3,7 @@ import { lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createObserverService, ObserverBroker } from "./service.mjs";
+import { assertNodeRuntime } from "./node-runtime.mjs";
 
 function privateFile(path) {
   const m = lstatSync(path);
@@ -17,6 +18,7 @@ function privateFile(path) {
   return m;
 }
 export function startConfiguredService(configPath) {
+  assertNodeRuntime();
   if (!isAbsolute(configPath) || privateFile(configPath).size > 8192)
     throw new Error("Observer configuration is unavailable.");
   const config = JSON.parse(readFileSync(configPath, "utf8"));

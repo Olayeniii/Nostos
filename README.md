@@ -76,7 +76,7 @@ tests/
 
 ## Local checks
 
-Requires Node.js 24 or later and pnpm 11 or later.
+Requires Node.js 24.22.1 or a newer Node 24 release and pnpm 11.28.7.
 
 ```bash
 pnpm install

@@ -13,7 +13,8 @@ import zipfile
 PIN = "987382f67e622915228686e9f956c6a9c9a7514c"
 LIMIT = 256 * 1024 * 1024
 ARCHIVE = "nostos-sdk-preview-arm64.tar.gz"
-CONTENTS = {"nostos-sdk-worker", "service.mjs", "run-service.mjs", "backup.py", "provenance.json"}
+CONTENTS = {"nostos-sdk-worker", "service.mjs", "run-service.mjs", "node-runtime.mjs", "backup.py", "provenance.json"}
+TRANSPORT = {"h2": "0.4.16", "rustls": "0.23.46", "rustls-webpki": "0.103.16", "webpki-roots": "1.0.10"}
 
 
 def require(condition):
@@ -42,6 +43,9 @@ def verify(path, revision, artifact_sha256):
     require(all(manifest[key] is False for key in ("wallet_files_included", "credentials_included", "services_changed", "production_enabled")))
     require(manifest["sends_requested"] == 0 and str(manifest["workflow_run_id"]).isdigit())
     require(re.fullmatch(r"[a-f0-9]{64}", manifest["prepared_lock_sha256"]))
+    require(manifest["transport_versions"] == TRANSPORT)
+    policy = Path(__file__).resolve().parents[2] / 'scripts/lightclient/transport_security.py'
+    require(manifest["transport_security_policy_sha256"] == hashlib.sha256(policy.read_bytes()).hexdigest())
     require(set(manifest["files"]) == CONTENTS - {"provenance.json"})
     require(all(re.fullmatch(r"[a-f0-9]{64}", value) for value in manifest["files"].values()))
     seen = set()
@@ -68,6 +72,7 @@ def verify(path, revision, artifact_sha256):
     require(seen == CONTENTS)
     return dict(read_only=True, artifact_verified=True, revision=revision, architecture="aarch64",
                 workflow_run_id=manifest["workflow_run_id"], binary_sha256=manifest["files"]["nostos-sdk-worker"],
+                transport_versions=manifest["transport_versions"],
                 extracted=False, executable_started=False, services_changed=False, sends_requested=0)
 
 

@@ -1,7 +1,7 @@
 name: Merchant wallet compatibility gate
 on:
   push:
-    branches: [feat/mainnet-wallet-compatibility]
+    branches: [feat/mainnet-wallet-compatibility, fix/dependency-security-oct22]
     paths:
       - scripts/lightclient/**
       - .github/workflows/merchant-wallet-compatibility.yml
@@ -40,6 +40,9 @@ jobs:
           persist-credentials: false
       - name: Install test prerequisites on runner only
         run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler age
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
       - run: rustup toolchain install 1.95.0 --profile minimal
       - uses: actions/cache/restore@v4
         with:
@@ -63,6 +66,8 @@ jobs:
           cp nostos/scripts/lightclient/wallet_check.rs zallet/zallet-core/examples/nostos_wallet_check.rs
           cp nostos/scripts/lightclient/operator_check.rs zallet/zallet-core/examples/nostos_operator_check.rs
           python3 nostos/scripts/lightclient/prepare.py zallet
+      - name: Audit resolved SDK transport and dependency inventory
+        run: python3 nostos/scripts/quality/audit-cargo.py zallet/Cargo.lock
       - name: Test public wallet export, account binding, memo and outgoing recovery
         working-directory: zallet
         env:
@@ -78,7 +83,8 @@ jobs:
         run: |
           python3 -m unittest discover -s nostos/scripts/lightclient -p test_backup.py
           python3 -m unittest discover -s nostos/scripts/lightclient -p test_operator_check.py
-          node --test nostos/scripts/lightclient/service.test.mjs
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_transport_security.py
+          node --test nostos/scripts/lightclient/service.test.mjs nostos/scripts/lightclient/node-runtime.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: offline-operator-check-${{ runner.arch }}
