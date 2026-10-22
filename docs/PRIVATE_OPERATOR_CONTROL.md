@@ -134,3 +134,32 @@ chain trust model; the helper is not an independent full-node consensus engine.
 Fixture success cannot prove real signing, real outgoing recovery or a live
 persistent receipt. Those require the separately approved run and saved private
 transaction/block evidence.
+
+## Verified native packaging checkpoint
+
+Source commit: `fd08a993cbce477c4a6b6afaa5e10ef38b1a7468` on
+`fix/dependency-security-oct22`. No merge or deployment occurred.
+
+- [Application CI](https://github.com/Olayeniii/Nostos/actions/runs/39821540175):
+  passed, 346 tests plus formatting, lint, typecheck, build and secret scan.
+- [Native compatibility CI](https://github.com/Olayeniii/Nostos/actions/runs/39821540214):
+  passed on x64 and ARM64. Each ran 19 journal/operator tests, nine Python
+  wrapper tests, 26 native observer tests, three offline checker tests and 30
+  control-helper tests, then built and packaged the native binaries.
+- [ARM64 observer CI](https://github.com/Olayeniii/Nostos/actions/runs/39821540223):
+  passed, including persistence and encrypted restore fixture checks.
+- The initial helper compile error was corrected using explicit display-hex to
+  SDK transaction-ID byte conversion, with a round-trip and invalid-input test.
+
+Public provenance hashes from the successful native packaging logs:
+
+| Artifact               | Provenance SHA-256                                                 | Native helper SHA-256                                              |
+| ---------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| merchant-control-X64   | `69439b966fc31a55f55cb6676c91c8faa7f21109eb5e417cd50aa12b7ccb4e59` | `7a2c81f54c1d8c9525bd9f5f7285af16d41f76e2c397457960819b7fe4619dd3` |
+| merchant-control-ARM64 | `7af04f6b4a18524761ff57b2f542d0f7a42db9f5685b9b4dbeb845e02a82bf00` | `dc07927d3b51e10ae5d55e2dca45d9a78bec5acd0f643a4da5a076f2187382cd` |
+
+The GitHub artifact ZIP digest is distinct from the provenance hash supplied to
+our wrapper. These are build records only, not authorization to run a live mode.
+No real transaction, outgoing recovery or NOSTOS checkout/refund receipt is proven
+by these tests. The Android account/build facts and live operation approvals above
+remain outstanding.
