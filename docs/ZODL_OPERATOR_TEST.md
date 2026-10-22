@@ -230,6 +230,12 @@ decryption/storage behavior, not these live results. Work can verify private
 results after an approved implementation and operator run. Do not ask the user
 to provide keys or raw decrypted transactions through chat to automate it.
 
+The separate [control journal preparation](MERCHANT_CONTROL_JOURNAL.md) now
+covers immutable instructions, one-send reservations and deduplicated candidate
+observations across reopen. It has no live runner or SDK verification adapter;
+its receipts always retain false verification/confirmation flags. This does not
+remove the live recovery and protected-storage blockers above.
+
 Share a redacted result with version/build, tested commit, booleans for binding,
 memo/outgoing match and reopen/retry invariants. Keep real txid/block references
 in the private evidence record; publish or paste a txid only with consent since
