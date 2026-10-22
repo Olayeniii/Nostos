@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PublicSurface } from "../../src/public-surface.js";
+import "../../src/receipt.css";
 import { StateLabel } from "../../src/status-label.js";
 import { requestJson, RequestError } from "../../src/requests.js";
 
