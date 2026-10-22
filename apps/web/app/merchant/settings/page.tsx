@@ -39,7 +39,6 @@ export default function Settings() {
       {loading && <StateLabel state="loading" text="Checking your store" />}
       {data && (
         <section className="settings-grid">
-          <ChangeEmail />
           <article className="panel">
             <h2>Merchant profile</h2>
             <dl>
@@ -95,6 +94,7 @@ export default function Settings() {
               storage.
             </p>
           </article>
+          <ChangeEmail />
           <article className="panel">
             <h2>Refund policy</h2>
             <p>

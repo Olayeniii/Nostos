@@ -300,8 +300,8 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     });
     if (
       process.env.UI_SCREENSHOTS !== "0" &&
-      width === 1440 &&
-      name === "overview"
+      ((width === 1440 && ["payments", "funds", "settings"].includes(name)) ||
+        (width === 390 && name === "refunds"))
     ) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({

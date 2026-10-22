@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      # Overview correction captures only one desktop viewport.
+      # Four review images only; all six widths still run layout and flow checks.
       UI_SCREENSHOTS: "1"
       PLAYWRIGHT_MODULES: /tmp/nostos-ui/node_modules
       NEXT_TELEMETRY_DISABLED: 1

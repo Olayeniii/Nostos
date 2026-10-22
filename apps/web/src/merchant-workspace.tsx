@@ -7,6 +7,7 @@ import { requestJson } from "./requests.js";
 import { Mark } from "./mark.js";
 import { NetworkLabel } from "./network-context.js";
 import "./merchant-workspace.css";
+import "./workspace-refinement.css";
 
 function WorkspaceIcon({
   kind,
@@ -109,7 +110,7 @@ export function MerchantWorkspace({
   ] as const;
   return (
     <main
-      className={`product-app dashboard-app merchant-studio ${detailOpen ? "detail-open" : ""} ${className}`}
+      className={`product-app dashboard-app merchant-studio refined-workspace ${detailOpen ? "detail-open" : ""} ${className}`}
     >
       <nav className="studio-rail" aria-label="Merchant workspace">
         <Link
@@ -155,16 +156,13 @@ export function MerchantWorkspace({
         <header className="studio-header">
           <div className="studio-identity">
             <Link href="/merchant/overview" className="studio-wordmark">
-              {pathname === "/merchant/overview" ? (
-                <>
-                  <span className="overview-desktop-brand">Workspace</span>
-                  <span className="overview-mobile-brand">NOSTOS</span>
-                </>
-              ) : (
-                "NOSTOS"
-              )}
+              <span className="overview-desktop-brand">Workspace</span>
+              <span className="overview-mobile-brand">NOSTOS</span>
             </Link>
-            <span>{pathname === "/merchant/overview" ? "Overview" : name}</span>
+            <span>
+              {destinations.find((item) => item.href === pathname)?.label ??
+                name}
+            </span>
           </div>
           <div className="studio-account">
             <span className="studio-network">
