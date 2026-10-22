@@ -58,11 +58,12 @@ do not prove signing, outgoing recovery, Ironwood selection or memo bytes.
 
 ## Private offline binding check: no funds or observer import
 
-**Artifact hold, 22 October:** the earlier run `39694509200` and its hashes below
-are historical evidence. Do not use that package for the next operator test.
-The security branch rebuilds with reviewed transport patches; record the new
-successful run and hashes before handling a live export. No funded test is
-authorized by this dependency update.
+**Updated artifact, 22 October:** use successful security
+[run 39765645507](https://github.com/Olayeniii/Nostos/actions/runs/39765645507),
+code `de1eb1f4ede9cf4b78e25e55f1a403b64ea978ba`. It replaces run `39694509200`
+and the earlier download/checksum command in chat. The current hashes below
+include the reviewed transport security updates. No funded test is authorized
+by this dependency update.
 
 Use the merchant's own trusted Linux computer, not the VPS, CI or Work terminal.
 The separate CI artifact `offline-operator-check-X64` or `-ARM64` contains only
@@ -235,26 +236,45 @@ This preparation adds a separately packaged offline checker and failure/privacy
 boundary tests; it does not integrate an external signer. The reconciliation
 contract above is wallet-independent lifecycle preparation.
 
-The checker code at `50e95633e39100716fbd7a5d2dfaa8d88eeb41c9` passed
-[native CI 39694509200](https://github.com/Olayeniii/Nostos/actions/runs/39694509200)
-on both architectures: 20 observer tests, three binding tests, six terminal
-wrapper tests, three backup tests and two broker checks per runner. Both
-artifacts are attached to that run. Application
-[CI 39694509191](https://github.com/Olayeniii/Nostos/actions/runs/39694509191)
-also passed. No live key or funded transaction was involved.
+The current checker code at `de1eb1f4ede9cf4b78e25e55f1a403b64ea978ba` passed
+[native CI 39765645507](https://github.com/Olayeniii/Nostos/actions/runs/39765645507)
+on ARM64 and x86_64: 20 observer tests, three binding tests, six terminal wrapper
+tests, four transport-policy tests, three backup tests and four Node/broker
+checks per runner. Both artifacts are attached to that run. Application
+[CI 39765645478](https://github.com/Olayeniii/Nostos/actions/runs/39765645478)
+also passed. No live key or funded transaction was involved. The selected SDK
+advisory scan has zero vulnerability findings and four reported informational
+notices; see [the security report](DEPENDENCY_SECURITY_2026_10_22.md) for scope
+and remaining legacy findings. This is not a certification of all dependencies.
 
 Verified SHA-256 values from the successful packaging logs:
 
 | Artifact                       | `nostos-operator-check` SHA-256                                    |
 | ------------------------------ | ------------------------------------------------------------------ |
-| `offline-operator-check-X64`   | `7e40eaf56e9254b0efe541183177305a115d05488f7d90b5352f116118514915` |
-| `offline-operator-check-ARM64` | `84dba9ee14b2e014cad041012a0ee57d29812ad1efa629bbf6f548301dd1d367` |
+| `offline-operator-check-X64`   | `2d6eb0dbaec439382c1b013b7fea4677aee9c3683f9222735ccdce553d254cc3` |
+| `offline-operator-check-ARM64` | `4bb518367feea91d312645957c8087bccd76f8ccc0e0c2b54c35de58ad7a650e` |
 
 The wrapper SHA-256 is identical in both packages:
 `f97bfeac2905820ac9b582478629ec63ed9888fa576056973804f024810fd40a`.
 These are public artifact hashes, not wallet identifiers. Review this code commit
 and match the manifest/log before handling a live export. The guide's later
 documentation-only commit does not change the tested artifact code.
+
+For the X64 package, verify the two extracted files before any key entry:
+
+```sh
+sha256sum -c <<'CHECKSUMS'
+2d6eb0dbaec439382c1b013b7fea4677aee9c3683f9222735ccdce553d254cc3  nostos-operator-check
+f97bfeac2905820ac9b582478629ec63ed9888fa576056973804f024810fd40a  operator-check.py
+CHECKSUMS
+```
+
+Require both `OK` results. The prepared Cargo lock hash is
+`1fe9ca774bf36ab0baccbee83bf3a4affb25edcff5b029976a64178926a9614e` and
+the transport policy hash is
+`8d9409ea73bb4b52ccd395208427733e09b191489003c91f8b1dd28fa1e24119`.
+The manifest must identify h2 0.4.16, rustls 0.23.46, rustls-webpki 0.103.16 and
+webpki-roots 1.0.10. These hashes are public build metadata, not wallet data.
 
 Next checkpoint: record the actual Android build/network and native business
 account selection, then obtain only the private offline check's boolean result.

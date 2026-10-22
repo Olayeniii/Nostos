@@ -98,11 +98,27 @@ integrity value. No global/laptop/VPS runtime was replaced.
 Application checks passed 327 tests, lint, formatting, type checking and build;
 the Next.js production build also passed. Targeted tests cover exact transport
 changes and refusal before private configuration access on an old Node runtime.
-Native ARM64/x86_64 rebuilds and updated artifact hashes must be recorded before
-resuming the operator key-binding test. The first local packaging check caught
+The first local packaging check caught
 a dynamic-test import/fixture mismatch introduced by the new policy module; the
 test loader and synthetic lock were updated, with artifact integrity checks
 retained and the new transport fields verified.
+
+Code `de1eb1f4ede9cf4b78e25e55f1a403b64ea978ba` passed all three workflows:
+
+- [Application CI 39765645478](https://github.com/Olayeniii/Nostos/actions/runs/39765645478):
+  clean pnpm audit, 327 application tests, production build, 56 web Python tests,
+  nine observer Python tests and two advisory-policy tests.
+- [Native checker CI 39765645507](https://github.com/Olayeniii/Nostos/actions/runs/39765645507):
+  ARM64 and x86_64 passed 20 observer tests, three binding tests, six wrapper tests,
+  four transport-policy tests, three backup tests and four Node/broker checks each.
+- [SDK worker ARM64 CI 39765645477](https://github.com/Olayeniii/Nostos/actions/runs/39765645477):
+  locked native build, selected SDK audit, 20 observer tests, backup and broker
+  checks, native linkage and fixed-file packaging all passed.
+
+The SDK ZIP artifact ID is `12419374063`, with GitHub-provided SHA-256
+`9d453d5716abd5931a5c2a6e26af81a7291d9304de63ea5051b7f2fe92b293dc`.
+No artifact was installed on a live host. Current checker hashes and the
+next non-funded procedure are in [ZODL_OPERATOR_TEST.md](ZODL_OPERATOR_TEST.md).
 
 No real viewing key, seed, spending key, transaction or sensitive memo is used.
 No funded payment/refund or persistent live receipt is claimed.
