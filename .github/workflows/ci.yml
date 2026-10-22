@@ -27,3 +27,4 @@ jobs:
       - run: python3 -m unittest discover -s scripts/web -p 'test_*.py'
       - run: python3 -m unittest discover -s scripts/observer -p 'test_*.py'
       - run: python3 -m unittest discover -s scripts/quality -p 'test_*.py'
+      - run: python3 -m unittest discover -s scripts/merchant-control -p 'test_*.py'

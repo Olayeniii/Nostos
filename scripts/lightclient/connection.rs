@@ -41,6 +41,61 @@ impl Connection {
             "fully_synced_height":full.map(|b|u32::from(b.block_height())),"locked":!ready,
             "account_connected":connected,"nostos_sdk_preview_v1":true,"observation_scope":"orchard-family-only","payments_enabled":false}))
     }
+    // Standalone private operator only. Deliberately absent from handle(), the
+    // HTTP broker and the existing worker method allowlists.
+    pub async fn control_prepare(&mut self, key:&str,birthday:u32,receiver:&str,reference:&str,
+        binding_key:&[u8;32])->Result<Value,&'static str> {
+        self.handle("z_importviewingkey",&[json!(key),json!("whenkeyisnew"),json!(birthday)]).await?;
+        let status=self.handle("nostos_sync",&[]).await?;
+        if status["locked"]!=false {return Err("control_not_synced");}
+        let db=self.wallet.db_mut();
+        let ids=db.get_account_ids().map_err(|_| "control_account")?;
+        if ids.len()!=1 {return Err("control_account");}
+        let keys=db.get_unified_full_viewing_keys().map_err(|_| "control_keys")?;
+        let key=keys.get(&ids[0]).ok_or("control_keys")?;
+        let request=transactions::ControlRequest::new(ids[0],receiver,reference,10_000,20_000,3)?;
+        let (account,memo_receiver,memo)=request.private_bindings(key,binding_key)?;
+        Ok(json!({"accountBinding":account,"receiverBinding":memo_receiver,"memoBinding":memo,
+            "receiver":receiver,"reference":reference,"birthday":birthday}))
+    }
+    pub async fn control_verify(&mut self,receiver:&str,reference:&str,binding_key:&[u8;32],
+        txid:zcash_primitives::transaction::TxId,max_fee:u64,max_debit:u64,confirmations:u32)->Result<Value,&'static str> {
+        let status=self.handle("nostos_sync",&[]).await?;
+        if status["locked"]!=false {return Err("control_not_synced");}
+        let db=self.wallet.db_mut();
+        let ids=db.get_account_ids().map_err(|_| "control_account")?;
+        if ids.len()!=1 {return Err("control_account");}
+        let keys=db.get_unified_full_viewing_keys().map_err(|_| "control_keys")?;
+        let key=keys.get(&ids[0]).ok_or("control_keys")?;
+        let request=transactions::ControlRequest::new(ids[0],receiver,reference,max_fee,max_debit,confirmations)?;
+        let (account,recipient,memo)=request.private_bindings(key,binding_key)?;
+        let enhanced=transactions::enhance(&mut self.client,db,txid).await?;
+        let checked=enhanced.verify_control(db,&request)?;
+        let after=self.status().await?;
+        if after["locked"]!=false || after["node_tip"]["height"].as_u64()!=Some(u64::from(checked.tip())) {
+            return Err("control_tip_changed");
+        }
+        Ok(json!({"observation":{"chain":"mainnet","pool":"ironwood",
+            "accountBinding":account,"receiverBinding":recipient,"memoBinding":memo,"amountZat":10_000,
+            "feeZat":checked.fee(),"txid":checked.txid().to_string(),"outputIndex":checked.output_index(),
+            "blockHeight":checked.height(),"blockHash":checked.anchor().to_string(),
+            "confirmations":checked.tip()-checked.height()+1},
+            "tipHeight":checked.tip(),"tipHash":after["node_tip"]["blockhash"],"grossInputZat":checked.gross_owned_inputs()}))
+    }
+    pub async fn control_preflight(&mut self,receiver:&str,reference:&str,binding_key:&[u8;32])->Result<Value,&'static str> {
+        let status=self.handle("nostos_sync",&[]).await?;
+        if status["locked"]!=false {return Err("control_not_synced");}
+        let db=self.wallet.db_mut();let ids=db.get_account_ids().map_err(|_| "control_account")?;
+        if ids.len()!=1 {return Err("control_account");}
+        let keys=db.get_unified_full_viewing_keys().map_err(|_| "control_keys")?;
+        let key=keys.get(&ids[0]).ok_or("control_keys")?;
+        let request=transactions::ControlRequest::new(ids[0],receiver,reference,10_000,20_000,3)?;
+        let (account,recipient,memo)=request.private_bindings(key,binding_key)?;
+        transactions::control_funding_ready(db,ids[0])?;
+        let after=self.status().await?;
+        if after["locked"]!=false {return Err("control_not_synced");}
+        Ok(json!({"accountBinding":account,"receiverBinding":recipient,"memoBinding":memo,"fundingReady":true}))
+    }
     pub async fn handle(&mut self,method:&str,params:&[Value]) -> Result<Value,&'static str> {
         match method {
             "getwalletstatus" if params.is_empty() => self.status().await,

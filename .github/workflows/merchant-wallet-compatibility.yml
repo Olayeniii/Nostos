@@ -4,10 +4,12 @@ on:
     branches: [feat/mainnet-wallet-compatibility, fix/dependency-security-oct22]
     paths:
       - scripts/lightclient/**
+      - scripts/merchant-control/**
       - .github/workflows/merchant-wallet-compatibility.yml
   pull_request:
     paths:
       - scripts/lightclient/**
+      - scripts/merchant-control/**
       - .github/workflows/merchant-wallet-compatibility.yml
 permissions:
   contents: read
@@ -43,6 +45,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.22.1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.28.7
+          package_json_file: nostos/package.json
+      - name: Build and test private operator JS on this architecture
+        working-directory: nostos
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec tsc -p scripts/merchant-control/tsconfig.operator.json
+          pnpm exec vitest run scripts/merchant-control
+          python3 -m unittest discover -s scripts/merchant-control -p 'test_*.py'
       - run: rustup toolchain install 1.95.0 --profile minimal
       - uses: actions/cache/restore@v4
         with:
@@ -65,6 +78,7 @@ jobs:
           cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
           cp nostos/scripts/lightclient/wallet_check.rs zallet/zallet-core/examples/nostos_wallet_check.rs
           cp nostos/scripts/lightclient/operator_check.rs zallet/zallet-core/examples/nostos_operator_check.rs
+          cp nostos/scripts/lightclient/control_check.rs zallet/zallet-core/examples/nostos_control_check.rs
           python3 nostos/scripts/lightclient/prepare.py zallet
       - name: Audit resolved SDK transport and dependency inventory
         run: python3 nostos/scripts/quality/audit-cargo.py zallet/Cargo.lock
@@ -85,6 +99,20 @@ jobs:
           python3 -m unittest discover -s nostos/scripts/lightclient -p test_operator_check.py
           python3 -m unittest discover -s nostos/scripts/lightclient -p test_transport_security.py
           node --test nostos/scripts/lightclient/service.test.mjs nostos/scripts/lightclient/node-runtime.test.mjs
+      - name: Build private operator helper without running its network entry point
+        working-directory: zallet
+        env:
+          NOSTOS_BACKUP_FIXTURE: ${{ github.workspace }}/nostos/scripts/lightclient/backup_fixture.py
+        run: |
+          cargo +1.95.0 test --locked --release -p zallet-core --example nostos_control_check
+          cargo +1.95.0 build --locked --release -p zallet-core --example nostos_control_check
+          python3 ../nostos/scripts/lightclient/package-control.py backends/zaino/target/release/examples/nostos_control_check ../nostos/.build/control-operator/scripts/merchant-control Cargo.lock ../control-operator
+      - uses: actions/upload-artifact@v4
+        with:
+          name: merchant-control-${{ runner.arch }}
+          path: control-operator/
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: offline-operator-check-${{ runner.arch }}

@@ -59,6 +59,19 @@ impl<A> ControlRequest<A> {
         Ok(Self{expected:Expected::new(account,OrchardReceiver::parse_mainnet(receiver)?,10_000,
             memo,ShieldedPool::Ironwood,TransferType::Outgoing,confirmations)?,max_fee,max_debit})
     }
+    pub fn private_bindings(&self,key:&UnifiedFullViewingKey,secret:&[u8;32]) -> Result<(String,String,String),&'static str> {
+        use hmac::{Hmac,Mac};
+        let address=Option::<orchard::Address>::from(orchard::Address::from_raw_address_bytes(&self.expected.receiver.0))
+            .ok_or("control_receiver")?;
+        if key.orchard().ok_or("control_key")?.scope_for_address(&address).is_some() {return Err("control_self_send");}
+        fn bind(secret:&[u8;32],label:&[u8],value:&[u8])->Result<String,&'static str> {
+            let mut mac=Hmac::<sha2::Sha256>::new_from_slice(secret).map_err(|_| "control_binding")?;
+            mac.update(b"nostos-control-mainnet-ironwood-v1\0");mac.update(label);mac.update(&[0]);mac.update(value);
+            Ok(hex::encode(mac.finalize().into_bytes()))
+        }
+        Ok((bind(secret,b"account",&key.orchard().ok_or("control_key")?.to_bytes())?,
+            bind(secret,b"receiver",&self.expected.receiver.0)?,bind(secret,b"memo",self.expected.memo.as_array())?))
+    }
 }
 
 // Only verify_control constructs this token outside this module. It carries no
@@ -79,6 +92,30 @@ impl ControlEvidence {
 struct ControlUnresolved;
 impl From<rusqlite::Error> for ControlUnresolved {fn from(_:rusqlite::Error)->Self {Self}}
 impl From<&'static str> for ControlUnresolved {fn from(_:&'static str)->Self {Self}}
+
+pub fn control_funding_ready(db:&mut Database,account:<Database as WalletRead>::AccountId)->Result<(),&'static str> {
+    use zcash_client_backend::data_api::NullifierQuery;
+    db.transactionally_with_extension::<_,_,ControlUnresolved>(|db,ext| {
+        if db.get_orchard_nullifiers(NullifierQuery::Unspent).map_err(|_| "funding_notes")?
+            .iter().any(|(a,_)|*a==account) {return Err(ControlUnresolved);}
+        let notes=db.get_ironwood_nullifiers(NullifierQuery::Unspent).map_err(|_| "funding_notes")?
+            .into_iter().filter(|(a,_)|*a==account).collect::<Vec<_>>();
+        if notes.len()!=1 {return Err(ControlUnresolved);}
+        let uuid=account.expose_uuid();let nf=notes[0].1.to_bytes();
+        let (value,mined,block):(i64,Option<u32>,Option<u32>)=ext.query_row(
+            "SELECT rn.value,t.mined_height,t.block FROM ironwood_received_notes rn
+             JOIN accounts a ON a.id=rn.account_id JOIN transactions t ON t.id_tx=rn.transaction_id
+             WHERE a.uuid=?1 AND rn.nf=?2",rusqlite::params![uuid.as_bytes().as_slice(),nf.as_slice()],
+             |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)))?;
+        let height=mined.filter(|h|*h>0 && block==Some(*h)).ok_or("funding_height")?;
+        let tip=db.chain_height().map_err(|_| "funding_tip")?.ok_or("funding_tip")?;
+        if value!=20_000 || u32::from(tip).checked_sub(height).and_then(|n|n.checked_add(1)).unwrap_or(0)<3
+            || db.get_block_hash(BlockHeight::from_u32(height)).map_err(|_| "funding_anchor")?.is_none() {
+            return Err(ControlUnresolved);
+        }
+        Ok(())
+    }).map_err(|_| "control_funding_unresolved")
+}
 impl<A> Expected<A> {
     pub fn new(account: A, receiver: OrchardReceiver, amount: u64, memo: MemoBytes,
         pool: ShieldedPool, direction: TransferType, confirmations: u32) -> Result<Self, &'static str> {

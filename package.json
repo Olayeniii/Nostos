@@ -27,7 +27,7 @@
     "intake:verify": "tsx scripts/payment-intake/verify-restart.ts",
     "refund:send": "tsx scripts/refund-core/send.ts",
     "refund:verify": "tsx scripts/refund-core/verify.ts",
-    "test": "vitest run --passWithNoTests",
+    "test": "tsc -p scripts/merchant-control/tsconfig.operator.json && vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "../..",
+    "outDir": "../../.build/control-operator"
+  },
+  "files": ["journal.ts", "verification.ts"]
+}

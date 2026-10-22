@@ -141,6 +141,30 @@ fn synthetic_unmined_control_cannot_produce_verified_evidence_even_after_reopen(
     assert!(tx.verify_control(&mut reopened,&control_request(account,&customer)).is_err());
 }
 
+#[test]
+fn control_bindings_are_stable_keyed_and_distinct_for_account_receiver_and_memo() {
+    let sender=key(31);let request=control_request(1,&key(32));
+    let one=request.private_bindings(&sender,&[7;32]).unwrap();
+    assert_eq!(one,request.private_bindings(&sender,&[7;32]).unwrap());
+    let other=request.private_bindings(&sender,&[8;32]).unwrap();
+    assert_ne!(one.0,other.0);assert_ne!(one.1,other.1);assert_ne!(one.2,other.2);
+    assert_ne!(one.0,one.1);assert_ne!(one.1,one.2);
+    assert!(control_request(1,&sender).private_bindings(&sender,&[7;32]).is_err());
+}
+
+#[test]
+fn funding_preflight_cannot_accept_an_empty_viewing_account() {
+    use zcash_client_backend::data_api::{Account,AccountBirthday,WalletWrite,chain::ChainState};
+    let temp=tempfile::tempdir().unwrap();let mut db=super::super::open_fixture(&temp.path().join("empty.sqlite")).unwrap();
+    let scoped=super::super::connection::scoped_key(&key(31).encode(&MAIN_NETWORK)).unwrap();
+    let height=BlockHeight::from_u32(3_524_931);
+    let birthday=AccountBirthday::from_parts(ChainState::empty(height-1,zcash_primitives::block::BlockHash([0;32])),None);
+    super::super::import_once(&mut db,&scoped,&birthday,u32::from(height)).unwrap();
+    db.update_chain_tip(height+5).unwrap();
+    let account=db.get_account_for_ufvk(&scoped).unwrap().unwrap().id();
+    assert!(control_funding_ready(&mut db,account).is_err());
+}
+
 // Public, already-published SDK regression vectors. Never fund this account.
 // Source: zodl-inc/zodl-android-wallet-sdk @ 828874217a22bbf6ab7df4ea59b59f295d059ff4,
 // backend-lib/src/main/rust/unified_r0.rs, MAINNET_PRE_PORT. No mnemonic is copied.

@@ -224,17 +224,20 @@ routes/memos in logs. Close and reopen the **isolated local observer**, resync,
 and verify the same record/output and memo match, no duplicate settlement and
 no second debit. This does not authorize restarting an existing service.
 
-The live control harness, note-spend ownership check and durable instruction to
-receipt integration are still remaining work; current offline fixtures prove
-decryption/storage behavior, not these live results. Work can verify private
-results after an approved implementation and operator run. Do not ask the user
-to provide keys or raw decrypted transactions through chat to automate it.
+The [private operator control tool](PRIVATE_OPERATOR_CONTROL.md) now implements
+the native owned-note checks, private request/receipt connection and fresh
+verification after reopening. Its successful mined path still needs the
+separately approved operator run; fixture checks prove neither real signing nor
+real outgoing recovery. Full product checkout/refund receipt integration also
+remains separate work. Do not ask the user to provide keys or raw decrypted
+transactions through chat to automate these checks.
 
 The separate [control journal preparation](MERCHANT_CONTROL_JOURNAL.md) now
 covers immutable instructions, one-send reservations and deduplicated candidate
-observations across reopen. It has no live runner or SDK verification adapter;
-its receipts always retain false verification/confirmation flags. This does not
-remove the live recovery and protected-storage blockers above.
+observations across reopen. Candidate-only receipts retain false verification
+flags; the subsequent private operator path requires two authenticated native
+checks before recording a verified control receipt. Actual funded recovery and
+host/storage isolation still require approved live evidence.
 
 Share a redacted result with version/build, tested commit, booleans for binding,
 memo/outgoing match and reopen/retry invariants. Keep real txid/block references

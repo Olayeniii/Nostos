@@ -1,5 +1,10 @@
 # Merchant control-transfer journal preparation
 
+This document describes the initial journal-only checkpoint. The subsequent
+[private operator control tool](PRIVATE_OPERATOR_CONTROL.md) adds authenticated
+native verification, a protected operator profile and a separate two-pass
+verified-receipt path. Candidate observations alone still cannot confirm.
+
 This is an isolated source/test checkpoint, not a live control tool or a signing
 integration. It is prepared on `fix/dependency-security-oct22` after the
 operator-reported offline binding pass recorded at

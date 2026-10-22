@@ -1,5 +1,10 @@
 # Private SDK control verifier preparation
 
+This describes the original verifier core. Its subsequent private runner,
+request commitments, journal connection and recheck path are documented in
+[PRIVATE_OPERATOR_CONTROL.md](PRIVATE_OPERATOR_CONTROL.md). No live test or
+mainnet-readiness claim is made by either source checkpoint.
+
 Branch: `fix/dependency-security-oct22`, continuing the control journal checkpoint
 `8ae562fa48b2dc5ac2ab78803d465c6033e41a39`. No merge, deployment, live account
 import or funded transaction is authorized by this source checkpoint.

@@ -1,9 +1,13 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { RefundStatus } from "../../packages/core/src/index.js";
+import {
+  consumeVerifiedControl,
+  isVerifiedControl,
+  type VerifiedControl,
+} from "./verification.js";
 
-// Preparation only. No CLI, wallet adapter, network, signing or settlement API.
-// Bindings must come from a future private SDK validator. They are opaque
-// commitments, not evidence that a receiver, memo or account has been verified.
+// Private control journal. No product settlement or signing API. Opaque request
+// commitments alone are never accepted as verified transaction evidence.
 interface Plan {
   id: string;
   merchantId: string;
@@ -169,13 +173,16 @@ export class ControlJournal {
               "control_environment",
               "control_plans",
               "control_observations",
+              "control_checks",
             ].includes(String(t.name)),
         )
       )
         refuse();
       if (
         tables.length !== 0 &&
-        (tables.length !== 3 ||
+        (![3, 4].includes(tables.length) ||
+          (tables.length === 3 &&
+            tables.some((t) => t.name === "control_checks")) ||
           database
             .prepare("SELECT profile FROM control_environment WHERE id=1")
             .get()?.profile !== "nostos-control-mainnet-v1")
@@ -202,6 +209,10 @@ export class ControlJournal {
             pool TEXT NOT NULL CHECK(pool IN ('orchard','ironwood')),
             output_index INTEGER NOT NULL, observation TEXT NOT NULL,
             UNIQUE(chain,txid,pool,output_index)
+          );
+          CREATE TABLE IF NOT EXISTS control_checks (
+            plan_id TEXT PRIMARY KEY REFERENCES control_plans(id),
+            valid INTEGER NOT NULL CHECK(valid IN (0,1)), evidence TEXT NOT NULL
           );
           CREATE TRIGGER IF NOT EXISTS control_plan_immutable
             BEFORE UPDATE OF id,merchant_id,account_binding,approval_id,plan ON control_plans
@@ -252,7 +263,7 @@ export class ControlJournal {
   }
 
   // Caller approval is a recorded assertion, not cryptographic approval proof.
-  // There is no operator runner or product integration invoking this method yet.
+  // Only the separate approved operator handoff invokes this; never a web route.
   recordApprovedPlan(input: unknown): { created: boolean } {
     return this.safe(() => {
       const plan = parsePlan(input);
@@ -326,7 +337,7 @@ export class ControlJournal {
   }
 
   // Candidate bookkeeping ONLY. Caller-supplied chain/decryption claims cannot
-  // confirm a send or close the compatibility gate. SDK verification is missing.
+  // confirm a send or close the compatibility gate.
   recordCandidate(id: string, input: unknown): { created: boolean } {
     return this.safe(() => {
       const observed = parseObservation(input);
@@ -390,13 +401,112 @@ export class ControlJournal {
       const observed = this.database
         .prepare("SELECT 1 FROM control_observations WHERE plan_id=?")
         .get(id);
+      const checked =
+        this.database
+          .prepare("SELECT valid FROM control_checks WHERE plan_id=?")
+          .get(id)?.valid === 1;
       return {
         state: row.state,
         candidateRecorded: !!observed,
-        confirmed: false as const,
-        liveEvidenceVerified: false as const,
-        compatibilityGatePassed: false as const,
+        confirmed: checked,
+        liveEvidenceVerified: checked,
+        compatibilityGatePassed: checked,
       };
     });
+  }
+
+  beginRecheck(id: string): void {
+    this.safe(() =>
+      this.atomic(() => {
+        this.row(id);
+        this.database
+          .prepare("UPDATE control_checks SET valid=0 WHERE plan_id=?")
+          .run(id);
+      }),
+    );
+  }
+
+  recordRechecked(
+    id: string,
+    first: VerifiedControl,
+    second: VerifiedControl,
+  ): void {
+    this.beginRecheck(id);
+    this.safe(() =>
+      this.atomic(() => {
+        if (
+          !isVerifiedControl(first) ||
+          !isVerifiedControl(second) ||
+          first.nonce === second.nonce
+        )
+          refuse();
+        if (!consumeVerifiedControl(first) || !consumeVerifiedControl(second))
+          refuse();
+        const row = this.row(id);
+        const plan = parsePlan(JSON.parse(row.plan));
+        const a = parseObservation(first.observation);
+        const b = parseObservation(second.observation);
+        const immutable = (o: Observation) =>
+          JSON.stringify({ ...o, confirmations: 0 });
+        if (
+          immutable(a) !== immutable(b) ||
+          second.tipHeight < first.tipHeight ||
+          (second.tipHeight === first.tipHeight &&
+            second.tipHash !== first.tipHash) ||
+          b.confirmations < a.confirmations ||
+          first.grossInputZat !== second.grossInputZat ||
+          second.grossInputZat > plan.maxDebitZat ||
+          row.state === "pending" ||
+          row.txid !== b.txid
+        )
+          refuse();
+        for (const field of [
+          "chain",
+          "pool",
+          "accountBinding",
+          "receiverBinding",
+          "memoBinding",
+          "amountZat",
+        ] as const) {
+          if (plan[field] !== b[field]) refuse();
+        }
+        if (
+          b.feeZat > plan.maxFeeZat ||
+          b.confirmations < plan.minConfirmations ||
+          b.amountZat + b.feeZat > plan.maxDebitZat
+        )
+          refuse();
+        const old = this.database
+          .prepare(
+            "SELECT observation FROM control_observations WHERE plan_id=?",
+          )
+          .get(id);
+        if (
+          old &&
+          immutable(parseObservation(JSON.parse(String(old.observation)))) !==
+            immutable(b)
+        )
+          refuse();
+        if (!old)
+          this.database
+            .prepare("INSERT INTO control_observations VALUES(?,?,?,?,?,?)")
+            .run(id, b.chain, b.txid, b.pool, b.outputIndex, JSON.stringify(b));
+        this.database
+          .prepare(
+            "INSERT INTO control_checks VALUES(?,1,?) ON CONFLICT(plan_id) DO UPDATE SET valid=1,evidence=excluded.evidence",
+          )
+          .run(
+            id,
+            JSON.stringify({
+              observation: b,
+              tipHeight: second.tipHeight,
+              tipHash: second.tipHash,
+              grossInputZat: second.grossInputZat,
+              firstNonce: first.nonce,
+              secondNonce: second.nonce,
+            }),
+          );
+      }),
+    );
   }
 }
