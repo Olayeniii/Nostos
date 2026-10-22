@@ -135,9 +135,11 @@ def preflight(db, attempt, call):
 def worker_call(binary, digest, root, method, params):
     # The worker still enforces its own wallet paths, lock and file permissions.
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    require(method == 'nostos_control')
     private_root(root)
     binary = Path(binary)
     require(binary.is_absolute() and binary.resolve() == binary and valid_hex(digest, 64))
+    private_root(binary.parent)
     meta = binary.lstat()
     require(stat.S_ISREG(meta.st_mode) and meta.st_uid in (0, os.getuid()) and not meta.st_mode & 0o022)
     require(hashlib.sha256(binary.read_bytes()).hexdigest() == digest)

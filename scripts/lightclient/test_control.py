@@ -167,6 +167,8 @@ class ControlTests(unittest.TestCase):
             binary.chmod(0o700)
             digest = hashlib.sha256(binary.read_bytes()).hexdigest()
             with self.assertRaises(control.Unresolved):
+                control.worker_call(binary, digest, root, 'z_importviewingkey', ['private-fixture'])
+            with self.assertRaises(control.Unresolved):
                 control.worker_call(binary, '0' * 64, root, 'nostos_control', ['private-fixture'])
             self.assertFalse((root / 'started').exists())
             result = control.worker_call(binary, digest, root, 'nostos_control', ['private-fixture'])
