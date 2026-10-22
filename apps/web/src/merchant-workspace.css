@@ -116,9 +116,9 @@
   align-items: center;
 }
 .merchant-studio .dashboard-title h1 {
-  font-family: Georgia, serif;
+  font-family: var(--font-manrope), system-ui, sans-serif;
   font-size: clamp(36px, 4vw, 52px);
-  font-weight: 400;
+  font-weight: 650;
   letter-spacing: -0.045em;
   line-height: 1.12;
   margin: 10px 0;
@@ -220,8 +220,8 @@
   margin-bottom: 18px;
 }
 .merchant-studio .studio-list-heading {
-  font-family: Georgia, serif;
-  font-weight: 400;
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-weight: 650;
   font-size: 25px;
   letter-spacing: -0.035em;
 }
@@ -378,9 +378,9 @@
   position: static;
 }
 .merchant-studio .payment-detail h2 {
-  font-family: Georgia, serif;
+  font-family: var(--font-manrope), system-ui, sans-serif;
   font-size: 27px;
-  font-weight: 400;
+  font-weight: 650;
   color: #192e29;
 }
 .merchant-studio .detail-amount {
@@ -741,14 +741,14 @@
   position: relative;
 }
 .studio-received h2 {
-  font-family: Georgia, serif;
+  font-family: var(--font-manrope), system-ui, sans-serif;
   font-size: 25px;
-  font-weight: 400;
+  font-weight: 650;
   margin: 12px 0;
 }
 .studio-received > strong {
   font-size: clamp(40px, 5vw, 64px);
-  font-weight: 400;
+  font-weight: 650;
   letter-spacing: -0.045em;
   display: block;
   margin: 16px 0 10px;
@@ -773,9 +773,9 @@
   text-underline-offset: 3px;
 }
 .studio-attention h2 {
-  font-family: Georgia, serif;
+  font-family: var(--font-manrope), system-ui, sans-serif;
   font-size: 25px;
-  font-weight: 400;
+  font-weight: 650;
   margin: 0 0 12px;
 }
 .studio-attention > a {
@@ -796,7 +796,7 @@
 }
 .studio-attention a strong {
   font-size: 28px;
-  font-weight: 400;
+  font-weight: 650;
 }
 .studio-record-list {
   padding: 0;
@@ -887,8 +887,8 @@
 .merchant-studio .settings-grid h2,
 .studio-funds h1,
 .studio-funds h2 {
-  font-family: Georgia, serif;
-  font-weight: 400;
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-weight: 650;
   letter-spacing: -0.035em;
 }
 .merchant-studio .settings-grid h2 {
@@ -1041,4 +1041,332 @@
   .studio-tab-count {
     margin-left: 4px;
   }
+}
+
+/* Approved refinement: existing palette, clearer type and layered surfaces. */
+.merchant-studio {
+  --muted: #59685f;
+}
+.merchant-studio :is(h1, h2, h3) {
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.merchant-studio .dashboard-title h1,
+.merchant-studio .studio-funds > h1 {
+  font-size: clamp(30px, 3vw, 42px);
+  font-weight: 750;
+  line-height: 1.2;
+}
+.merchant-studio .dashboard-title p,
+.studio-context,
+.studio-funds > p {
+  font-size: 14px;
+  color: #59685f;
+}
+.merchant-studio :is(.primary, .secondary) {
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  min-height: 44px;
+}
+.merchant-studio :is(input, select, textarea) {
+  border-radius: 7px;
+  font-size: 14px;
+}
+.merchant-studio .panel,
+.studio-received,
+.studio-stat,
+.studio-attention,
+.studio-recent {
+  background: #faf8f2;
+  border: 1px solid #d7d8cd;
+  border-radius: 12px;
+  box-shadow:
+    0 2px 4px #192e2904,
+    0 1px 0 #ffffff inset;
+}
+.merchant-studio .studio-list-heading,
+.studio-attention h2,
+.studio-received h2,
+.merchant-studio .settings-grid h2,
+.merchant-studio .funds-withdrawal h2,
+.merchant-studio .funds-review h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+.merchant-studio .summary-grid {
+  border: 0;
+  gap: 14px;
+}
+.merchant-studio .summary-grid article,
+.merchant-studio .summary-grid article:first-child {
+  background: #faf8f2;
+  border: 1px solid #d7d8cd;
+  border-radius: 12px;
+  padding: 24px;
+}
+.merchant-studio .summary-grid article:first-child {
+  border-top: 3px solid #365944;
+}
+.merchant-studio .summary-grid :is(span, small, p) {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.merchant-studio .summary-grid strong {
+  font-weight: 750;
+}
+.studio-overview-grid {
+  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.studio-received,
+.studio-stat {
+  padding: 24px;
+}
+.studio-received {
+  border-top: 3px solid #365944;
+}
+.studio-received h2 {
+  margin: 4px 0;
+}
+.studio-received > strong,
+.studio-stat > strong {
+  display: block;
+  font-size: clamp(30px, 3vw, 44px);
+  line-height: 1.25;
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  margin: 20px 0 10px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.studio-received > strong small {
+  font-size: 16px;
+  font-weight: 600;
+}
+.studio-received > span {
+  margin-top: 16px;
+  font-size: 12px;
+}
+.studio-stat h2 {
+  font-size: 14px;
+  letter-spacing: 0;
+  margin: 6px 0;
+}
+.studio-stat p,
+.studio-stat > a {
+  color: #59685f;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.studio-stat > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #365944;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.studio-attention {
+  padding: 22px 24px;
+  margin-bottom: 28px;
+}
+.studio-attention h2 {
+  margin: 0 0 14px;
+}
+.studio-attention-items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.studio-attention-items > a {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid #e0e2d8;
+  border-radius: 8px;
+  background: #f5f3ec;
+  font-size: 13px;
+}
+.studio-attention-items > a:hover {
+  border-color: #9fb3a4;
+  background: #edf1e8;
+}
+.studio-attention-items strong {
+  font-size: 26px;
+  font-weight: 700;
+}
+.studio-recent {
+  padding: 24px;
+}
+.studio-record-list a {
+  gap: 16px;
+  padding: 20px 12px;
+}
+.studio-record-name strong,
+.merchant-studio .ledger-row strong,
+.merchant-studio .ledger-row .ledger-amount {
+  font-size: 14px;
+}
+.studio-record-name small,
+.studio-record-state > small,
+.studio-record-date,
+.merchant-studio .ledger-order small,
+.merchant-studio .ledger-row span > small,
+.merchant-studio .ledger-date,
+.merchant-studio .ledger-columns {
+  font-size: 11px;
+  color: #647065;
+}
+.merchant-studio .status-chip,
+.merchant-studio .ledger-row .status-chip {
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+.merchant-studio .studio-tabs button,
+.merchant-studio .studio-search input {
+  font-size: 12px;
+}
+.merchant-studio .payment-detail {
+  border-radius: 12px;
+}
+.merchant-studio .payment-detail h2 {
+  font-size: 26px;
+  font-weight: 700;
+}
+.merchant-studio .payment-lifecycle small {
+  font-size: 12px;
+}
+.merchant-studio .empty-state {
+  border: 1px dashed #b5c2af;
+  background: #f3f4eb;
+  border-radius: 10px;
+}
+.studio-brand-name,
+.studio-business {
+  display: none;
+}
+.studio-rail a:not(.studio-mark) svg {
+  flex-shrink: 0;
+}
+.studio-rail a[aria-current] {
+  color: #c5f7de;
+  box-shadow: inset 3px 0 #53e3a6;
+}
+@media (min-width: 1201px) {
+  .merchant-studio {
+    grid-template-columns: 224px minmax(0, 1fr);
+  }
+  .merchant-studio .studio-rail {
+    width: 224px;
+    padding: 28px 16px 18px;
+  }
+  .studio-rail .studio-mark {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 12px;
+    margin-bottom: 42px;
+  }
+  .studio-brand-name {
+    display: block;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: #f3efe6;
+  }
+  .studio-destinations {
+    gap: 10px;
+  }
+  .studio-rail a:not(.studio-mark) {
+    flex-direction: row;
+    justify-content: flex-start;
+    min-height: 50px;
+    gap: 14px;
+    padding: 0 16px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+  .studio-rail a:not(.studio-mark):hover {
+    background: #243d33;
+  }
+  .studio-business {
+    display: grid;
+    gap: 6px;
+    margin-top: auto;
+    padding: 18px 12px;
+    border-top: 1px solid #3a5045;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .studio-business small {
+    color: #b7c6ba;
+    font-size: 11px;
+  }
+  .studio-page {
+    padding: 32px;
+  }
+  .merchant-studio .studio-header {
+    padding: 18px 32px;
+  }
+}
+@media (max-width: 1200px) {
+  .studio-overview-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .studio-received {
+    grid-column: 1 / -1;
+  }
+  .studio-attention-items {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 900px) {
+  .merchant-studio .dashboard-title h1,
+  .merchant-studio .studio-funds > h1 {
+    font-size: 32px;
+  }
+  .merchant-studio .summary-grid article,
+  .merchant-studio .summary-grid article:first-child {
+    padding: 20px 16px;
+  }
+  .merchant-studio .summary-grid strong {
+    font-size: 28px;
+  }
+  .studio-overview-grid {
+    gap: 12px;
+  }
+  .studio-received,
+  .studio-stat,
+  .studio-attention,
+  .studio-recent {
+    padding: 20px 16px;
+  }
+  .studio-stat > strong {
+    font-size: 30px;
+  }
+  .studio-record-list a {
+    padding: 18px 0;
+  }
+  .studio-rail a:not(.studio-mark) {
+    font-size: 10px;
+  }
+  .studio-rail a[aria-current] {
+    box-shadow: inset 0 2px #53e3a6;
+  }
+}
+.merchant-studio .dashboard-title > .primary {
+  background: #53e3a6;
+  border-color: #53e3a6;
+  color: #142b22;
+}
+.merchant-studio .dashboard-title > .primary:hover {
+  background: #76ebba;
+  border-color: #76ebba;
 }

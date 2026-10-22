@@ -1,4 +1,5 @@
 "use client";
+import { OverviewIcon } from "../../../src/overview-icon.js";
 import { useRef, useState } from "react";
 import { AppFooter } from "../../../src/shell.js";
 import { useRecord } from "../../../src/use-record.js";
@@ -72,6 +73,23 @@ export default function FundsPage() {
         {loading && <p role="status">Checking shielded funds...</p>}
         {data && (
           <>
+            <section
+              className="workspace-available panel"
+              aria-label="Available withdrawal balance"
+            >
+              <span className="workspace-summary-icon">
+                <OverviewIcon kind="bag" />
+              </span>
+              <div>
+                <h2>Available before withdrawal fee</h2>
+                <strong>
+                  {zec(data.withdrawableBeforeFeeZat)} <small>ZEC</small>
+                </strong>
+                <p>
+                  Refund reserves and their fee allowance are already set aside.
+                </p>
+              </div>
+            </section>
             <dl className="payment-summary">
               <dt>Confirmed shielded funds</dt>
               <dd>{zec(data.spendableZat)} ZEC</dd>
@@ -79,8 +97,6 @@ export default function FundsPage() {
               <dd>{zec(data.reservedForRefundsZat)} ZEC</dd>
               <dt>Refund fee allowance</dt>
               <dd>{zec(data.refundFeeAllowanceZat)} ZEC</dd>
-              <dt>Available before withdrawal fee</dt>
-              <dd>{zec(data.withdrawableBeforeFeeZat)} ZEC</dd>
             </dl>
             <p className="funds-explainer">
               The available amount is before the withdrawal fee. Review provides
@@ -131,14 +147,19 @@ export default function FundsPage() {
               }}
             >
               <h2>Withdraw released earnings</h2>
-              <p>
-                1. Enter the destination and amount. 2. Review the actual fee.
-                3. Confirm the send.
-              </p>
+              <ol
+                className="workspace-withdraw-steps"
+                aria-label="Withdrawal steps"
+              >
+                <li>1. Enter details</li>
+                <li>2. Review fee</li>
+                <li>3. Confirm send</li>
+              </ol>
               <label>
                 Shielded destination
                 <input
                   required
+                  name="shielded-destination"
                   autoComplete="off"
                   value={destination}
                   onChange={(e) => {
@@ -152,6 +173,8 @@ export default function FundsPage() {
                 Amount in ZEC
                 <input
                   required
+                  name="withdrawal-amount"
+                  autoComplete="off"
                   inputMode="decimal"
                   value={amount}
                   onChange={(e) => {

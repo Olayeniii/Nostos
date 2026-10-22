@@ -7,6 +7,7 @@ import { requestJson } from "./requests.js";
 import { Mark } from "./mark.js";
 import { NetworkLabel } from "./network-context.js";
 import "./merchant-workspace.css";
+import "./workspace-refinement.css";
 
 function WorkspaceIcon({
   kind,
@@ -60,12 +61,14 @@ function WorkspaceIcon({
 }
 export function MerchantWorkspace({
   name = "Merchant workspace",
+  className = "",
   detailOpen = false,
   onSignOut,
   onPaymentsHome,
   children,
 }: {
   name?: string;
+  className?: string;
   detailOpen?: boolean;
   onSignOut?: () => Promise<void>;
   onPaymentsHome?: () => void;
@@ -107,7 +110,7 @@ export function MerchantWorkspace({
   ] as const;
   return (
     <main
-      className={`product-app dashboard-app merchant-studio ${detailOpen ? "detail-open" : ""}`}
+      className={`product-app dashboard-app merchant-studio refined-workspace ${detailOpen ? "detail-open" : ""} ${className}`}
     >
       <nav className="studio-rail" aria-label="Merchant workspace">
         <Link
@@ -116,6 +119,7 @@ export function MerchantWorkspace({
           aria-label="NOSTOS overview"
         >
           <Mark />
+          <span className="studio-brand-name">NOSTOS</span>
         </Link>
         <div className="studio-destinations">
           {destinations.map((item) => (
@@ -143,14 +147,22 @@ export function MerchantWorkspace({
             </Link>
           ))}
         </div>
+        <div className="studio-business">
+          <strong>{name}</strong>
+          <small>Merchant account</small>
+        </div>
       </nav>
       <div className="studio-body">
         <header className="studio-header">
           <div className="studio-identity">
             <Link href="/merchant/overview" className="studio-wordmark">
-              NOSTOS
+              <span className="overview-desktop-brand">Workspace</span>
+              <span className="overview-mobile-brand">NOSTOS</span>
             </Link>
-            <span>{name}</span>
+            <span>
+              {destinations.find((item) => item.href === pathname)?.label ??
+                name}
+            </span>
           </div>
           <div className="studio-account">
             <span className="studio-network">

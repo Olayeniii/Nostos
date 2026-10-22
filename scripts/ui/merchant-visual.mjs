@@ -300,8 +300,8 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     });
     if (
       process.env.UI_SCREENSHOTS !== "0" &&
-      ((width === 1440 && name === "checkout") ||
-        (width === 390 && name === "receipt"))
+      ((width === 1440 && ["payments", "funds", "settings"].includes(name)) ||
+        (width === 390 && name === "refunds"))
     ) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({
@@ -316,6 +316,11 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     if (phase === "after")
       assert.equal(overflow, false, `${width} ${name} overflows`);
   };
+  await visit("http://127.0.0.1:3000/");
+  await page
+    .getByRole("heading", { name: "Private payments. A way back." })
+    .waitFor();
+  await capture("home");
   await visit("http://127.0.0.1:3000/merchant");
   await page.getByRole("button", { name: /Studio commission/ }).waitFor();
   await capture("payments");
@@ -407,7 +412,7 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
 
   await visit("http://127.0.0.1:3000/merchant/overview");
   await page
-    .getByRole("heading", { name: "Your store, at a glance." })
+    .getByRole("heading", { name: "Your payments, in order." })
     .waitFor();
   await page.locator(".studio-record-list a").first().waitFor();
   assert.equal(
@@ -425,7 +430,10 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await page.locator(".studio-record-list a").first().waitFor();
   assert.equal(await page.locator(".studio-record-list a").count(), 3);
   await capture("refunds");
-  await page.getByRole("button", { name: /Needs review/ }).click();
+  await page
+    .locator(".studio-tabs")
+    .getByRole("button", { name: /Needs review/ })
+    .click();
   assert.equal(await page.locator(".studio-record-list a").count(), 1);
   assert(
     await page
@@ -442,7 +450,10 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
   await visit("http://127.0.0.1:3000/merchant/refunds");
   await page.locator(".studio-record-list a").first().waitFor();
 
-  await page.getByRole("button", { name: /Processing/ }).click();
+  await page
+    .locator(".studio-tabs")
+    .getByRole("button", { name: /Processing/ })
+    .click();
   assert.equal(await page.locator(".studio-record-list a").count(), 1);
   await page
     .getByRole("link", { name: /Refund awaiting confirmation/ })
@@ -682,7 +693,9 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
 
   // Connected review: every write below is intercepted above; no wallet send.
   await visit("http://127.0.0.1:3000/merchant/overview");
-  await page.getByRole("link", { name: "New payment +", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Create payment link", exact: true })
+    .click();
   await page
     .getByRole("heading", { name: "Create payment request", exact: true })
     .waitFor();

@@ -1,4 +1,5 @@
 "use client";
+import { OverviewIcon } from "../../../src/overview-icon.js";
 import { useState } from "react";
 import { AppFooter } from "../../../src/shell.js";
 import { MerchantWorkspace } from "../../../src/merchant-workspace.js";
@@ -53,6 +54,38 @@ export default function Refunds() {
             "Wallet sync is unavailable. Saved records are shown. Refresh before taking action."}
         </p>
       )}
+      <section
+        className="workspace-refund-summary"
+        aria-label="Refund activity"
+      >
+        {(
+          [
+            ["review", "Needs review", "attention"],
+            ["processing", "Processing", "clock"],
+            ["history", "History", "check"],
+          ] as const
+        ).map(([bucket, label, icon]) => (
+          <button
+            key={bucket}
+            className="workspace-refund-metric"
+            aria-pressed={filter === bucket}
+            onClick={() => setFilter(bucket)}
+          >
+            <span className="workspace-summary-icon">
+              <OverviewIcon kind={icon} />
+            </span>
+            <span>
+              <small>{label}</small>
+              <strong>
+                {data
+                  ? records.filter((record) => refundBucket(record) === bucket)
+                      .length
+                  : "..."}
+              </strong>
+            </span>
+          </button>
+        ))}
+      </section>
       <p className="studio-context">
         Open a payment to review its request, refund progress, and remaining
         value. Refund availability is checked in payment details. No new
@@ -89,6 +122,12 @@ export default function Refunds() {
         </label>
       </div>
       {loading && <StateLabel state="loading" text="Checking refunds" />}
+      <div className="workspace-record-columns" aria-hidden="true">
+        <span>Order</span>
+        <span>Refund amount</span>
+        <span>State</span>
+        <span>Next step</span>
+      </div>
       <MerchantRecordList records={shown} refunds />
       {data && !loading && shown.length === 0 && (
         <div className="empty-state">
