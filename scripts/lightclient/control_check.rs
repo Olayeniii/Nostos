@@ -7,12 +7,17 @@ use sha2::{Digest,Sha256};
 use hmac::{Hmac,Mac};
 use tonic::transport::{ClientTlsConfig,Endpoint};
 use zcash_address::unified::{self,Container,Encoding};
-use zcash_protocol::consensus::{Parameters,MAIN_NETWORK};
+use zcash_protocol::consensus::MAIN_NETWORK;
 
 fn hex32(value:&Value)->Result<[u8;32],&'static str> {
     let text=value.as_str().ok_or("hex_format")?;
     if text.len()!=64 || !text.bytes().all(|c|c.is_ascii_digit() || (b'a'..=b'f').contains(&c)) {return Err("hex_format");}
     hex::decode(text).map_err(|_| "hex_format")?.try_into().map_err(|_| "hex_length")
+}
+fn parse_txid(value:&Value)->Result<zcash_primitives::transaction::TxId,&'static str> {
+    let mut bytes=hex32(value)?;
+    bytes.reverse();
+    Ok(zcash_primitives::transaction::TxId::from_bytes(bytes))
 }
 fn text<'a>(body:&'a Value,key:&str)->Result<&'a str,&'static str> {
     body[key].as_str().filter(|s|s.len()<=3000).ok_or("private_input")
@@ -69,7 +74,7 @@ async fn run()->Result<String,&'static str> {
     } else if mode=="preflight" {
         connection.control_preflight(&receiver,reference,&binding).await?
     } else {
-        let txid=text(&body,"txid")?.parse().map_err(|_| "txid")?;
+        let txid=parse_txid(&body["txid"])?;
         let fee=body["maxFeeZat"].as_u64().ok_or("fee")?;
         let debit=body["maxDebitZat"].as_u64().ok_or("debit")?;
         let confirmations=body["minConfirmations"].as_u64().and_then(|n|u32::try_from(n).ok()).ok_or("confirmations")?;
@@ -95,6 +100,12 @@ fn fixture_key(seed:u8)->Result<zcash_keys::keys::UnifiedFullViewingKey,&'static
 }
 #[cfg(test)] mod tests {
     use super::*;
+    #[test] fn displayed_txid_round_trips_and_rejects_invalid_input() {
+        let display="0123456789abcdef".repeat(4);
+        assert_eq!(parse_txid(&json!(display)).unwrap().to_string(),display);
+        assert!(parse_txid(&json!("0".repeat(63))).is_err());
+        assert!(parse_txid(&json!("g".repeat(64))).is_err());
+    }
     #[test] fn private_envelope_rejects_send_unknown_fields_and_bad_secrets() {
         for value in [json!({"body":"{}","sessionKey":"invalid","nonce":"invalid"}),
             json!({"body":"{\"mode\":\"send\"}","sessionKey":"0".repeat(64),"nonce":"0".repeat(64)}),
