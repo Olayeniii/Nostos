@@ -22,24 +22,28 @@ fn fixture(pool: ShieldedPool, ovk_present: bool, duplicate: bool) -> (VerifiedT
     fixture_from_sender(pool,ovk_present,duplicate,key(31))
 }
 fn fixture_from_sender(pool: ShieldedPool, ovk_present: bool, duplicate: bool, sender: UnifiedFullViewingKey) -> (VerifiedTransaction, UnifiedFullViewingKey, UnifiedFullViewingKey) {
+    fixture_with_values(pool,ovk_present,duplicate,sender,1800000,memo(),0)
+}
+fn fixture_with_values(pool: ShieldedPool, ovk_present: bool, duplicate: bool, sender: UnifiedFullViewingKey,
+    value:u64, note_memo:MemoBytes, fee:i64) -> (VerifiedTransaction, UnifiedFullViewingKey, UnifiedFullViewingKey) {
     let customer = key(32);
     let recipient = customer.orchard().unwrap().address_at(0u32,Scope::External);
     let rho = Rho::from_bytes(&[0;32]).unwrap();
     let nf = Nullifier::from_bytes(&[0;32]).unwrap();
     let rseed = RandomSeed::from_bytes([3;32],&rho).unwrap();
     let ironwood = pool==ShieldedPool::Ironwood;
-    let note = Note::from_parts(recipient,NoteValue::from_raw(1800000),rho,rseed,
+    let note = Note::from_parts(recipient,NoteValue::from_raw(value),rho,rseed,
         if ironwood {NoteVersion::V3} else {NoteVersion::V2}).unwrap();
     let cmx = ExtractedNoteCommitment::from(note.commitment());
     let cv = ValueCommitment::from_bytes(&[0;32]).unwrap();
     let ovk = ovk_present.then(||sender.orchard().unwrap().to_ovk(Scope::External));
     let mut rng = rand::rngs::OsRng;
     let encrypted = if ironwood {
-        let ne = IronwoodNoteEncryption::new(ovk,note,*memo().as_array());
+        let ne = IronwoodNoteEncryption::new(ovk,note,*note_memo.as_array());
         TransmittedNoteCiphertext{epk_bytes:IronwoodDomain::epk_bytes(ne.epk()).0,
             enc_ciphertext:ne.encrypt_note_plaintext(),out_ciphertext:ne.encrypt_outgoing_plaintext(&cv,&cmx,&mut rng)}
     } else {
-        let ne = OrchardNoteEncryption::new(ovk,note,*memo().as_array());
+        let ne = OrchardNoteEncryption::new(ovk,note,*note_memo.as_array());
         TransmittedNoteCiphertext{epk_bytes:OrchardDomain::epk_bytes(ne.epk()).0,
             enc_ciphertext:ne.encrypt_note_plaintext(),out_ciphertext:ne.encrypt_outgoing_plaintext(&cv,&cmx,&mut rng)}
     };
@@ -51,7 +55,7 @@ fn fixture_from_sender(pool: ShieldedPool, ovk_present: bool, duplicate: bool, s
     let version = if ironwood {BundleVersion::ironwood_v3()} else {BundleVersion::orchard_v3()};
     let authorization = Authorized::from_parts(Proof::new(vec![0;Proof::expected_proof_size(actions.len())]),
         redpallas::Signature::from([0u8;64]));
-    let bundle = Bundle::try_from_parts(actions,version.default_flags(),ZatBalance::zero(),Anchor::empty_tree(),authorization,version).unwrap();
+    let bundle = Bundle::try_from_parts(actions,version.default_flags(),ZatBalance::from_i64(fee).unwrap(),Anchor::empty_tree(),authorization,version).unwrap();
     let height = 3_524_931;
     let branch = BranchId::for_height(&MAIN_NETWORK,BlockHeight::from_u32(height));
     let tx = TransactionData::<TxAuthorized>::from_parts_v6(branch,0,BlockHeight::from_u32(height+20),None,None,
@@ -59,6 +63,82 @@ fn fixture_from_sender(pool: ShieldedPool, ovk_present: bool, duplicate: bool, s
     let mut bytes = vec![]; tx.write(&mut bytes).unwrap();
     let parsed = decode(&bytes,tx.txid(),height,height+5).unwrap();
     (VerifiedTransaction{tx:parsed,height,tip:height+5,anchor:zcash_primitives::block::BlockHash([0;32])},sender,customer)
+}
+
+fn control_request<A>(account:A, customer:&UnifiedFullViewingKey) -> ControlRequest<A> {
+    let ua=unified::Address::try_from_items(vec![unified::Receiver::Orchard(receiver(customer).0)])
+        .unwrap().encode(&MAIN_NETWORK.network_type());
+    ControlRequest::new(account,&ua,&"a".repeat(32),10_000,20_000,3).unwrap()
+}
+fn control_fixture(pool:ShieldedPool, ovk:bool, fee:i64) -> (VerifiedTransaction,UnifiedFullViewingKey,UnifiedFullViewingKey) {
+    let request=control_request(1,&key(32));
+    fixture_with_values(pool,ovk,false,key(31),10_000,request.expected.memo,fee)
+}
+
+#[test]
+fn control_fields_recover_exact_outgoing_and_enforce_actual_gross_input_cap() {
+    let (tx,sender,customer)=control_fixture(ShieldedPool::Ironwood,true,10_000);
+    let request=control_request(1,&customer);
+    let keys=HashMap::from([(1,sender)]);
+    let nfs=[[0u8;32]];
+    assert_eq!(tx.control_fields(&keys,&request,&nfs,|_|Ok(20_000)).unwrap(),(0,10_000,20_000));
+    for value in [0,19_999,20_001,u64::MAX] {
+        assert!(tx.control_fields(&keys,&request,&nfs,|_|Ok(value)).is_err());
+    }
+    assert!(tx.control_fields(&keys,&request,&[],|_|panic!("no owned input should be queried")).is_err());
+    assert!(tx.control_fields(&keys,&request,&nfs,|_|Err("missing_note")).is_err());
+}
+
+#[test]
+fn control_fields_reject_wrong_memo_receiver_pool_key_and_fee() {
+    for (pool,ovk,fee) in [(ShieldedPool::Orchard,true,10_000),(ShieldedPool::Ironwood,false,10_000),
+        (ShieldedPool::Ironwood,true,10_001),(ShieldedPool::Ironwood,true,-1)] {
+        let (tx,sender,customer)=control_fixture(pool,ovk,fee);
+        assert!(tx.control_fields(&HashMap::from([(1,sender)]),&control_request(1,&customer),&[[0u8;32]],|_|Ok(20_000)).is_err());
+    }
+    let (tx,sender,customer)=control_fixture(ShieldedPool::Ironwood,true,10_000);
+    let mut request=control_request(1,&customer);
+    request.expected.memo=MemoBytes::from_bytes(b"wrong-control-reference").unwrap();
+    assert!(tx.control_fields(&HashMap::from([(1,sender.clone())]),&request,&[[0u8;32]],|_|Ok(20_000)).is_err());
+    let own_receiver=control_request(1,&sender);
+    assert!(tx.control_fields(&HashMap::from([(1,sender.clone())]),&own_receiver,&[[0u8;32]],|_|Ok(20_000)).is_err());
+    assert!(tx.control_fields(&HashMap::from([(1,sender),(2,key(44))]),&control_request(1,&customer),&[[0u8;32]],|_|Ok(20_000)).is_err());
+}
+
+#[test]
+fn control_request_rejects_unsafe_policy_or_noncanonical_destination() {
+    let customer=key(32);
+    let ua=unified::Address::try_from_items(vec![unified::Receiver::Orchard(receiver(&customer).0)])
+        .unwrap().encode(&MAIN_NETWORK.network_type());
+    for (fee,debit,confirmations) in [(10_001,20_001,3),(0,20_000,3),(10_000,19_999,3),(10_000,20_000,2)] {
+        assert!(ControlRequest::new(1,&ua,&"a".repeat(32),fee,debit,confirmations).is_err());
+    }
+    for reference in ["", "nostos:control:private-route",&"A".repeat(32)] {
+        assert!(ControlRequest::new(1,&ua,reference,10_000,20_000,3).is_err());
+    }
+    for address in ["t1invalid","tex1invalid",""] {
+        assert!(ControlRequest::new(1,address,&"a".repeat(32),10_000,20_000,3).is_err());
+    }
+}
+
+#[test]
+fn synthetic_unmined_control_cannot_produce_verified_evidence_even_after_reopen() {
+    use zcash_client_backend::data_api::{Account,AccountBirthday,WalletWrite,chain::ChainState};
+    let (tx,sender,customer)=control_fixture(ShieldedPool::Ironwood,true,10_000);
+    let temp=tempfile::tempdir().unwrap();
+    let path=temp.path().join("unmined-control.sqlite");
+    let scoped=super::super::connection::scoped_key(&sender.encode(&MAIN_NETWORK)).unwrap();
+    let birthday=AccountBirthday::from_parts(ChainState::empty(BlockHeight::from_u32(tx.height-1),tx.anchor),None);
+    let mut db=super::super::open_fixture(&path).unwrap();
+    super::super::import_once(&mut db,&scoped,&birthday,tx.height).unwrap();
+    let account=db.get_account_for_ufvk(&scoped).unwrap().unwrap().id();
+    db.update_chain_tip(BlockHeight::from_u32(tx.tip)).unwrap();
+    decrypt_and_store_transaction(&MAIN_NETWORK,&mut db,&tx.tx,None).unwrap();
+    assert!(tx.verify_control(&mut db,&control_request(account,&customer)).is_err());
+    drop(db);
+    let mut reopened=super::super::open_fixture(&path).unwrap();
+    assert_eq!(reopened.get_tx_height(tx.txid()).unwrap(),None);
+    assert!(tx.verify_control(&mut reopened,&control_request(account,&customer)).is_err());
 }
 
 // Public, already-published SDK regression vectors. Never fund this account.

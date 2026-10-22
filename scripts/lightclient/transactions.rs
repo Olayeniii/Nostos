@@ -43,6 +43,42 @@ pub struct Expected<A> {
     account: A, receiver: OrchardReceiver, amount: u64, memo: MemoBytes,
     pool: ShieldedPool, direction: TransferType, confirmations: u32,
 }
+
+// No Debug/serialization. This is a private request, never a browser match claim.
+pub struct ControlRequest<A> { expected: Expected<A>, max_fee: u64, max_debit: u64 }
+impl<A> ControlRequest<A> {
+    pub fn new(account: A, receiver: &str, reference: &str,
+        max_fee: u64, max_debit: u64, confirmations: u32) -> Result<Self, &'static str> {
+        if reference.len()!=32 || !reference.bytes().all(|c|c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+            || max_fee==0 || max_fee>10_000 || max_debit>20_000
+            || 10_000u64.checked_add(max_fee).is_none_or(|n|n>max_debit) || confirmations<3 {
+            return Err("control_request");
+        }
+        let memo=MemoBytes::from_bytes(format!("nostos:control:{reference}").as_bytes())
+            .map_err(|_| "control_memo")?;
+        Ok(Self{expected:Expected::new(account,OrchardReceiver::parse_mainnet(receiver)?,10_000,
+            memo,ShieldedPool::Ironwood,TransferType::Outgoing,confirmations)?,max_fee,max_debit})
+    }
+}
+
+// Only verify_control constructs this token outside this module. It carries no
+// key, receiver or memo. A private persistence adapter is still required.
+pub struct ControlEvidence {
+    txid: TxId, height: u32, tip: u32, anchor: zcash_primitives::block::BlockHash,
+    output_index: usize, fee: u64, gross_owned_inputs: u64,
+}
+impl ControlEvidence {
+    pub fn txid(&self)->TxId {self.txid}
+    pub fn height(&self)->u32 {self.height}
+    pub fn tip(&self)->u32 {self.tip}
+    pub fn anchor(&self)->zcash_primitives::block::BlockHash {self.anchor}
+    pub fn output_index(&self)->usize {self.output_index}
+    pub fn fee(&self)->u64 {self.fee}
+    pub fn gross_owned_inputs(&self)->u64 {self.gross_owned_inputs}
+}
+struct ControlUnresolved;
+impl From<rusqlite::Error> for ControlUnresolved {fn from(_:rusqlite::Error)->Self {Self}}
+impl From<&'static str> for ControlUnresolved {fn from(_:&'static str)->Self {Self}}
 impl<A> Expected<A> {
     pub fn new(account: A, receiver: OrchardReceiver, amount: u64, memo: MemoBytes,
         pool: ShieldedPool, direction: TransferType, confirmations: u32) -> Result<Self, &'static str> {
@@ -92,6 +128,93 @@ impl VerifiedTransaction {
         match matches.as_slice() {
             [index] => Ok(*index), [] => Err("exact_output_not_found"), _ => Err("ambiguous_output_match"),
         }
+    }
+
+    // Public SDK account/nullifier APIs plus a pinned-schema, read-only query
+    // through the SDK extension authorizer. No wallet schema/data writes occur.
+    pub fn verify_control(&self, db: &mut Database,
+        request: &ControlRequest<<Database as WalletRead>::AccountId>) -> Result<ControlEvidence,&'static str> {
+        db.transactionally_with_extension::<_,_,ControlUnresolved>(|db,ext| {
+            let height=BlockHeight::from_u32(self.height);
+            if db.chain_height().map_err(|_| "control_chain")?!=Some(BlockHeight::from_u32(self.tip))
+                || db.block_fully_scanned().map_err(|_| "control_scan")?.map(|b|b.block_height())!=Some(BlockHeight::from_u32(self.tip))
+                || db.get_tx_height(self.txid()).map_err(|_| "control_height")?!=Some(height)
+                || db.get_block_hash(height).map_err(|_| "control_anchor")?!=Some(self.anchor) {
+                return Err(ControlUnresolved);
+            }
+            let keys=db.get_unified_full_viewing_keys().map_err(|_| "control_keys")?;
+            let known=db.get_ironwood_nullifiers(zcash_client_backend::data_api::NullifierQuery::All)
+                .map_err(|_| "control_nullifiers")?.into_iter()
+                .filter(|(account,_)|*account==request.expected.account).map(|(_,nf)|nf.to_bytes()).collect::<Vec<_>>();
+            let account=request.expected.account.expose_uuid();
+            let (output_index,fee,gross_owned_inputs)=self.control_fields(&keys,request,&known,|nf| {
+                // The schema is pinned at librustzcash 1f6bb207. Fail closed on
+                // missing/pruned notes or unmined funding; never infer a value.
+                let (value,mined,block):(i64,Option<u32>,Option<u32>)=ext.query_row(
+                    "SELECT rn.value,t.mined_height,t.block FROM ironwood_received_notes rn
+                     JOIN accounts a ON a.id=rn.account_id JOIN transactions t ON t.id_tx=rn.transaction_id
+                     WHERE a.uuid=?1 AND rn.nf=?2",
+                    rusqlite::params![account.as_bytes().as_slice(),nf.as_slice()],
+                    |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).map_err(|_| "control_input_value")?;
+                let h=mined.filter(|h|*h>0 && *h<self.height && block==Some(*h)).ok_or("control_funding_height")?;
+                if db.get_block_hash(BlockHeight::from_u32(h)).map_err(|_| "control_funding_anchor")?.is_none() {
+                    return Err("control_funding_anchor");
+                }
+                u64::try_from(value).ok().filter(|n|*n>0).ok_or("control_input_value")
+            })?;
+            Ok(ControlEvidence{txid:self.txid(),height:self.height,tip:self.tip,anchor:self.anchor,
+                output_index,fee,gross_owned_inputs})
+        }).map_err(|_| "control_unresolved")
+    }
+
+    // Fixture-testable field checks. This helper never produces ControlEvidence
+    // and cannot establish mining or account ownership from caller claims.
+    fn control_fields<A:Copy+Eq+std::hash::Hash,F>(&self,keys:&HashMap<A,UnifiedFullViewingKey>,
+        request:&ControlRequest<A>,known:&[[u8;32]],mut input_value:F) -> Result<(usize,u64,u64),&'static str>
+        where F:FnMut(&[u8;32])->Result<u64,&'static str> {
+        use zcash_protocol::consensus::NetworkUpgrade;
+        let expected=&request.expected;
+        if keys.len()!=1 || expected.pool!=ShieldedPool::Ironwood
+            || !MAIN_NETWORK.is_nu_active(NetworkUpgrade::Nu6_3,BlockHeight::from_u32(self.height))
+            || self.tx.transparent_bundle().is_some() || self.tx.sprout_bundle().is_some()
+            || self.tx.sapling_bundle().is_some() || self.tx.orchard_bundle().is_some() {
+            return Err("control_pool");
+        }
+        let key=keys.get(&expected.account).ok_or("control_account")?.orchard().ok_or("control_key")?;
+        let receiver=Option::<orchard::Address>::from(orchard::Address::from_raw_address_bytes(&expected.receiver.0))
+            .ok_or("control_receiver")?;
+        if key.scope_for_address(&receiver).is_some() {return Err("control_self_send");}
+        let index=self.matching_output(keys,expected)?;
+        let decrypted=zcash_client_backend::decrypt_transaction(&MAIN_NETWORK,
+            Some(BlockHeight::from_u32(self.height)),Some(BlockHeight::from_u32(self.tip)),&self.tx,keys);
+        if decrypted.ironwood_outputs().iter().filter(|out|*out.account()==expected.account
+            && out.transfer_type()==TransferType::Outgoing && out.note().0.value().inner()>0).count()!=1 {
+            return Err("control_additional_output");
+        }
+        let fee=self.tx.fee_paid::<zcash_protocol::value::BalanceError,_>(|_|Ok(None))
+            .map_err(|_| "control_fee")?.ok_or("control_fee")?.into_u64();
+        if fee>request.max_fee || expected.amount.checked_add(fee).is_none_or(|n|n>request.max_debit) {
+            return Err("control_fee_cap");
+        }
+        let mut seen=std::collections::HashSet::new();
+        let mut gross=0u64;
+        let mut owned=0;
+        for action in self.tx.ironwood_bundle().ok_or("control_bundle")?.actions().iter() {
+            let nf=action.nullifier().to_bytes();
+            if !seen.insert(nf) {return Err("control_duplicate_spend");}
+            if known.contains(&nf) {
+                let value=input_value(&nf)?;
+                if value==0 {return Err("control_input_value");}
+                gross=gross.checked_add(value).ok_or("control_input_overflow")?;
+                owned+=1;
+            }
+        }
+        // Conservative cap: all business-owned inputs consumed, before change,
+        // must fit the approved debit. Do not assume amount+fee is the debit.
+        if owned==0 || gross>request.max_debit || expected.amount.checked_add(fee).is_none_or(|n|gross<n) {
+            return Err("control_owned_input_cap");
+        }
+        Ok((index,fee,gross))
     }
 }
 

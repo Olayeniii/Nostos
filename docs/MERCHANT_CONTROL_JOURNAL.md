@@ -94,6 +94,10 @@ shielded transaction, live UFVK, Android signing, provider RPC or real receipt.
    sender/recipient, transaction plan, memo and spending/fee caps. Do not request
    a transfer while these implementation blockers remain.
 
+The next [SDK verifier preparation](MERCHANT_CONTROL_VERIFIER.md) adds the
+private native verification core. It does not connect live evidence to this
+journal, create an operator runner or add a confirmed state.
+
 The Android build/distribution, native business account selection and successful
 artifact checksum confirmation still need explicit operator reporting. No repeat
 key entry is needed. The web-image probe approval also remains pending; this
