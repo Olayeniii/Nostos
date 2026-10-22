@@ -61,6 +61,12 @@ pub struct VerifiedTransaction {tx: Transaction, height: u32, tip: u32, anchor: 
 impl VerifiedTransaction {
     pub fn txid(&self) -> TxId {self.tx.txid()}
     pub fn store(&self, db: &mut Database) -> Result<(), &'static str> {
+        require_current_context(
+            self.height, self.tip, self.anchor,
+            db.chain_height().map_err(|_| "chain_height")?.map(u32::from),
+            db.block_fully_scanned().map_err(|_| "scan_height")?.map(|b| u32::from(b.block_height())),
+            db.get_block_hash(BlockHeight::from_u32(self.height)).map_err(|_| "wallet_block_hash")?,
+        )?;
         // Refuse to persist after the wallet's anchored block has changed.
         let known = db.get_tx_height(self.tx.txid()).map_err(|_| "wallet_tx_height")?;
         if known != Some(BlockHeight::from_u32(self.height))
@@ -93,6 +99,22 @@ impl VerifiedTransaction {
             [index] => Ok(*index), [] => Err("exact_output_not_found"), _ => Err("ambiguous_output_match"),
         }
     }
+}
+
+
+fn require_current_context(
+    height: u32, verified_tip: u32, anchor: zcash_primitives::block::BlockHash,
+    current_tip: Option<u32>, scanned_tip: Option<u32>,
+    current_anchor: Option<zcash_primitives::block::BlockHash>,
+) -> Result<(), &'static str> {
+    // A rewind, new tip or incomplete rescan invalidates the captured evidence.
+    // Enhance again rather than committing an older confirmation count.
+    if height == 0 || height > verified_tip
+        || current_tip != Some(verified_tip) || scanned_tip != Some(verified_tip)
+        || current_anchor != Some(anchor) {
+        return Err("wallet_context_changed");
+    }
+    Ok(())
 }
 
 fn decode(bytes: &[u8], expected: TxId, height: u32, tip: u32) -> Result<Transaction, &'static str> {
