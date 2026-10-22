@@ -43,6 +43,56 @@ impl Connection {
     }
     pub async fn handle(&mut self,method:&str,params:&[Value]) -> Result<Value,&'static str> {
         match method {
+            // Private operator pipe only. The HTTP broker does not allow this
+            // method. This never settles a product instruction or enables payments.
+            "nostos_control" if params.len()==4 => {
+                use zcash_client_backend::{TransferType, data_api::NullifierQuery};
+                use zcash_protocol::{ShieldedPool, memo::MemoBytes};
+                use zcash_primitives::transaction::TxId;
+                let receiver=transactions::OrchardReceiver::parse_mainnet(params[1].as_str().ok_or("control_receiver")?)?;
+                let memo=params[2].as_str().ok_or("control_memo")?;
+                if memo.len()!=47 || !memo.starts_with("nostos:control:")
+                    || !memo[15..].bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                    return Err("control_memo");
+                }
+                let account_id=params[3].as_str().ok_or("control_account")?;
+                let accounts=self.wallet.db_mut().get_account_ids().map_err(|_| "account_lookup")?;
+                if accounts.len()!=1 || accounts[0].expose_uuid().to_string()!=account_id {
+                    return Err("control_account");
+                }
+                let account=accounts[0];
+                let keys=self.wallet.db_mut().get_unified_full_viewing_keys().map_err(|_| "control_keys")?;
+                let key=keys.get(&account).ok_or("control_keys")?;
+                receiver.require_external_to(key)?;
+                let expected=transactions::Expected::new(account,receiver,10_000,
+                    MemoBytes::from_bytes(memo.as_bytes()).map_err(|_| "control_memo")?,
+                    ShieldedPool::Ironwood,TransferType::Outgoing,3)?;
+                if params[0].is_null() {
+                    if self.status().await?.get("locked").and_then(Value::as_bool)!=Some(false) {
+                        return Err("control_not_synced");
+                    }
+                    return Ok(json!({"nostos_control_plan_v1":true,"amount_zats":10_000,
+                        "fee_cap_zats":10_000,"pool":"ironwood","minimum_confirmations":3,
+                        "payments_enabled":false}));
+                }
+                let id=params[0].as_str().ok_or("control_txid")?;
+                if id.len()!=64 || !id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                    return Err("control_txid");
+                }
+                let mut bytes: [u8;32]=hex::decode(id).map_err(|_| "control_txid")?.try_into().map_err(|_| "control_txid")?;
+                bytes.reverse();
+                let txid=TxId::from_bytes(bytes);
+                let before=self.tip().await?;
+                let tx=transactions::enhance(&mut self.client,self.wallet.db_mut(),txid).await?;
+                let owned=self.wallet.db_mut().get_ironwood_nullifiers(NullifierQuery::All)
+                    .map_err(|_| "control_nullifiers")?.into_iter()
+                    .filter_map(|(owner,nf)| (owner==account).then_some(nf)).collect::<Vec<_>>();
+                let after=self.tip().await?;
+                if before!=after {return Err("control_chain_changed");}
+                let result=tx.verify_control(&keys,&expected,&owned,after.0)?;
+                tx.store(self.wallet.db_mut())?;
+                Ok(result)
+            },
             "getwalletstatus" if params.is_empty() => self.status().await,
             "z_importviewingkey" if params.len()==3 => {
                 let key=scoped_key(params[0].as_str().ok_or("view_key_format")?)?;
@@ -95,3 +145,4 @@ mod tests {
         assert!(scoped_key("not-a-viewing-key").is_err());
     }
 }
+

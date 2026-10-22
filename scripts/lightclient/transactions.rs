@@ -27,6 +27,14 @@ pub fn client(channel: Channel) -> Client {
 #[derive(Clone)]
 pub struct OrchardReceiver([u8;43]);
 impl OrchardReceiver {
+    pub fn require_external_to(&self, key: &UnifiedFullViewingKey) -> Result<(), &'static str> {
+        let address=Option::<orchard::Address>::from(orchard::Address::from_raw_address_bytes(&self.0))
+            .ok_or("control_receiver")?;
+        if key.orchard().ok_or("control_keys")?.scope_for_address(&address).is_some() {
+            return Err("control_self_transfer");
+        }
+        Ok(())
+    }
     pub fn parse_mainnet(address: &str) -> Result<Self, &'static str> {
         if address.len()>512 {return Err("route_length");}
         let (network, ua) = unified::Address::decode(address).map_err(|_| "route_decode")?;
@@ -60,6 +68,41 @@ impl<A> Expected<A> {
 pub struct VerifiedTransaction {tx: Transaction, height: u32, tip: u32, anchor: zcash_primitives::block::BlockHash}
 impl VerifiedTransaction {
     pub fn txid(&self) -> TxId {self.tx.txid()}
+    // Control-only check. The caller must source these nullifiers from the
+    // already-bound account, including notes now marked spent after scanning.
+    fn control_policy(&self, owned: &[orchard::note::Nullifier]) -> Result<u64, &'static str> {
+        if self.tx.transparent_bundle().is_some() || self.tx.sprout_bundle().is_some()
+            || self.tx.sapling_bundle().is_some() || self.tx.orchard_bundle().is_some() {
+            return Err("control_unexpected_pool");
+        }
+        let bundle = self.tx.ironwood_bundle().ok_or("control_ironwood_required")?;
+        if !bundle.actions().iter().any(|a| owned.contains(a.nullifier())) {
+            return Err("control_owned_spend_required");
+        }
+        let fee = self.tx.fee_paid::<zcash_protocol::value::BalanceError, _>(|_| Ok(None))
+            .map_err(|_| "control_fee_unresolved")?.ok_or("control_fee_unresolved")?.into_u64();
+        if fee > 10_000 {return Err("control_fee_cap");}
+        Ok(fee)
+    }
+    pub fn verify_control<A: Copy+Eq+std::hash::Hash>(&self,
+        keys: &HashMap<A,UnifiedFullViewingKey>, expected: &Expected<A>,
+        owned: &[orchard::note::Nullifier], remote_tip: u32)
+        -> Result<serde_json::Value, &'static str> {
+        if expected.amount!=10_000 || expected.pool!=ShieldedPool::Ironwood
+            || expected.direction!=TransferType::Outgoing || expected.confirmations<3 {
+            return Err("control_expectation");
+        }
+        if remote_tip!=self.tip {return Err("control_chain_changed");}
+        expected.receiver.require_external_to(keys.get(&expected.account).ok_or("control_keys")?)?;
+        let fee=self.control_policy(owned)?;
+        let output_index=self.matching_output(keys,expected)?;
+        Ok(serde_json::json!({"nostos_control_v1":true,"txid":self.txid().to_string(),
+            "height":self.height,"block_hash":self.anchor.to_string(),
+            "confirmations":self.tip-self.height+1,"pool":"ironwood",
+            "output_index":output_index,"amount_zats":10_000,"fee_zats":fee,
+            "exact_output_match":true,"owned_spend_match":true,
+            "payments_enabled":false}))
+    }
     pub fn store(&self, db: &mut Database) -> Result<(), &'static str> {
         require_current_context(
             self.height, self.tip, self.anchor,
@@ -186,3 +229,4 @@ pub async fn check_public_fetch(client: &mut Client, db: &Database) -> Result<()
 #[cfg(test)]
 #[path = "transaction_tests.rs"]
 mod tests;
+

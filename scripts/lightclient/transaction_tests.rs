@@ -22,24 +22,28 @@ fn fixture(pool: ShieldedPool, ovk_present: bool, duplicate: bool) -> (VerifiedT
     fixture_from_sender(pool,ovk_present,duplicate,key(31))
 }
 fn fixture_from_sender(pool: ShieldedPool, ovk_present: bool, duplicate: bool, sender: UnifiedFullViewingKey) -> (VerifiedTransaction, UnifiedFullViewingKey, UnifiedFullViewingKey) {
+    fixture_details(pool,ovk_present,duplicate,sender,1800000,memo(),0)
+}
+fn fixture_details(pool: ShieldedPool, ovk_present: bool, duplicate: bool, sender: UnifiedFullViewingKey,
+    amount: u64, message: MemoBytes, fee: i64) -> (VerifiedTransaction, UnifiedFullViewingKey, UnifiedFullViewingKey) {
     let customer = key(32);
     let recipient = customer.orchard().unwrap().address_at(0u32,Scope::External);
     let rho = Rho::from_bytes(&[0;32]).unwrap();
     let nf = Nullifier::from_bytes(&[0;32]).unwrap();
     let rseed = RandomSeed::from_bytes([3;32],&rho).unwrap();
     let ironwood = pool==ShieldedPool::Ironwood;
-    let note = Note::from_parts(recipient,NoteValue::from_raw(1800000),rho,rseed,
+    let note = Note::from_parts(recipient,NoteValue::from_raw(amount),rho,rseed,
         if ironwood {NoteVersion::V3} else {NoteVersion::V2}).unwrap();
     let cmx = ExtractedNoteCommitment::from(note.commitment());
     let cv = ValueCommitment::from_bytes(&[0;32]).unwrap();
     let ovk = ovk_present.then(||sender.orchard().unwrap().to_ovk(Scope::External));
     let mut rng = rand::rngs::OsRng;
     let encrypted = if ironwood {
-        let ne = IronwoodNoteEncryption::new(ovk,note,*memo().as_array());
+        let ne = IronwoodNoteEncryption::new(ovk,note,*message.as_array());
         TransmittedNoteCiphertext{epk_bytes:IronwoodDomain::epk_bytes(ne.epk()).0,
             enc_ciphertext:ne.encrypt_note_plaintext(),out_ciphertext:ne.encrypt_outgoing_plaintext(&cv,&cmx,&mut rng)}
     } else {
-        let ne = OrchardNoteEncryption::new(ovk,note,*memo().as_array());
+        let ne = OrchardNoteEncryption::new(ovk,note,*message.as_array());
         TransmittedNoteCiphertext{epk_bytes:OrchardDomain::epk_bytes(ne.epk()).0,
             enc_ciphertext:ne.encrypt_note_plaintext(),out_ciphertext:ne.encrypt_outgoing_plaintext(&cv,&cmx,&mut rng)}
     };
@@ -51,7 +55,7 @@ fn fixture_from_sender(pool: ShieldedPool, ovk_present: bool, duplicate: bool, s
     let version = if ironwood {BundleVersion::ironwood_v3()} else {BundleVersion::orchard_v3()};
     let authorization = Authorized::from_parts(Proof::new(vec![0;Proof::expected_proof_size(actions.len())]),
         redpallas::Signature::from([0u8;64]));
-    let bundle = Bundle::try_from_parts(actions,version.default_flags(),ZatBalance::zero(),Anchor::empty_tree(),authorization,version).unwrap();
+    let bundle = Bundle::try_from_parts(actions,version.default_flags(),ZatBalance::from_i64(fee).unwrap(),Anchor::empty_tree(),authorization,version).unwrap();
     let height = 3_524_931;
     let branch = BranchId::for_height(&MAIN_NETWORK,BlockHeight::from_u32(height));
     let tx = TransactionData::<TxAuthorized>::from_parts_v6(branch,0,BlockHeight::from_u32(height+20),None,None,
@@ -299,3 +303,48 @@ fn confirmed_store_requires_the_same_fully_scanned_chain_context() {
     assert!(require_current_context(0,105,anchor,Some(105),Some(105),Some(anchor)).is_err());
     assert!(require_current_context(106,105,anchor,Some(105),Some(105),Some(anchor)).is_err());
 }
+
+#[test]
+fn control_requires_owned_spend_exact_outgoing_and_fee_cap() {
+    let message=MemoBytes::from_bytes(b"nostos:control:0123456789abcdef0123456789abcdef").unwrap();
+    let owned=[Nullifier::from_bytes(&[0;32]).unwrap()];
+    let unknown=[Nullifier::from_bytes(&[1;32]).unwrap()];
+    for (pool,ovk,duplicate,fee,passes) in [
+        (ShieldedPool::Ironwood,true,false,10_000,true),
+        (ShieldedPool::Ironwood,true,false,10_001,false),
+        (ShieldedPool::Ironwood,true,false,-1,false),
+        (ShieldedPool::Orchard,true,false,10_000,false),
+        (ShieldedPool::Ironwood,false,false,10_000,false),
+        (ShieldedPool::Ironwood,true,true,10_000,false),
+    ] {
+        let (tx,sender,customer)=fixture_details(pool,ovk,duplicate,key(31),10_000,message.clone(),fee);
+        let keys=HashMap::from([(1,sender)]);
+        let expected=Expected::new(1,receiver(&customer),10_000,message.clone(),
+            ShieldedPool::Ironwood,TransferType::Outgoing,3).unwrap();
+        assert_eq!(tx.verify_control(&keys,&expected,&owned,tx.tip).is_ok(),passes);
+        assert!(tx.verify_control(&keys,&expected,&[],tx.tip).is_err());
+        assert!(tx.verify_control(&keys,&expected,&unknown,tx.tip).is_err());
+        assert!(tx.verify_control(&keys,&expected,&owned,tx.tip+1).is_err());
+    }
+}
+
+#[test]
+fn control_rejects_self_transfer_changed_fields_and_weak_confirmations() {
+    let message=MemoBytes::from_bytes(b"nostos:control:0123456789abcdef0123456789abcdef").unwrap();
+    let (tx,sender,customer)=fixture_details(ShieldedPool::Ironwood,true,false,key(31),10_000,message.clone(),10_000);
+    assert!(receiver(&sender).require_external_to(&sender).is_err());
+    assert!(receiver(&customer).require_external_to(&sender).is_ok());
+    let keys=HashMap::from([(1,sender)]);
+    let owned=[Nullifier::from_bytes(&[0;32]).unwrap()];
+    for field in 0..7 {
+        let mut e=Expected::new(1,receiver(&customer),10_000,message.clone(),
+            ShieldedPool::Ironwood,TransferType::Outgoing,3).unwrap();
+        match field {
+            0=>e.amount=9999, 1=>e.confirmations=2, 2=>e.confirmations=100,
+            3=>e.direction=TransferType::Incoming, 4=>e.receiver=receiver(&key(33)),
+            5=>e.memo=memo(), _=>e.account=2,
+        }
+        assert!(tx.verify_control(&keys,&e,&owned,tx.tip).is_err(),"field {field}");
+    }
+}
+
