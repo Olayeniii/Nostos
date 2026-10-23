@@ -16,7 +16,11 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def package(binary, lock, output):
+def package(binary, lock, output, *, local_revision=None):
+    if local_revision is not None:
+        import re
+        if not re.fullmatch(r"[a-f0-9]{40}", local_revision):
+            raise ValueError("Exact local revision required")
     if not binary.is_file() or binary.is_symlink():
         raise ValueError("Regular binary required")
     with binary.open("rb") as stream:
@@ -30,7 +34,9 @@ def package(binary, lock, output):
             raise ValueError("Regular package sources required")
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     manifest = dict(format="nostos-sdk-preview-arm64-v1", architecture="aarch64", build_os="ubuntu-24.04",
-                    upstream_pin=PIN, nostos_revision=os.environ["GITHUB_SHA"], workflow_run_id=os.environ["GITHUB_RUN_ID"],
+                    upstream_pin=PIN, nostos_revision=local_revision or os.environ["GITHUB_SHA"],
+                    workflow_run_id=None if local_revision else os.environ["GITHUB_RUN_ID"],
+                    build_origin="local" if local_revision else "github-actions",
                     prepared_lock_sha256=digest(lock), files={name: digest(path) for name, path in files.items()},
                     wallet_files_included=False, credentials_included=False, services_changed=False,
                     production_enabled=False, sends_requested=0)
