@@ -1,13 +1,13 @@
 name: Build ARM64 observer binary
+# Manual while the hosted Actions allowance is exhausted.
+# See docs/CI_VALIDATION.md before restoring automatic events.
 on:
-  push:
-    branches: [main]
-    paths:
-      - scripts/observer/zallet-ufvk.patch
-      - scripts/observer/package-arm64.py
-      - scripts/observer/zaino-transport.patch
-      - scripts/observer/prepare-transport.py
-      - .github/workflows/observer-arm64.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:

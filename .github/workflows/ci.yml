@@ -1,8 +1,13 @@
 name: ci
 
+# Manual while the hosted Actions allowance is exhausted.
+# See docs/CI_VALIDATION.md before restoring automatic events.
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
