@@ -1,12 +1,13 @@
 name: Build isolated SDK observer for Ubuntu ARM64
+# Manual while the hosted Actions allowance is exhausted.
+# See docs/CI_VALIDATION.md before restoring automatic events.
 on:
-  push:
-    branches: [main]
-    paths:
-      - scripts/lightclient/*.rs
-      - scripts/lightclient/*.py
-      - scripts/lightclient/*.mjs
-      - .github/workflows/sdk-observer-arm64.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:

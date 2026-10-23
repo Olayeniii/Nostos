@@ -1,13 +1,13 @@
 name: Orchard observer extension
+# Manual while the hosted Actions allowance is exhausted.
+# See docs/CI_VALIDATION.md before restoring automatic events.
 on:
-  push:
-    paths:
-      - scripts/observer/**
-      - .github/workflows/observer.yml
-  pull_request:
-    paths:
-      - scripts/observer/**
-      - .github/workflows/observer.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:

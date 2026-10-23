@@ -1,10 +1,13 @@
 name: Read-only lightwalletd SDK probe
+# Manual while the hosted Actions allowance is exhausted.
+# See docs/CI_VALIDATION.md before restoring automatic events.
 on:
-  push:
-    branches: [main]
-    paths:
-      - scripts/lightclient/**
-      - .github/workflows/lightclient-probe.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:

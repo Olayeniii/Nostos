@@ -1,14 +1,13 @@
 name: Merchant wallet compatibility gate
+# Manual while the hosted Actions allowance is exhausted.
+# See docs/CI_VALIDATION.md before restoring automatic events.
 on:
-  push:
-    branches: [feat/mainnet-wallet-compatibility]
-    paths:
-      - scripts/lightclient/**
-      - .github/workflows/merchant-wallet-compatibility.yml
-  pull_request:
-    paths:
-      - scripts/lightclient/**
-      - .github/workflows/merchant-wallet-compatibility.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:
