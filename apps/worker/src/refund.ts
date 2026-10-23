@@ -1,5 +1,6 @@
 import type { SqlitePaymentStore } from "../../../packages/database/src/index.js";
 import { orchardRefundReceiver } from "../../../packages/zcash-adapter/src/refund-route.js";
+import { runtimeNetwork } from "../../../packages/network/src/index.js";
 
 export interface RefundBroadcaster {
   spendableShieldedBalanceZat(account: string): Promise<number>;
@@ -29,8 +30,17 @@ export async function executePartialRefund(options: {
   allowMultiple?: boolean;
   authorizeBeforePrepare?: () => void;
 }): Promise<{ broadcast: boolean; txid: string }> {
+  // The hosted worker must not become a signer fallback for observer records,
+  // including when a mainnet ledger is opened with the default testnet env.
+  if (
+    runtimeNetwork() === "mainnet" ||
+    options.store.boundNetwork() === "mainnet"
+  )
+    throw new Error("Hosted refund signing is disabled on mainnet.");
   const payment = options.store.findByTxid(options.paymentTxid);
   if (!payment) throw new Error("Refund payment was not found.");
+  if (payment.refundAddress.startsWith("u1"))
+    throw new Error("Hosted refund signing is disabled on mainnet.");
   const existing = options.store.findRefundByKey(options.idempotencyKey);
   if (existing) {
     if (
