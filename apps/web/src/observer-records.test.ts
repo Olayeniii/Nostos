@@ -1,0 +1,581 @@
+import { GET } from "../app/api/product/[...action]/route.js";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import {
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+  readdirSync,
+  readFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { ProductStore } from "./product-store.js";
+import { coreStore, newRequest, checkoutView } from "./product-service.js";
+import { observerConnection } from "./merchant-observer.js";
+import {
+  reconcileObservedPayment,
+  prepareObservedRefund,
+  claimObservedRefund,
+  bindObservedRefund,
+  reconcileObservedRefund,
+} from "./observer-records.js";
+
+let root: string,
+  store: ProductStore,
+  core: ReturnType<typeof coreStore>,
+  merchant: string;
+let requests: Array<{ method: string; params: unknown[] }>;
+let transform: (proof: Record<string, unknown>) => Record<string, unknown>;
+const account = "afcf8468-1814-4fea-a9f6-ce5a57505078",
+  destination = "u1" + "b".repeat(60),
+  route = "u1" + "r".repeat(60);
+const paymentTx = "a".repeat(64),
+  refundTx = "d".repeat(64);
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), "nostos-observer-records-"));
+  vi.stubEnv("NOSTOS_NETWORK", "mainnet");
+  vi.stubEnv("NOSTOS_MAINNET_ENABLED", "yes");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv(
+    "NOSTOS_MAINNET_PRODUCT_DATABASE_PATH",
+    join(root, "product.sqlite"),
+  );
+  vi.stubEnv(
+    "NOSTOS_MAINNET_PRODUCT_CORE_DATABASE_PATH",
+    join(root, "core.sqlite"),
+  );
+  vi.stubEnv("NOSTOS_MAINNET_PRODUCT_DATA_KEY", "b".repeat(64));
+  vi.stubEnv("NOSTOS_PRODUCT_DATA_KEY", "e".repeat(64));
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RPC_URL", "http://127.0.0.1:38235");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RPC_COOKIE_FILE", join(root, "cookie"));
+  writeFileSync(join(root, "cookie"), "public-test:fixture-only", {
+    mode: 0o600,
+  });
+  store = new ProductStore();
+  core = coreStore(store);
+  merchant = store.signup("observer@example.com", "test-password-long").id;
+  store.db
+    .prepare("UPDATE merchants SET email_verified_at=?,name=? WHERE id=?")
+    .run(new Date().toISOString(), store.encrypt("Fixture store"), merchant);
+  observerConnection(store, merchant);
+  store.db
+    .prepare(`INSERT INTO merchant_observers VALUES(?,?,?,?,?,?,?,?,?,?)`)
+    .run(
+      merchant,
+      "mainnet",
+      "f".repeat(64),
+      store.encrypt("public fixture only"),
+      100,
+      "sdk-orchard-view-access-v1",
+      new Date().toISOString(),
+      "connected",
+      store.encrypt(account),
+      store.encrypt(destination),
+    );
+  requests = [];
+  transform = (p) => p;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: unknown, options: RequestInit) => {
+      const request = JSON.parse(String(options.body));
+      requests.push(request);
+      const [
+        namespace,
+        acct,
+        txid,
+        ,
+        amount,
+        ,
+        pool,
+        direction,
+        binding,
+        feeCap,
+      ] = request.params;
+      expect(namespace).toBe(merchant);
+      let result: unknown;
+      if (request.method === "z_listunifiedreceivers")
+        result = { orchard: request.params[1] };
+      else {
+        expect(request.method).toBe("nostos_verify_output");
+        result = transform({
+          nostos_output_proof_v1: true,
+          network: "mainnet",
+          observation_scope: "orchard-family-only",
+          payments_enabled: false,
+          binding,
+          account_uuid: acct,
+          txid,
+          pool,
+          direction,
+          amount_zat: amount,
+          exact_match: true,
+          owned_spend: direction === "outgoing",
+          height: 100,
+          tip_height: 102,
+          confirmations: 3,
+          block_hash: "c".repeat(64),
+          tip_hash: "f".repeat(64),
+          output_index: 0,
+          fee_zat: direction === "outgoing" ? Math.min(1000, feeCap) : null,
+        });
+      }
+      return new Response(JSON.stringify({ result }));
+    }),
+  );
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  core.close();
+  store.close();
+  vi.unstubAllEnvs();
+  rmSync(root, { recursive: true, force: true });
+});
+function checkout(refundRoute = route) {
+  const c = store.createRequest(
+    merchant,
+    "Fixture item",
+    `n_${randomUUID().replaceAll("-", "")}`,
+    100000,
+  ).checkout;
+  store.setRoute(c.id, refundRoute);
+  return store.checkout(c.id)!;
+}
+async function paid() {
+  const c = checkout();
+  await reconcileObservedPayment(store, core, merchant, c.id, paymentTx);
+  return store.checkout(c.id)!;
+}
+function approve(checkoutId: string, amount = 40000) {
+  const id = randomUUID();
+  store.createRefundRequest(checkoutId, id, amount, "Fixture reason");
+  store.decideRefundRequest(id, "approved", "Approved fixture", amount);
+  return id;
+}
+
+it("builds expectations from saved checkout data and projects a verified payment into its receipt", async () => {
+  const c = checkout();
+  const result = await reconcileObservedPayment(
+    store,
+    core,
+    merchant,
+    c.id,
+    paymentTx,
+  );
+  expect(result).toMatchObject({
+    paymentStatus: "confirmed",
+    paymentConfirmations: 3,
+    paymentTxid: paymentTx,
+  });
+  const sent = requests.find(
+    (r) => r.method === "nostos_verify_output",
+  )!.params;
+  expect(sent.slice(0, 5)).toEqual([
+    merchant,
+    account,
+    paymentTx,
+    destination,
+    100000,
+  ]);
+  expect(Buffer.from(sent[5] as string, "hex").toString()).toContain(c.order);
+  expect(Buffer.from(sent[5] as string, "hex").toString()).toContain(route);
+  expect(JSON.stringify(result)).not.toContain(route);
+  expect(JSON.stringify(result)).not.toContain(account);
+  expect(() =>
+    newRequest(store, store.merchant(merchant)!, "Still held", 1000),
+  ).toThrow(/Merchant-controlled/);
+});
+it("reserves a saved approved refund and treats a supplied txid only as an unresolved candidate", async () => {
+  const c = await paid(),
+    id = approve(c.id);
+  const first = await prepareObservedRefund(store, core, merchant, id, 5000);
+  const again = await prepareObservedRefund(store, core, merchant, id, 5000);
+  expect(first).toEqual(again);
+  expect(first).toMatchObject({
+    recipient: route,
+    amountZat: 40000,
+    pool: "ironwood",
+    requiresWalletApproval: true,
+  });
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  expect(core.refundTotals(paymentTx)).toEqual({
+    refundedZat: 0,
+    reservedZat: 40000,
+    inProgress: true,
+  });
+  expect(core.findRefund(first.refundId)?.status).toBe("broadcasting");
+  expect(store.refundRequest(id)?.status).toBe("approved");
+  expect(() =>
+    bindObservedRefund(store, core, merchant, id, "e".repeat(64)),
+  ).toThrow("unresolved");
+  expect(core.findRefund(first.refundId)?.txid).toBeUndefined();
+});
+it("confirms a partial refund exactly once and keeps the remaining receipt amount and route", async () => {
+  const c = await paid(),
+    id = approve(c.id);
+  await prepareObservedRefund(store, core, merchant, id, 5000);
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  const result = await reconcileObservedRefund(store, core, merchant, id);
+  expect(result).toMatchObject({
+    confirmedRefundAmountZat: 40000,
+    pendingRefundAmountZat: 0,
+    remainingAmountZat: 60000,
+  });
+  expect(store.refundRequest(id)?.status).toBe("settled");
+  expect(store.checkout(c.id)?.route).toBe(route);
+  const calls = requests.length;
+  expect(await reconcileObservedRefund(store, core, merchant, id)).toEqual(
+    result,
+  );
+  expect(requests.length).toBe(calls);
+  expect(core.listRefundsByPayment(paymentTx)).toHaveLength(1);
+});
+it("retires both route copies after a full refund without retaining them in the proof journal", async () => {
+  const c = await paid(),
+    id = approve(c.id, 100000);
+  await prepareObservedRefund(store, core, merchant, id, 5000);
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  const result = await reconcileObservedRefund(store, core, merchant, id);
+  expect(result.confirmedRefundAmountZat).toBe(100000);
+  expect(store.checkout(c.id)?.route).toBe("");
+  expect(core.findByTxid(paymentTx)?.refundAddress).toBe("");
+  const rows = JSON.stringify(
+    core
+      .withdrawalDatabase()
+      .prepare("SELECT * FROM observer_record_instructions")
+      .all(),
+  );
+  for (const value of [route, account, c.order])
+    expect(rows).not.toContain(value);
+  for (const file of readdirSync(root).filter((f) => f.includes("sqlite")))
+    expect(readFileSync(join(root, file)).includes(Buffer.from(route))).toBe(
+      false,
+    );
+  expect(await reconcileObservedRefund(store, core, merchant, id)).toEqual(
+    result,
+  );
+});
+it.each([
+  "binding",
+  "account_uuid",
+  "txid",
+  "pool",
+  "direction",
+  "amount_zat",
+  "owned_spend",
+  "exact_match",
+  "confirmations",
+  "tip_height",
+  "block_hash",
+  "payments_enabled",
+  "network",
+  "fee_zat",
+  "height",
+  "output_index",
+  "nostos_output_proof_v1",
+])(
+  "keeps the refund reservation unresolved on a mismatched proof field: %s",
+  async (field) => {
+    const c = await paid(),
+      id = approve(c.id);
+    await prepareObservedRefund(store, core, merchant, id, 5000);
+    claimObservedRefund(store, core, merchant, id);
+    bindObservedRefund(store, core, merchant, id, refundTx);
+    transform = (p) => ({
+      ...p,
+      [field]:
+        field === "payments_enabled"
+          ? true
+          : field === "confirmations"
+            ? 2
+            : "wrong",
+    });
+    await expect(
+      reconcileObservedRefund(store, core, merchant, id),
+    ).rejects.toThrow("unresolved");
+    expect(core.refundTotals(paymentTx)).toEqual({
+      refundedZat: 0,
+      reservedZat: 40000,
+      inProgress: true,
+    });
+    expect(store.refundRequest(id)?.status).toBe("approved");
+    expect(store.checkout(c.id)?.route).toBe(route);
+  },
+);
+it("rejects a control-test report as product evidence", async () => {
+  const c = checkout();
+  transform = () => ({
+    nostos_control_v1: true,
+    passed: true,
+    payments_enabled: false,
+  });
+  await expect(
+    reconcileObservedPayment(store, core, merchant, c.id, paymentTx),
+  ).rejects.toThrow("unresolved");
+  expect(core.paymentCount()).toBe(0);
+  expect(store.checkout(c.id)?.status).toBe("unpaid");
+});
+it("recovers a core commit after product projection fails, including after reopening both stores", async () => {
+  const c = checkout();
+  vi.spyOn(store, "recordPayment").mockImplementationOnce(() => {
+    throw Error("interrupted");
+  });
+  await expect(
+    reconcileObservedPayment(store, core, merchant, c.id, paymentTx),
+  ).rejects.toThrow("unresolved");
+  expect(core.paymentCount()).toBe(1);
+  expect(store.checkout(c.id)?.status).toBe("unpaid");
+  core.close();
+  store.close();
+  store = new ProductStore();
+  core = coreStore(store);
+  const calls = requests.length;
+  const result = await reconcileObservedPayment(
+    store,
+    core,
+    merchant,
+    c.id,
+    paymentTx,
+  );
+  expect(result.paymentStatus).toBe("confirmed");
+  expect(requests.length).toBe(calls);
+  expect(core.paymentCount()).toBe(1);
+});
+it("recovers an already confirmed refund projection without another proof, refund or debit", async () => {
+  const c = await paid(),
+    id = approve(c.id, 100000);
+  await prepareObservedRefund(store, core, merchant, id, 5000);
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  vi.spyOn(store, "settleRefundRequest").mockImplementationOnce(() => {
+    throw Error("interrupted");
+  });
+  await expect(
+    reconcileObservedRefund(store, core, merchant, id),
+  ).rejects.toThrow("unresolved");
+  expect(core.refundTotals(paymentTx).refundedZat).toBe(100000);
+  expect(store.refundRequest(id)?.status).toBe("approved");
+  core.close();
+  store.close();
+  store = new ProductStore();
+  core = coreStore(store);
+  const calls = requests.length;
+  expect(
+    (await reconcileObservedRefund(store, core, merchant, id))
+      .confirmedRefundAmountZat,
+  ).toBe(100000);
+  expect(requests.length).toBe(calls);
+  expect(core.listRefundsByPayment(paymentTx)).toHaveLength(1);
+});
+it("rejects a reused transaction across checkouts and rejects another merchant before RPC", async () => {
+  const first = await paid(),
+    second = checkout("u1" + "s".repeat(60));
+  await expect(
+    reconcileObservedPayment(store, core, merchant, second.id, paymentTx),
+  ).rejects.toThrow("unresolved");
+  expect(store.checkout(second.id)?.status).toBe("unpaid");
+  expect(core.paymentCount()).toBe(1);
+  const calls = requests.length;
+  await expect(
+    reconcileObservedPayment(store, core, randomUUID(), first.id, paymentTx),
+  ).rejects.toThrow("unresolved");
+  expect(requests.length).toBe(calls);
+});
+it("rechecks saved approval after the asynchronous observer response", async () => {
+  const c = await paid(),
+    id = approve(c.id);
+  await prepareObservedRefund(store, core, merchant, id, 5000);
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  transform = (p) => {
+    store.db
+      .prepare(
+        "UPDATE refund_requests SET approved_zat=approved_zat+1 WHERE id=?",
+      )
+      .run(id);
+    return p;
+  };
+  await expect(
+    reconcileObservedRefund(store, core, merchant, id),
+  ).rejects.toThrow("unresolved");
+  expect(core.refundTotals(paymentTx).reservedZat).toBe(40000);
+  expect(core.refundTotals(paymentTx).refundedZat).toBe(0);
+});
+it("keeps receipt totals unchanged on timeout and omits raw provider errors", async () => {
+  const c = await paid(),
+    id = approve(c.id);
+  await prepareObservedRefund(store, core, merchant, id, 5000);
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  const before = checkoutView(store, core, store.checkout(c.id)!);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw Error("private provider diagnostic " + route);
+    }),
+  );
+  await expect(
+    reconcileObservedRefund(store, core, merchant, id),
+  ).rejects.toThrow(/^Observer reconciliation is unresolved/);
+  expect(checkoutView(store, core, store.checkout(c.id)!)).toEqual(before);
+});
+
+it("confirms an unknown attempt only after matching native evidence", async () => {
+  const c = await paid(),
+    id = approve(c.id);
+  const plan = await prepareObservedRefund(store, core, merchant, id, 5000);
+  claimObservedRefund(store, core, merchant, id);
+  core.markRefundBroadcastUnknown(paymentTx, plan.refundId);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  expect(core.refundTotals(paymentTx).reservedZat).toBe(40000);
+  expect(
+    (await reconcileObservedRefund(store, core, merchant, id))
+      .confirmedRefundAmountZat,
+  ).toBe(40000);
+  expect(core.findRefund(plan.refundId)?.status).toBe("confirmed");
+});
+it("cannot reopen an instruction closed as failed", async () => {
+  const c = await paid(),
+    id = approve(c.id);
+  const plan = await prepareObservedRefund(store, core, merchant, id, 5000);
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  core
+    .withdrawalDatabase()
+    .prepare("UPDATE refund_events SET status='failed' WHERE id=?")
+    .run(plan.refundId);
+  await expect(
+    reconcileObservedRefund(store, core, merchant, id),
+  ).rejects.toThrow("unresolved");
+  expect(core.findRefund(plan.refundId)?.status).toBe("failed");
+  expect(store.refundRequest(id)?.status).toBe("approved");
+});
+it("replaying a settled partial refund preserves a later refund reservation", async () => {
+  const c = await paid(),
+    first = approve(c.id);
+  await prepareObservedRefund(store, core, merchant, first, 5000);
+  claimObservedRefund(store, core, merchant, first);
+  bindObservedRefund(store, core, merchant, first, refundTx);
+  await reconcileObservedRefund(store, core, merchant, first);
+  const second = approve(c.id, 20000);
+  await prepareObservedRefund(store, core, merchant, second, 5000);
+  const result = await reconcileObservedRefund(store, core, merchant, first);
+  expect(result).toMatchObject({
+    confirmedRefundAmountZat: 40000,
+    pendingRefundAmountZat: 20000,
+    remainingAmountZat: 40000,
+  });
+  expect(store.checkout(c.id)?.route).toBe(route);
+});
+
+it("does not record a second payment when competing pool hints resolve out of order", async () => {
+  const c = checkout(),
+    secondTx = "e".repeat(64),
+    original = globalThis.fetch;
+  let release!: () => void;
+  let entered!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: Parameters<typeof fetch>[0], options?: RequestInit) => {
+      const result = await original(input, options);
+      const body = JSON.parse(String(options?.body));
+      if (
+        body.method === "nostos_verify_output" &&
+        body.params[2] === secondTx
+      ) {
+        entered();
+        await waiting;
+      }
+      return result;
+    }),
+  );
+  const later = reconcileObservedPayment(
+    store,
+    core,
+    merchant,
+    c.id,
+    secondTx,
+    "orchard",
+  );
+  const rejected = expect(later).rejects.toThrow("unresolved");
+  await started;
+  await reconcileObservedPayment(store, core, merchant, c.id, paymentTx);
+  release();
+  await rejected;
+  expect(core.paymentCount()).toBe(1);
+  expect(store.checkout(c.id)?.paymentTxid).toBe(paymentTx);
+});
+it("rejects testnet runtime before accessing the observer", async () => {
+  const c = checkout();
+  vi.stubEnv("NOSTOS_NETWORK", "testnet");
+  await expect(
+    reconcileObservedPayment(store, core, merchant, c.id, paymentTx),
+  ).rejects.toThrow("unresolved");
+  expect(requests).toHaveLength(0);
+  expect(core.paymentCount()).toBe(0);
+});
+
+it("grants the wallet handoff only once and refuses binding before it", async () => {
+  const c = await paid(),
+    id = approve(c.id);
+  await prepareObservedRefund(store, core, merchant, id, 5000);
+  expect(() => bindObservedRefund(store, core, merchant, id, refundTx)).toThrow(
+    "unresolved",
+  );
+  expect(claimObservedRefund(store, core, merchant, id).handoffGranted).toBe(
+    true,
+  );
+  core.close();
+  store.close();
+  store = new ProductStore();
+  core = coreStore(store);
+  expect(() => claimObservedRefund(store, core, merchant, id)).toThrow(
+    "unresolved",
+  );
+  expect(
+    (await prepareObservedRefund(store, core, merchant, id, 5000))
+      .handoffStarted,
+  ).toBe(true);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  expect(() => claimObservedRefund(store, core, merchant, id)).toThrow(
+    "unresolved",
+  );
+});
+
+it("serves verified refund accounting through the private receipt API", async () => {
+  const c = await paid(),
+    id = approve(c.id);
+  await prepareObservedRefund(store, core, merchant, id, 5000);
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  await reconcileObservedRefund(store, core, merchant, id);
+  expect(
+    (await GET(new Request("http://localhost/api/product/checkout"))).status,
+  ).toBe(401);
+  const response = await GET(
+    new Request("http://localhost/api/product/checkout", {
+      headers: {
+        authorization: `Bearer ${store.receiptToken(c.id, merchant)}`,
+      },
+    }),
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.receipt).toMatchObject({
+    confirmedRefundAmountZat: 40000,
+    remainingAmountZat: 60000,
+  });
+  expect(JSON.stringify(body)).not.toContain(account);
+  expect(JSON.stringify(body)).not.toContain("nostos_output_proof_v1");
+});

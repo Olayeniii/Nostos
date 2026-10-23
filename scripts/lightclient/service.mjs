@@ -10,6 +10,7 @@ const allowed = new Set([
   "getwalletstatus",
   "z_importviewingkey",
   "z_listunifiedreceivers",
+  "nostos_verify_output",
 ]);
 const unresolved = () => new Error("Observer request is unresolved.");
 function privateDirectory(path) {
@@ -258,6 +259,24 @@ export function createObserverService({ authorization, broker }) {
         typeof merchant !== "string" ||
         !merchantPattern.test(merchant) ||
         (body.method === "getwalletstatus" && params.length !== 0) ||
+        (body.method === "nostos_verify_output" &&
+          (params.length !== 9 ||
+            !merchantPattern.test(params[0]) ||
+            !/^[a-f0-9]{64}$/.test(params[1]) ||
+            typeof params[2] !== "string" ||
+            params[2].length > 512 ||
+            !Number.isSafeInteger(params[3]) ||
+            params[3] <= 0 ||
+            params[3] > 2100000000000000 ||
+            typeof params[4] !== "string" ||
+            !/^(?:[a-f0-9]{2}){0,512}$/.test(params[4]) ||
+            !["orchard", "ironwood"].includes(params[5]) ||
+            !["incoming", "outgoing"].includes(params[6]) ||
+            !merchantPattern.test(params[7]) ||
+            !Number.isSafeInteger(params[8]) ||
+            params[8] < 0 ||
+            params[8] > 2100000000000000 ||
+            (params[6] === "outgoing" && params[8] === 0))) ||
         (body.method === "z_listunifiedreceivers" &&
           (params.length !== 1 ||
             typeof params[0] !== "string" ||

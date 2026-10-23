@@ -79,6 +79,43 @@ test("HTTP authentication, scope and method restrictions precede worker access",
     const ok = await send(body("getwalletstatus", [merchant]));
     assert.equal(ok.body.result.payments_enabled, false);
     assert.deepEqual(calls, [[merchant, "getwalletstatus", []]]);
+    const proofParams = [
+      merchant,
+      merchant,
+      "a".repeat(64),
+      "u1" + "b".repeat(60),
+      1000,
+      "00",
+      "ironwood",
+      "incoming",
+      merchant,
+      0,
+    ];
+    for (const [field, value] of [
+      [1, "../other-account"],
+      [2, "invalid"],
+      [4, 1.5],
+      [5, "ff".repeat(513)],
+      [6, "transparent"],
+      [7, "change"],
+      [8, "../binding"],
+      [9, -1],
+    ]) {
+      const invalid = [...proofParams];
+      invalid[field] = value;
+      assert.ok((await send(body("nostos_verify_output", invalid))).body.error);
+    }
+    assert.equal(calls.length, 1);
+    assert.equal(
+      (await send(body("nostos_verify_output", proofParams))).body.result
+        .payments_enabled,
+      false,
+    );
+    assert.deepEqual(calls[1], [
+      merchant,
+      "nostos_verify_output",
+      proofParams.slice(1),
+    ]);
     const secret = "uview1" + "a".repeat(100);
     broker.request = async () => {
       throw new Error(secret);

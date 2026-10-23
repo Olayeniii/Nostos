@@ -348,3 +348,45 @@ fn control_rejects_self_transfer_changed_fields_and_weak_confirmations() {
     }
 }
 
+#[test]
+fn product_proofs_match_saved_fields_without_echoing_receiver_or_memo() {
+    let owned=[Nullifier::from_bytes(&[0;32]).unwrap()];
+    for pool in [ShieldedPool::Orchard,ShieldedPool::Ironwood] {
+        let (tx,sender,customer)=fixture(pool,true,false);
+        let keys=HashMap::from([(1,sender.clone()),(2,customer.clone())]);
+        for (account,direction) in [(1,TransferType::Outgoing),(2,TransferType::Incoming)] {
+            let expected=Expected::new(account,receiver(&customer),1800000,memo(),pool,direction,3).unwrap();
+            let proof=tx.verify_product(&keys,&expected,&owned,tx.tip,10000,
+                "afcf8468-1814-4fea-a9f6-ce5a57505078","afcf8468-1814-4fea-a9f6-ce5a57505078",&"a".repeat(64)).unwrap();
+            assert_eq!(proof["nostos_output_proof_v1"],true);
+            assert_eq!(proof["owned_spend"],direction==TransferType::Outgoing);
+            assert!(!proof.to_string().contains("nostos:offline-fixture"));
+            assert!(proof.get("receiver").is_none() && proof.get("memo").is_none());
+            assert!(tx.verify_product(&keys,&expected,&owned,tx.tip+1,10000,"binding","account","tip").is_err());
+            if direction==TransferType::Outgoing {
+                assert!(tx.verify_product(&keys,&expected,&[],tx.tip,10000,"binding","account","tip").is_err());
+                assert!(tx.verify_product(&keys,&expected,&owned,tx.tip,0,"binding","account","tip").is_err());
+            }
+        }
+    }
+}
+
+#[test]
+fn product_proofs_reject_ambiguous_outputs_and_changed_expectations() {
+    let owned=[Nullifier::from_bytes(&[0;32]).unwrap()];
+    for (ovk,duplicate) in [(false,false),(true,true)] {
+        let (tx,sender,customer)=fixture(ShieldedPool::Ironwood,ovk,duplicate);
+        let expected=Expected::new(1,receiver(&customer),1800000,memo(),ShieldedPool::Ironwood,TransferType::Outgoing,3).unwrap();
+        assert!(tx.verify_product(&HashMap::from([(1,sender)]),&expected,&owned,tx.tip,10000,"binding","account","tip").is_err());
+    }
+    let (tx,sender,customer)=fixture(ShieldedPool::Ironwood,true,false);
+    let keys=HashMap::from([(1,sender)]);
+    for field in 0..6 {
+        let mut expected=Expected::new(1,receiver(&customer),1800000,memo(),ShieldedPool::Ironwood,TransferType::Outgoing,3).unwrap();
+        match field {0=>expected.amount+=1,1=>expected.memo=MemoBytes::from_bytes(b"wrong").unwrap(),
+            2=>expected.pool=ShieldedPool::Orchard,3=>expected.account=3,
+            4=>expected.confirmations=2,_=>expected.receiver=receiver(&key(33)),}
+        assert!(tx.verify_product(&keys,&expected,&owned,tx.tip,10000,"binding","account","tip").is_err());
+    }
+}
+

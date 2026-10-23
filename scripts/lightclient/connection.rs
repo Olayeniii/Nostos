@@ -43,6 +43,54 @@ impl Connection {
     }
     pub async fn handle(&mut self,method:&str,params:&[Value]) -> Result<Value,&'static str> {
         match method {
+            "nostos_verify_output" if params.len()==9 => {
+                use zcash_client_backend::{TransferType,data_api::NullifierQuery};
+                use zcash_protocol::{ShieldedPool,memo::MemoBytes};
+                let account_uuid=params[0].as_str().ok_or("product_account")?;
+                let accounts=self.wallet.db_mut().get_account_ids().map_err(|_| "account_lookup")?;
+                if accounts.len()!=1 || accounts[0].expose_uuid().to_string()!=account_uuid {
+                    return Err("product_account");
+                }
+                let account=accounts[0];
+                let id=params[1].as_str().ok_or("product_txid")?;
+                if id.len()!=64 || !id.bytes().all(|b|b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                    return Err("product_txid");
+                }
+                let mut bytes:[u8;32]=hex::decode(id).map_err(|_| "product_txid")?.try_into().map_err(|_| "product_txid")?;
+                bytes.reverse();
+                let txid=zcash_primitives::transaction::TxId::from_bytes(bytes);
+                let receiver=transactions::OrchardReceiver::parse_mainnet(params[2].as_str().ok_or("product_receiver")?)?;
+                let amount=params[3].as_u64().ok_or("product_amount")?;
+                let encoded=params[4].as_str().ok_or("product_memo")?;
+                if encoded.len()>1024 || encoded.len()%2!=0 {return Err("product_memo");}
+                let memo=MemoBytes::from_bytes(&hex::decode(encoded).map_err(|_| "product_memo")?).map_err(|_| "product_memo")?;
+                let pool=match params[5].as_str() {Some("ironwood")=>ShieldedPool::Ironwood,Some("orchard")=>ShieldedPool::Orchard,_=>return Err("product_pool")};
+                let direction=match params[6].as_str() {Some("incoming")=>TransferType::Incoming,Some("outgoing")=>TransferType::Outgoing,_=>return Err("product_direction")};
+                let binding=params[7].as_str().ok_or("product_binding")?;
+                if uuid::Uuid::parse_str(binding).map_err(|_| "product_binding")?.to_string()!=binding {
+                    return Err("product_binding");
+                }
+                let fee_cap=params[8].as_u64().ok_or("product_fee_cap")?;
+                let expected=transactions::Expected::new(account,receiver,amount,memo,pool,direction,3)?;
+                let keys=self.wallet.db_mut().get_unified_full_viewing_keys().map_err(|_| "product_keys")?;
+                let before=self.tip().await?;
+                let tx=transactions::enhance(&mut self.client,self.wallet.db_mut(),txid).await?;
+                let owned=if direction==TransferType::Outgoing {
+                    let pairs=match pool {
+                        ShieldedPool::Ironwood=>self.wallet.db_mut().get_ironwood_nullifiers(NullifierQuery::All),
+                        _=>self.wallet.db_mut().get_orchard_nullifiers(NullifierQuery::All),
+                    }.map_err(|_| "product_nullifiers")?;
+                    pairs.into_iter().filter_map(|(owner,nf)|(owner==account).then_some(nf)).collect::<Vec<_>>()
+                } else {vec![]};
+                let after=self.tip().await?;
+                let scanned=self.wallet.db_mut().get_max_height_hash().map_err(|_| "product_tip")?.ok_or("product_tip")?;
+                if before!=after || u32::from(scanned.0)!=after.0 || scanned.1.to_string()!=after.1 {
+                    return Err("product_chain_changed");
+                }
+                let result=tx.verify_product(&keys,&expected,&owned,after.0,fee_cap,binding,account_uuid,&after.1)?;
+                tx.store(self.wallet.db_mut())?;
+                Ok(result)
+            },
             // Private operator pipe only. The HTTP broker does not allow this
             // method. This never settles a product instruction or enables payments.
             "nostos_control" if params.len()==4 => {
