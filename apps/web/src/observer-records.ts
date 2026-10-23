@@ -14,8 +14,8 @@ import {
 import { checkoutView } from "./product-service.js";
 import { ProductStore } from "./product-store.js";
 
-// Internal reconciliation only. No public route calls these functions, and they
-// neither enable mainnet payments nor possess a signing interface.
+// Reconciliation has no signing interface and never enables mainnet payments.
+// Preview callers must enforce their feature flag, session, origin and ownership.
 export class ObserverRecordError extends Error {
   constructor() {
     super(

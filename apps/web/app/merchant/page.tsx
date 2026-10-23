@@ -10,6 +10,7 @@ import { useRecord } from "../../src/use-record.js";
 import { requestJson, parseZec } from "../../src/requests.js";
 import { zec, date } from "../../src/receipt-card.js";
 import { paymentSummary } from "../../src/payment-summary.js";
+import { ObserverRecordCheck } from "../../src/observer-record-check.js";
 import { MerchantRefundRequest } from "../../src/merchant-refund-request.js";
 import {
   type Dashboard,
@@ -89,7 +90,12 @@ export default function Merchant() {
     clearPaymentHash();
   }
   const safe =
-    !warning && !data?.syncWarning && !loading && !busy && !uncertain;
+    !warning &&
+    !data?.syncWarning &&
+    !data?.observerPreview &&
+    !loading &&
+    !busy &&
+    !uncertain;
   async function post<T>(action: string, body: unknown) {
     return requestJson<T>(
       `/api/product/${action}`,
@@ -655,6 +661,13 @@ export default function Merchant() {
                   Check original payment route
                 </button>
               </div>
+            )}
+            {data?.observerRecordChecksEnabled && (
+              <ObserverRecordCheck
+                key={current.id}
+                record={current}
+                onRefresh={() => void refresh()}
+              />
             )}
             <h3 className="refund-section-title">03 / Refund if needed</h3>
             {current.refundRequests?.map((r) => (

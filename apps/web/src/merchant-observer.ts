@@ -190,3 +190,99 @@ export async function connectObserver(
     throw new ObserverError();
   }
 }
+
+export type ObserverSyncStatus = {
+  state: "ready" | "syncing";
+  nodeHeight: number;
+  scannedHeight: number | null;
+  paymentsEnabled: false;
+  signingEnabled: false;
+};
+// Readiness is a fresh observation, never a durable payment-enable flag.
+export async function observerSyncStatus(
+  store: ProductStore,
+  merchantId: string,
+  rpc: ObserverRpc,
+): Promise<ObserverSyncStatus> {
+  try {
+    const merchant = store.merchant(merchantId);
+    const connection = observerConnection(store, merchantId);
+    if (
+      !sdkObserverSelected() ||
+      runtimeNetwork() !== "mainnet" ||
+      !merchant?.emailVerifiedAt ||
+      merchant.wallet ||
+      merchant.destination ||
+      connection?.state !== "connected" ||
+      connection.network !== "mainnet"
+    )
+      throw new ObserverError();
+    const row = store.db
+      .prepare(
+        "SELECT consent_version FROM merchant_observers WHERE merchant_id=?",
+      )
+      .get(merchantId);
+    if (row?.consent_version !== "sdk-orchard-view-access-v1")
+      throw new ObserverError();
+    const status = await rpc.call<Record<string, unknown>>(
+      "getwalletstatus",
+      [],
+    );
+    const node = status.node_tip as {
+      height?: unknown;
+      blockhash?: unknown;
+    } | null;
+    const scanned = status.wallet_tip as {
+      height?: unknown;
+      blockhash?: unknown;
+    } | null;
+    const height = (n: unknown): n is number =>
+      typeof n === "number" &&
+      Number.isSafeInteger(n) &&
+      n > 0 &&
+      n <= 0xffffffff;
+    const hash = (h: unknown): h is string =>
+      typeof h === "string" && /^[a-f0-9]{64}$/.test(h);
+    const fully = status.fully_synced_height;
+    if (
+      status.nostos_sdk_preview_v1 !== true ||
+      status.payments_enabled !== false ||
+      status.observation_scope !== "orchard-family-only" ||
+      status.account_connected !== true ||
+      typeof status.locked !== "boolean" ||
+      !node ||
+      !height(node.height) ||
+      !hash(node.blockhash) ||
+      !(fully === null || (height(fully) && fully <= node.height)) ||
+      !(
+        scanned === null ||
+        (scanned &&
+          height(scanned.height) &&
+          scanned.height <= node.height &&
+          hash(scanned.blockhash))
+      )
+    )
+      throw new ObserverError();
+    const ready =
+      !status.locked &&
+      fully === node.height &&
+      scanned?.height === node.height &&
+      scanned.blockhash === node.blockhash;
+    return {
+      state: ready ? "ready" : "syncing",
+      nodeHeight: node.height,
+      scannedHeight: typeof fully === "number" ? fully : null,
+      paymentsEnabled: false,
+      signingEnabled: false,
+    };
+  } catch {
+    throw new ObserverError();
+  }
+}
+export function observerRecordChecksEnabled() {
+  return (
+    runtimeValue("NOSTOS_OBSERVER_RECORD_CHECKS") === "yes" &&
+    runtimeNetwork() === "mainnet" &&
+    sdkObserverSelected()
+  );
+}

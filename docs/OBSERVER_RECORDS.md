@@ -1,6 +1,6 @@
 # Internal observer record reconciliation
 
-`apps/web/src/observer-records.ts` connects native read-only output verification to the existing payment ledger and private receipt projection. No public mutation route invokes these functions. Mainnet payment creation and hosted signing remain held. Callers must establish merchant/operator authorization before invoking the internal functions.
+`apps/web/src/observer-records.ts` connects native read-only output verification to the existing payment ledger and private receipt projection. Explicit opt-in authenticated preview routes can request payment and saved-refund verification. Preparing an instruction, claiming a handoff and binding a refund remain internal operations. See [merchant checks](OBSERVER_MERCHANT_CHECKS.md). Mainnet payment creation and hosted signing remain held. Callers must establish merchant/operator authorization before invoking the internal functions.
 
 Incoming reconciliation requires a candidate transaction ID and explicit Orchard-family pool. It derives the account, destination, amount and original memo from saved merchant and checkout records. Automatic transaction discovery is not implemented.
 

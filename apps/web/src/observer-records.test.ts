@@ -1,4 +1,4 @@
-import { GET } from "../app/api/product/[...action]/route.js";
+import { GET, POST } from "../app/api/product/[...action]/route.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   mkdtempSync,
@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { ProductStore } from "./product-store.js";
+import { ProductStore, accountHeader } from "./product-store.js";
 import { coreStore, newRequest, checkoutView } from "./product-service.js";
 import { observerConnection } from "./merchant-observer.js";
 import {
@@ -578,4 +578,201 @@ it("serves verified refund accounting through the private receipt API", async ()
   });
   expect(JSON.stringify(body)).not.toContain(account);
   expect(JSON.stringify(body)).not.toContain("nostos_output_proof_v1");
+});
+
+function previewRequest(
+  action: string,
+  body: unknown,
+  options: { origin?: string; cookie?: boolean; actor?: string } = {},
+) {
+  return new Request(`https://nostos.example/api/product/${action}`, {
+    method: "POST",
+    headers: {
+      origin: options.origin ?? "https://nostos.example",
+      "content-type": "application/json",
+      ...(options.cookie === false
+        ? {}
+        : {
+            cookie: accountHeader(
+              store.session(options.actor ?? merchant),
+            ).split(";")[0]!,
+          }),
+    },
+    body: JSON.stringify(body),
+  });
+}
+it("holds record-check routes by default without calling the observer", async () => {
+  vi.stubEnv("NOSTOS_WEB_TRUSTED_ORIGINS", "https://nostos.example");
+  const c = checkout();
+  const response = await POST(
+    previewRequest("observer-payment-check", {
+      id: c.id,
+      txid: paymentTx,
+      pool: "ironwood",
+    }),
+  );
+  expect(response.status).toBe(409);
+  expect(requests).toHaveLength(0);
+  expect(core.paymentCount()).toBe(0);
+});
+it("checks a payment through the authorized opt-in route and private receipt projection", async () => {
+  vi.stubEnv("NOSTOS_WEB_TRUSTED_ORIGINS", "https://nostos.example");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RECORD_CHECKS", "yes");
+  const c = checkout();
+  const response = await POST(
+    previewRequest("observer-payment-check", {
+      id: c.id,
+      txid: paymentTx,
+      pool: "ironwood",
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect((await response.json()).receipt).toMatchObject({
+    paymentStatus: "confirmed",
+    paymentTxid: paymentTx,
+  });
+  expect(core.paymentCount()).toBe(1);
+  const body = await (
+    await POST(
+      previewRequest("observer-payment-check", {
+        id: c.id,
+        txid: paymentTx,
+        pool: "ironwood",
+      }),
+    )
+  ).text();
+  expect(body).not.toContain(account);
+  expect(body).not.toContain("nostos_output_proof_v1");
+  expect(core.paymentCount()).toBe(1);
+  expect(requests.every((r) => r.method === "nostos_verify_output")).toBe(true);
+});
+it("enforces session, origin, strict fields and merchant ownership before record proof RPC", async () => {
+  vi.stubEnv("NOSTOS_WEB_TRUSTED_ORIGINS", "https://nostos.example");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RECORD_CHECKS", "yes");
+  const c = checkout(),
+    body = { id: c.id, txid: paymentTx, pool: "ironwood" };
+  expect(
+    (
+      await POST(
+        previewRequest("observer-payment-check", body, { cookie: false }),
+      )
+    ).status,
+  ).toBe(401);
+  expect(
+    (
+      await POST(
+        previewRequest("observer-payment-check", body, {
+          origin: "https://evil.example",
+        }),
+      )
+    ).status,
+  ).toBe(403);
+  for (const extra of [
+    { receiver: route },
+    { amountZat: 1 },
+    { memo: "different" },
+    { merchantId: merchant },
+  ]) {
+    expect(
+      (
+        await POST(
+          previewRequest("observer-payment-check", { ...body, ...extra }),
+        )
+      ).status,
+    ).toBe(400);
+  }
+  const other = store.signup(
+    "other-preview@example.com",
+    "a-long-test-password",
+  ).id;
+  store.db
+    .prepare("UPDATE merchants SET email_verified_at=? WHERE id=?")
+    .run(new Date().toISOString(), other);
+  expect(
+    (
+      await POST(
+        previewRequest("observer-payment-check", body, { actor: other }),
+      )
+    ).status,
+  ).toBe(409);
+  expect(requests).toHaveLength(0);
+  expect(core.paymentCount()).toBe(0);
+});
+it("does not let the refund proof route create a handoff or accept caller transaction fields", async () => {
+  vi.stubEnv("NOSTOS_WEB_TRUSTED_ORIGINS", "https://nostos.example");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RECORD_CHECKS", "yes");
+  const c = await paid(),
+    id = approve(c.id);
+  const plan = await prepareObservedRefund(store, core, merchant, id, 5000);
+  const before = requests.length;
+  expect(
+    (
+      await POST(
+        previewRequest("observer-refund-check", {
+          requestId: id,
+          txid: refundTx,
+        }),
+      )
+    ).status,
+  ).toBe(400);
+  expect(
+    (await POST(previewRequest("observer-refund-check", { requestId: id })))
+      .status,
+  ).toBe(409);
+  expect(requests).toHaveLength(before);
+  expect(core.findRefund(plan.refundId)?.status).toBe("pending");
+  claimObservedRefund(store, core, merchant, id);
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  const result = await POST(
+    previewRequest("observer-refund-check", { requestId: id }),
+  );
+  expect(result.status).toBe(200);
+  expect((await result.json()).receipt.confirmedRefundAmountZat).toBe(40000);
+  expect(core.findRefund(plan.refundId)?.status).toBe("confirmed");
+});
+
+it("returns live wallet readiness through a tenant-scoped read-only endpoint without private fields", async () => {
+  vi.stubEnv("NOSTOS_WEB_TRUSTED_ORIGINS", "https://nostos.example");
+  const url = "https://nostos.example/api/product/wallet-status";
+  expect((await GET(new Request(url))).status).toBe(401);
+  expect((await POST(previewRequest("wallet-status", {}))).status).toBe(405);
+  const call = vi.fn(async (_url: unknown, options: RequestInit) => {
+    const body = JSON.parse(String(options.body));
+    expect(body.method).toBe("getwalletstatus");
+    expect(body.params).toEqual([merchant]);
+    return Response.json({
+      jsonrpc: "2.0",
+      id: body.id,
+      result: {
+        nostos_sdk_preview_v1: true,
+        observation_scope: "orchard-family-only",
+        payments_enabled: false,
+        account_connected: true,
+        locked: false,
+        node_tip: { height: 103, blockhash: "b".repeat(64) },
+        wallet_tip: { height: 103, blockhash: "b".repeat(64) },
+        fully_synced_height: 103,
+        account_uuid: account,
+        extra: "provider details must not escape",
+      },
+    });
+  });
+  vi.stubGlobal("fetch", call);
+  const cookie = accountHeader(store.session(merchant)).split(";")[0]!;
+  const response = await GET(new Request(url, { headers: { cookie } }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    status: {
+      state: "ready",
+      nodeHeight: 103,
+      scannedHeight: 103,
+      paymentsEnabled: false,
+      signingEnabled: false,
+    },
+  });
+  expect(call).toHaveBeenCalledTimes(1);
+  call.mockRejectedValueOnce(new Error("private provider details"));
+  const failed = await GET(new Request(url, { headers: { cookie } }));
+  expect(failed.status).toBe(409);
+  expect(await failed.text()).not.toContain("private provider details");
 });

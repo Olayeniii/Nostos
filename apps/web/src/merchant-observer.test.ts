@@ -262,3 +262,127 @@ it("does not silently convert a prior observer claim to SDK consent", async () =
   ).rejects.toThrow();
   expect(calls).toHaveLength(0);
 });
+
+it("reports fresh SDK sync readiness without enabling payment creation or signing", async () => {
+  const { observerSyncStatus } = await import("./merchant-observer.js");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  await connectObserver(
+    store,
+    merchantId,
+    { ...input(), scopeConsent: true },
+    rpc,
+    node,
+  );
+  const statusRpc = {
+    ...rpc,
+    call: vi.fn(
+      async <T>() =>
+        ({
+          nostos_sdk_preview_v1: true,
+          observation_scope: "orchard-family-only",
+          payments_enabled: false,
+          account_connected: true,
+          locked: false,
+          node_tip: { height: 100, blockhash: hash },
+          wallet_tip: { height: 100, blockhash: hash },
+          fully_synced_height: 100,
+        }) as T,
+    ),
+  };
+  expect(
+    await observerSyncStatus(store, merchantId, statusRpc as ObserverRpc),
+  ).toEqual({
+    state: "ready",
+    nodeHeight: 100,
+    scannedHeight: 100,
+    paymentsEnabled: false,
+    signingEnabled: false,
+  });
+  expect(statusRpc.call).toHaveBeenCalledWith("getwalletstatus", []);
+  expect(observerConnection(store, merchantId)?.syncVerified).toBe(false);
+  expect(() =>
+    newRequest(store, store.merchant(merchantId)!, "Still held", 1000),
+  ).toThrow(/Merchant-controlled/);
+});
+it.each([
+  { locked: true },
+  { fully_synced_height: 99 },
+  { wallet_tip: { height: 100, blockhash: "d".repeat(64) } },
+  { fully_synced_height: null, wallet_tip: null },
+])(
+  "keeps incomplete or changed chain context in syncing state: %j",
+  async (change) => {
+    const { observerSyncStatus } = await import("./merchant-observer.js");
+    vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+    vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+    await connectObserver(
+      store,
+      merchantId,
+      { ...input(), scopeConsent: true },
+      rpc,
+      node,
+    );
+    const statusRpc = {
+      ...rpc,
+      call: async <T>() =>
+        ({
+          nostos_sdk_preview_v1: true,
+          observation_scope: "orchard-family-only",
+          payments_enabled: false,
+          account_connected: true,
+          locked: false,
+          node_tip: { height: 100, blockhash: hash },
+          wallet_tip: { height: 100, blockhash: hash },
+          fully_synced_height: 100,
+          ...change,
+        }) as T,
+    };
+    expect((await observerSyncStatus(store, merchantId, statusRpc)).state).toBe(
+      "syncing",
+    );
+  },
+);
+it.each([
+  { payments_enabled: true },
+  { account_connected: false },
+  { nostos_sdk_preview_v1: false },
+  { fully_synced_height: 101 },
+  { wallet_tip: { height: 101, blockhash: hash } },
+])("rejects untrusted or impossible readiness fields: %j", async (change) => {
+  const { observerSyncStatus } = await import("./merchant-observer.js");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  await connectObserver(
+    store,
+    merchantId,
+    { ...input(), scopeConsent: true },
+    rpc,
+    node,
+  );
+  const statusRpc = {
+    ...rpc,
+    call: async <T>() =>
+      ({
+        nostos_sdk_preview_v1: true,
+        observation_scope: "orchard-family-only",
+        payments_enabled: false,
+        account_connected: true,
+        locked: false,
+        node_tip: { height: 100, blockhash: hash },
+        wallet_tip: { height: 100, blockhash: hash },
+        fully_synced_height: 100,
+        ...change,
+      }) as T,
+  };
+  await expect(
+    observerSyncStatus(store, merchantId, statusRpc),
+  ).rejects.toThrow(/^Wallet connection could not be verified/);
+});
+it("does not request readiness for a missing merchant connection", async () => {
+  const { observerSyncStatus } = await import("./merchant-observer.js");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  await expect(observerSyncStatus(store, merchantId, rpc)).rejects.toThrow();
+  expect(calls).toEqual([]);
+});

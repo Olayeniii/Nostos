@@ -1,5 +1,6 @@
 "use client";
-import { NetworkLabel } from "../../../src/network-context.js";
+import { MerchantWalletConnection } from "../../../src/merchant-wallet-connection.js";
+import { NetworkLabel, useNetwork } from "../../../src/network-context.js";
 import { DEFAULT_REFUND_WINDOW_DAYS } from "../../../src/refund-policy.js";
 import { ChangeEmail } from "../../../src/change-email.js";
 import { useState } from "react";
@@ -10,6 +11,7 @@ import { AppFooter } from "../../../src/shell.js";
 import { StateLabel } from "../../../src/status-label.js";
 import { MerchantWorkspace } from "../../../src/merchant-workspace.js";
 export default function Settings() {
+  const network = useNetwork();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const { data, warning, loading, refresh } = useRecord<{
@@ -57,43 +59,49 @@ export default function Settings() {
               </Link>
             )}
           </article>
-          <article className="panel">
-            <h2>Wallet integration</h2>
-            <dl>
-              <div>
-                <dt>Network</dt>
-                <dd>
-                  <NetworkLabel />
-                </dd>
-              </div>
-              <div>
-                <dt>Custody</dt>
-                <dd>Hosted by NOSTOS</dd>
-              </div>
-              <div>
-                <dt>Store wallet</dt>
-                <dd>
-                  {data.merchant.ready
-                    ? "Provisioned"
-                    : data.merchant.setupPending
-                      ? "Reconciliation needed"
-                      : "Not provisioned"}
-                </dd>
-              </div>
-              <div>
-                <dt>Refund policy</dt>
-                <dd>
-                  Full or partial refunds within the remaining payment value
-                </dd>
-              </div>
-            </dl>
-            <p className="privacy">
-              Each store has a separate wallet account. The service operator
-              controls the wallet keys and can view your payment and refund
-              details. A private return route is kept encrypted in product
-              storage.
-            </p>
-          </article>
+          {network === "mainnet" ? (
+            <MerchantWalletConnection />
+          ) : network === "testnet" ? (
+            <article className="panel">
+              <h2>Wallet integration</h2>
+              <dl>
+                <div>
+                  <dt>Network</dt>
+                  <dd>
+                    <NetworkLabel />
+                  </dd>
+                </div>
+                <div>
+                  <dt>Custody</dt>
+                  <dd>Hosted by NOSTOS</dd>
+                </div>
+                <div>
+                  <dt>Store wallet</dt>
+                  <dd>
+                    {data.merchant.ready
+                      ? "Provisioned"
+                      : data.merchant.setupPending
+                        ? "Reconciliation needed"
+                        : "Not provisioned"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Refund policy</dt>
+                  <dd>
+                    Full or partial refunds within the remaining payment value
+                  </dd>
+                </div>
+              </dl>
+              <p className="privacy">
+                Each store has a separate wallet account. The service operator
+                controls the wallet keys and can view your payment and refund
+                details. A private return route is kept encrypted in product
+                storage.
+              </p>
+            </article>
+          ) : (
+            <StateLabel state="loading" text="Checking wallet network" />
+          )}
           <ChangeEmail />
           <article className="panel">
             <h2>Refund policy</h2>

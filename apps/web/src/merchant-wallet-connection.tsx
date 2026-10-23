@@ -1,4 +1,5 @@
 "use client";
+import type { ObserverSyncStatus } from "./merchant-observer.js";
 import { useState } from "react";
 import { requestJson } from "./requests.js";
 import { useRecord } from "./use-record.js";
@@ -8,6 +9,7 @@ export function MerchantWalletConnection() {
   }>("/api/product/wallet-connection");
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
+  const [sync, setSync] = useState<ObserverSyncStatus>();
   return (
     <article className="panel">
       <h2>Connect your business wallet</h2>
@@ -30,97 +32,136 @@ export function MerchantWalletConnection() {
             : "Connection pending. Use the same key and birthday when retrying."}
         </p>
       )}
+      {data?.connection?.state === "connected" && (
+        <section aria-label="Observer sync readiness">
+          <p role="status">
+            {sync
+              ? sync.state === "ready"
+                ? "At the last check, the observer was caught up. Payment creation and wallet signing remain disabled."
+                : `At the last check, the observer was syncing. Scanned block ${sync.scannedHeight ?? "not available"}; chain tip ${sync.nodeHeight}.`
+              : "Sync readiness has not been checked in this session."}
+          </p>
+          <button
+            className="secondary"
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              if (busy) return;
+              setBusy(true);
+              setSync(undefined);
+              setMessage("");
+              try {
+                const result = await requestJson<{
+                  status: ObserverSyncStatus;
+                }>("/api/product/wallet-status", { cache: "no-store" }, 20000);
+                setSync(result.status);
+              } catch {
+                setMessage(
+                  "Could not verify current sync readiness. Saved view access is unchanged. Try the status check again.",
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "Checking wallet" : "Check wallet sync"}
+          </button>
+        </section>
+      )}
       {data?.connection?.address && (
         <p className="privacy">
           Observer receiving address: <code>{data.connection.address}</code>. Do
           not fund it during connection testing.
         </p>
       )}
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (busy) return;
-          const form = event.currentTarget,
-            fields = new FormData(form);
-          const payload = {
-            viewingKey: String(fields.get("viewingKey") ?? "").trim(),
-            birthday: Number(fields.get("birthday")),
-            password: String(fields.get("password") ?? ""),
-            consent: fields.get("consent") === "on",
-            scopeConsent: fields.get("consent") === "on",
-          };
-          form.reset();
-          setBusy(true);
-          setMessage("");
-          try {
-            await requestJson(
-              "/api/product/wallet-connection",
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-              },
-              45000,
-            );
-            setMessage(
-              "View access recorded. Payments remain disabled until sync and merchant signing are proved.",
-            );
-            await refresh();
-          } catch {
-            setMessage(
-              "Could not verify the connection. Check the key, birthday and password. A pending import is retained; retry only the same details.",
-            );
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <label>
-          Unified full viewing key
-          <input
-            name="viewingKey"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={3008}
-            required
-            disabled={busy}
-          />
-        </label>
-        <label>
-          Wallet birthday block
-          <input
-            name="birthday"
-            type="number"
-            min={1}
-            max={4294967295}
-            step={1}
-            required
-            disabled={busy}
-          />
-        </label>
-        <label>
-          NOSTOS account password
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            maxLength={128}
-            required
-            disabled={busy}
-          />
-        </label>
-        <label className="consent-field">
-          <input name="consent" type="checkbox" required disabled={busy} /> I
-          grant NOSTOS view access to this dedicated business account and
-          understand that account activity and memos are visible to its
-          operator. For SDK preview, I authorize Orchard-family view access and
-          the hosted chain queries described above.
-        </label>
-        <button className="primary" disabled={busy}>
-          {busy ? "Checking view access" : "Connect view access"}
-        </button>
-      </form>
+      {data?.connection?.state !== "connected" && (
+        <form
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (busy) return;
+            const form = event.currentTarget,
+              fields = new FormData(form);
+            const payload = {
+              viewingKey: String(fields.get("viewingKey") ?? "").trim(),
+              birthday: Number(fields.get("birthday")),
+              password: String(fields.get("password") ?? ""),
+              consent: fields.get("consent") === "on",
+              scopeConsent: fields.get("consent") === "on",
+            };
+            form.reset();
+            setBusy(true);
+            setSync(undefined);
+            setMessage("");
+            try {
+              await requestJson(
+                "/api/product/wallet-connection",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                },
+                45000,
+              );
+              setMessage(
+                "View access recorded. Payments remain disabled until sync and merchant signing are proved.",
+              );
+              await refresh();
+            } catch {
+              setMessage(
+                "Could not verify the connection. Check the key, birthday and password. A pending import is retained; retry only the same details.",
+              );
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <label>
+            Unified full viewing key
+            <input
+              name="viewingKey"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={3008}
+              required
+              disabled={busy}
+            />
+          </label>
+          <label>
+            Wallet birthday block
+            <input
+              name="birthday"
+              type="number"
+              min={1}
+              max={4294967295}
+              step={1}
+              required
+              disabled={busy}
+            />
+          </label>
+          <label>
+            NOSTOS account password
+            <input
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              maxLength={128}
+              required
+              disabled={busy}
+            />
+          </label>
+          <label className="consent-field">
+            <input name="consent" type="checkbox" required disabled={busy} /> I
+            grant NOSTOS view access to this dedicated business account and
+            understand that account activity and memos are visible to its
+            operator. For SDK preview, I authorize Orchard-family view access
+            and the hosted chain queries described above.
+          </label>
+          <button className="primary" disabled={busy}>
+            {busy ? "Checking view access" : "Connect view access"}
+          </button>
+        </form>
+      )}
       {message && <p role="status">{message}</p>}
     </article>
   );

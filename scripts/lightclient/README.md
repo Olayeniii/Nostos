@@ -7,9 +7,9 @@ The wallet compatibility branch adds `control.py` and the pipe-only
 limits, private ledger, exact outgoing/owned-spend checks, normal observer reopen
 check and remaining live gates. The HTTP broker cannot call this method. No
 mainnet payment enablement is included. The internal output-to-record integration
-is documented in [observer records](../../docs/OBSERVER_RECORDS.md); no public
-mutation route invokes it. Build artifacts and offline tests do not establish a
-funded merchant-wallet proof.
+is documented in [observer records](../../docs/OBSERVER_RECORDS.md). Authenticated
+preview record checks are off by default; see [merchant checks](../../docs/OBSERVER_MERCHANT_CHECKS.md).
+Build artifacts and offline tests do not establish a funded merchant-wallet proof.
 
 This is tested observer source, not a deployed service. An opt-in authenticated
 preview listener and app adapter exist; no real merchant key has been supplied by

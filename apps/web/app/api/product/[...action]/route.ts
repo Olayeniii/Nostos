@@ -1,8 +1,16 @@
 import {
+  ObserverRecordError,
+  reconcileObservedPayment,
+  reconcileObservedRefund,
+} from "../../../../src/observer-records.js";
+import {
   ObserverError,
   observerWallet,
   observerConnection,
   connectObserver,
+  observerSyncStatus,
+  observerRecordChecksEnabled,
+  sdkObserverSelected,
 } from "../../../../src/merchant-observer.js";
 import { MerchantCustodyError } from "../../../../src/custody-policy.js";
 import { runtimeNetwork } from "../../../../../../packages/network/src/index.js";
@@ -415,6 +423,77 @@ async function handle(request: Request) {
         .run(String(body.state), checkout.id);
       return json({ ok: true });
     }
+    if (route === "wallet-status") {
+      if (request.method !== "GET")
+        return json({ error: "Method unavailable" }, 405);
+      return json({
+        status: await observerSyncStatus(
+          store,
+          merchant.id,
+          observerWallet(merchant.id),
+        ),
+      });
+    }
+    if (
+      route === "observer-payment-check" ||
+      route === "observer-refund-check"
+    ) {
+      if (!observerRecordChecksEnabled())
+        return json({ error: "Observer record checks are unavailable." }, 409);
+      if (request.method !== "POST")
+        return json({ error: "Method unavailable" }, 405);
+      if (!merchant.emailVerifiedAt)
+        return json({ error: "Verify your email first." }, 403);
+      const expectedKeys =
+        route === "observer-payment-check"
+          ? ["id", "txid", "pool"]
+          : ["requestId"];
+      if (Object.keys(body).some((key) => !expectedKeys.includes(key)))
+        return json(
+          { error: "Use only the saved record and transaction reference." },
+          400,
+        );
+      if (!identityLimit(store, "observer-record:" + merchant.id, 12))
+        return json(
+          { error: "Too many observer checks. Try again later." },
+          429,
+        );
+      if (route === "observer-payment-check") {
+        const id = text(body.id, 36, 36),
+          txid = text(body.txid, 64, 64);
+        if (
+          !id ||
+          !txid ||
+          !/^[a-f0-9]{64}$/.test(txid) ||
+          !["orchard", "ironwood"].includes(String(body.pool))
+        )
+          return json(
+            { error: "Enter the transaction reference and shielded pool." },
+            400,
+          );
+        return json({
+          receipt: await reconcileObservedPayment(
+            store,
+            core,
+            merchant.id,
+            id,
+            txid,
+            body.pool as "orchard" | "ironwood",
+          ),
+        });
+      }
+      const requestId = text(body.requestId, 36, 36);
+      if (!requestId)
+        return json({ error: "Saved refund request required." }, 400);
+      return json({
+        receipt: await reconcileObservedRefund(
+          store,
+          core,
+          merchant.id,
+          requestId,
+        ),
+      });
+    }
     if (route === "wallet-connection") {
       if (!isPost)
         return json({ connection: observerConnection(store, merchant.id) });
@@ -560,6 +639,9 @@ async function handle(request: Request) {
           .requests(merchant.id)
           .map((r) => checkoutView(store!, core!, r, true)),
         syncWarning,
+        observerPreview:
+          runtimeNetwork() === "mainnet" && sdkObserverSelected(),
+        observerRecordChecksEnabled: observerRecordChecksEnabled(),
       });
     }
     if (route === "refund" && isPost) {
@@ -596,7 +678,8 @@ async function handle(request: Request) {
       error instanceof RefundFundingError ||
       error instanceof FundsError ||
       error instanceof MerchantCustodyError ||
-      error instanceof ObserverError
+      error instanceof ObserverError ||
+      error instanceof ObserverRecordError
     )
       return json({ error: error.message }, 409);
     // Raw wallet/SQLite errors can contain private memos, destinations or identities.

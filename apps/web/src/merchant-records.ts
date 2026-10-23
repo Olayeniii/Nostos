@@ -9,6 +9,8 @@ export type Dashboard = {
   merchant: { name: string; ready: boolean };
   records: RecordData[];
   syncWarning: boolean;
+  observerPreview?: boolean;
+  observerRecordChecksEnabled?: boolean;
 };
 export function paymentRecordStatus(r: RecordData) {
   if (r.status === "broadcast_unknown") return "Refund outcome unknown";
