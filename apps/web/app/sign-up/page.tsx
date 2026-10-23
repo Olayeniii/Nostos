@@ -1,4 +1,8 @@
+import { redirect } from "next/navigation";
 import { AccountForm } from "../../src/account-form.js";
-export default function SignUp() {
+import { accountWorkspace } from "../../src/account-workspace.server.js";
+export default async function SignUp() {
+  const destination = await accountWorkspace();
+  if (destination) redirect(destination);
   return <AccountForm signup />;
 }

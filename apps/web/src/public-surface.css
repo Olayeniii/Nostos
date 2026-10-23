@@ -43,8 +43,8 @@
 .public-surface h1,
 .public-surface h2 {
   color: #192e29;
-  font-family: Georgia, serif;
-  font-weight: 400;
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-weight: 700;
   letter-spacing: -0.04em;
 }
 .public-surface h1 {
@@ -203,7 +203,7 @@
   margin: 26px 0;
   color: #192e29;
   font-size: 48px;
-  font-weight: 400;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .public-surface .checkout-total span {
@@ -298,7 +298,7 @@
 .public-surface .receipt-total h2 {
   font-family: var(--font-manrope), system-ui, sans-serif;
   font-size: 44px;
-  font-weight: 400;
+  font-weight: 700;
   color: #192e29;
 }
 .public-surface .receipt-divider {
@@ -575,4 +575,31 @@
   .public-surface .manual-payment textarea {
     font-size: 12px;
   }
+}
+
+.public-surface :is(.panel, .account-card, .setup-card, .receipt-card) {
+  border-radius: 12px;
+  box-shadow:
+    0 2px 5px #192e2905,
+    0 1px 0 #fff inset;
+}
+.public-surface :is(.primary, .secondary, input, textarea, select) {
+  border-radius: 8px;
+}
+.public-surface :is(.primary, .secondary) {
+  font-weight: 650;
+}
+.public-surface h1 {
+  letter-spacing: -0.04em;
+  font-weight: 750;
+}
+.public-surface .account-context h1 {
+  font-size: clamp(36px, 4vw, 48px);
+}
+.public-surface :is(p, .privacy, .lede) {
+  color: #59685f;
+  font-size: 14px;
+}
+.public-surface > footer :is(p, span) {
+  font-size: 12px;
 }

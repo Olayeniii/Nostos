@@ -1,3 +1,4 @@
+import { OverviewIcon } from "./overview-icon.js";
 import Link from "next/link";
 import { date, zec } from "./receipt-card.js";
 import {
@@ -33,8 +34,13 @@ export function MerchantRecordList({
           <li key={record.id}>
             <Link href={paymentHref(record.id)}>
               <span className="studio-record-name">
-                <strong>{record.description || record.orderReference}</strong>
-                <small>{record.orderReference}</small>
+                <span className="workspace-document">
+                  <OverviewIcon kind="receipt" />
+                </span>
+                <span>
+                  <strong>{record.description || record.orderReference}</strong>
+                  <small>{record.orderReference}</small>
+                </span>
               </span>
               <span className="studio-record-value">
                 {zec(
@@ -68,7 +74,17 @@ export function MerchantRecordList({
                 </small>
               </span>
               <span className="studio-record-date">
-                {date(record.createdAt)}
+                {refunds ? (
+                  <span className="workspace-row-action">
+                    {refundBucket(record) === "review"
+                      ? "Review request"
+                      : refundBucket(record) === "processing"
+                        ? "Check progress"
+                        : "View payment"}
+                  </span>
+                ) : (
+                  date(record.createdAt)
+                )}
               </span>
             </Link>
           </li>

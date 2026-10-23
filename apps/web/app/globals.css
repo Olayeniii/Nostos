@@ -2593,3 +2593,52 @@ form .primary {
   color: var(--mint);
   font-size: 18px;
 }
+
+/* Keep the account action readable beside the quieter network status. */
+.product-app > .app-header {
+  gap: 8px 12px;
+}
+.app-header .header-context {
+  flex-wrap: nowrap;
+  gap: 10px;
+  align-items: center;
+}
+.app-header .header-sign-in {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--ivory);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: 4px;
+}
+.app-header .header-sign-in:hover {
+  background: var(--surface);
+}
+.app-header .network {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: 4px;
+}
+@media (max-width: 600px) {
+  .app-header .header-context {
+    gap: 6px;
+  }
+  .app-header .header-sign-in {
+    padding-inline: 8px;
+    font-size: 13px;
+  }
+  .app-header .network {
+    font-size: 10px;
+    padding-inline: 6px;
+  }
+}

@@ -1,0 +1,176 @@
+/* Restore the original ticket receipt only. Other public pages keep their style. */
+.public-surface.public-receipt {
+  color-scheme: dark;
+  --ink: #0b1514;
+  --ivory: #f3efe6;
+  --muted: #94a49e;
+  --surface: #12201e;
+  --border: #29403b;
+  background: var(--ink);
+  color: var(--ivory);
+}
+.public-receipt > header,
+.public-receipt > footer {
+  width: calc(100% - 64px);
+  max-width: 696px;
+  margin-inline: auto;
+  padding-inline: 0;
+  border-color: var(--border);
+}
+.public-receipt .brand {
+  color: var(--ivory);
+}
+.public-receipt .header-context,
+.public-receipt :is(.lede, .privacy),
+.public-receipt > footer :is(p, span) {
+  color: var(--muted);
+}
+.public-receipt .public-body {
+  width: 100%;
+  max-width: 624px;
+  padding: 44px 32px 36px;
+}
+.public-receipt .workspace-intro {
+  margin-bottom: 36px;
+}
+.public-receipt h1 {
+  color: var(--ivory);
+  font-size: clamp(30px, 4vw, 40px);
+}
+.public-receipt .receipt-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 560px;
+}
+.public-receipt .receipt-container > * {
+  width: 100%;
+  min-width: 0;
+}
+.public-receipt .receipt-card {
+  color-scheme: light;
+  background: var(--ivory);
+  color: var(--ink);
+  padding: 28px 32px;
+  border: 0;
+  border-radius: 18px;
+  box-shadow: 0 10px 36px #0002;
+}
+.public-receipt .receipt-total {
+  text-align: center;
+  padding: 32px 0 24px;
+}
+.public-receipt .receipt-total h2 {
+  color: var(--ink);
+  font-size: 46px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.public-receipt .receipt-divider {
+  margin: 0 -32px;
+  border-top: 1px dashed #bec9bb;
+}
+.public-receipt .receipt-divider::before,
+.public-receipt .receipt-divider::after {
+  display: block;
+  background: var(--ink);
+}
+.public-receipt .receipt-facts div {
+  padding: 9px 0;
+  gap: 22px;
+  border: 0;
+}
+.public-receipt .receipt-facts dd {
+  font-weight: 650;
+}
+.public-receipt .receipt-refund {
+  background: #e7e9de;
+  border-color: #d1d7c9;
+  border-radius: 12px;
+  padding: 18px;
+}
+.public-receipt .receipt-refund.complete {
+  background: #dfecdf;
+  border-color: #bfd6c0;
+}
+.public-receipt .receipt-card p {
+  color: #5e6e5d;
+}
+.public-receipt .receipt-refund .refund-total {
+  color: var(--ink);
+}
+.public-receipt .receipt-container > .privacy {
+  margin: 0;
+}
+.public-receipt :is(.refund-request-panel, .access) {
+  background: var(--surface);
+  color: var(--ivory);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 28px;
+}
+.public-receipt .refund-request-panel h2 {
+  color: var(--ivory);
+  font-size: 24px;
+}
+.public-receipt :is(.refund-request-panel, .access) p {
+  color: #a1b1aa;
+}
+.public-receipt label {
+  color: #c0cec6;
+}
+.public-receipt :is(input, textarea) {
+  color-scheme: light;
+}
+.public-receipt .refund-policy {
+  color: var(--ivory);
+  background: #1a2c24;
+  border-color: #3c5745;
+  border-radius: 10px;
+}
+.public-receipt .refund-request {
+  border-color: var(--border);
+}
+.public-receipt .status-chip {
+  color: #e4c188;
+}
+.public-receipt .status-chip.confirmed {
+  color: #8cdcb0;
+}
+.public-receipt .status-chip.failed {
+  color: #ffb5a3;
+}
+.public-receipt .primary {
+  background: #53e3a6;
+  color: #0b1514;
+  border-color: #53e3a6;
+  border-radius: 8px;
+}
+.public-receipt .primary:hover:not(:disabled) {
+  background: #83edbe;
+}
+.public-receipt :focus-visible {
+  outline-color: #53e3a6;
+}
+.public-receipt .receipt-card :focus-visible {
+  outline-color: #376149;
+}
+@media (max-width: 600px) {
+  .public-receipt > header,
+  .public-receipt > footer {
+    width: calc(100% - 36px);
+    padding-inline: 0;
+  }
+  .public-receipt .public-body {
+    padding: 44px 18px 32px;
+  }
+  .public-receipt .receipt-card {
+    padding: 24px 22px;
+  }
+  .public-receipt .receipt-divider {
+    margin-inline: -22px;
+  }
+  .public-receipt :is(.refund-request-panel, .access) {
+    padding: 22px;
+  }
+}

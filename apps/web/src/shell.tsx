@@ -2,16 +2,26 @@ import { NetworkLabel, NetworkNotice } from "./network-context.js";
 import Link from "next/link";
 import { Mark } from "./mark.js";
 
-export function AppHeader({ role }: { role?: "Merchant" | "Customer" }) {
+export function AppHeader({
+  role,
+  accountHref,
+}: {
+  role?: "Merchant" | "Customer";
+  accountHref?: string;
+}) {
   return (
-    <header>
+    <header className="app-header">
       <Link className="brand" href="/" aria-label="NOSTOS home">
         <Mark />
         <span>NOSTOS</span>
       </Link>
       <div className="header-context">
         {role && <span>{role}</span>}
-        {!role && <Link href="/sign-in">Sign in</Link>}
+        {!role && (
+          <Link className="header-sign-in" href={accountHref ?? "/sign-in"}>
+            {accountHref ? "Open workspace" : "Sign in"}
+          </Link>
+        )}
         <span className="network">
           <NetworkLabel />
         </span>

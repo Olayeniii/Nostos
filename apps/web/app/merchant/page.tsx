@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { AppFooter } from "../../src/shell.js";
+import { OverviewIcon } from "../../src/overview-icon.js";
 import { MerchantWorkspace } from "../../src/merchant-workspace.js";
 import { StateLabel } from "../../src/status-label.js";
 import { useRecord } from "../../src/use-record.js";
@@ -166,6 +167,9 @@ export default function Merchant() {
       <section className="summary-grid" aria-label="Payment totals">
         <article>
           <span>Total received</span>
+          <i className="workspace-metric-icon">
+            <OverviewIcon kind="receipt" />
+          </i>
           <strong>
             {data ? zec(summary.receivedZat) : "..."} <small>ZEC</small>
           </strong>
@@ -177,6 +181,9 @@ export default function Merchant() {
         </article>
         <article>
           <span>Available to refund</span>
+          <i className="workspace-metric-icon">
+            <OverviewIcon kind="return" />
+          </i>
           <strong>
             {data ? zec(summary.availableZat) : "..."} <small>ZEC</small>
           </strong>
@@ -184,6 +191,9 @@ export default function Merchant() {
         </article>
         <article>
           <span>Refunded</span>
+          <i className="workspace-metric-icon">
+            <OverviewIcon kind="check" />
+          </i>
           <strong>
             {data ? zec(summary.refundedZat) : "..."} <small>ZEC</small>
           </strong>
