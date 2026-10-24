@@ -7,6 +7,7 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import secrets
 import subprocess
 import tarfile
 
@@ -20,7 +21,47 @@ def run(args, **kwargs):
     subprocess.run([str(x) for x in args], check=True, **kwargs)
 
 
-def stage(revision):
+def verify_resume(work, source, revision):
+    for path in (work, source):
+        if path.resolve() != path or not path.is_dir() or path.stat().st_uid != os.getuid():
+            raise ValueError("Unexpected staged directory. Preserve existing files.")
+    if (work / "revision.txt").read_text().strip() != revision or (work / "zallet").exists():
+        raise ValueError("Resume is limited to the staged web-build failure.")
+    archive = work / "source.tar"
+    expected = subprocess.check_output(["git", "-C", str(NATIVE / "source"), "archive", "--format=tar", revision])
+    if archive.is_symlink() or archive.read_bytes() != expected:
+        raise ValueError("Staged source archive does not match the pinned commit.")
+    with tarfile.open(archive) as tree:
+        for entry in tree:
+            path = source / entry.name
+            if not path.resolve().is_relative_to(source):
+                raise ValueError("Unexpected staged source path.")
+            if entry.isfile():
+                if path.is_symlink() or not path.is_file() or path.read_bytes() != tree.extractfile(entry).read():
+                    raise ValueError("Staged source changed. Preserve it for review.")
+            elif entry.issym() and (not path.is_symlink() or os.readlink(path) != entry.linkname):
+                raise ValueError("Staged source link changed.")
+
+
+def web_build_command(work, source, revision):
+    tooling = work / "tooling"
+    tooling.mkdir(mode=0o700, exist_ok=True)
+    if tooling.resolve() != tooling or tooling.stat().st_uid != os.getuid():
+        raise ValueError("Unexpected tooling directory.")
+    # Keep npm launchers on a separate build-only bind, outside /tmp and source.
+    # Read-only runtime settings and all wallet paths remain outside this builder.
+    return ["docker", "run", "--name", "nostos-commerce-build-" + revision[:12] + "-" + secrets.token_hex(3), "--user", "1001:1001",
+            "--network=host", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--read-only",
+            "--memory=2g", "--tmpfs", "/tmp:rw,nosuid,nodev,size=256m", "-e", "npm_config_cache=/build-tools/npm-cache",
+            "-e", "NEXT_TELEMETRY_DISABLED=1", "-e", "NODE_OPTIONS=--max-old-space-size=1024",
+            "-v", str(source) + ":/app", "-v", str(tooling) + ":/build-tools", "-w", "/app", IMAGE, "sh", "-c",
+            'npm install --prefix /build-tools --ignore-scripts --no-audit --no-fund pnpm@11.25.0 && '
+            'export PATH="/build-tools/node_modules/.bin:$PATH" && '
+            'node /build-tools/node_modules/pnpm/bin/pnpm.cjs check && '
+            'node /build-tools/node_modules/pnpm/bin/pnpm.cjs --filter @nostos/web build']
+
+
+def stage(revision, resume=False):
     if not re.fullmatch(r"[a-f0-9]{40}", revision) or platform.machine() != "aarch64" or os.getuid() != 1001:
         raise ValueError("Expected the Ubuntu ARM64 operator and exact revision.")
     for root in (REVIEW, NATIVE, NATIVE / "source", NATIVE / "upstream"):
@@ -34,27 +75,24 @@ def stage(revision):
         if not path.is_dir():
             raise ValueError("Previous ARM64 dependencies are unavailable.")
     work = REVIEW / ("commerce-build-" + revision[:12])
-    work.mkdir(mode=0o700, exist_ok=False)
     source = work / "source"
-    source.mkdir(mode=0o700)
-    run(["git", "-C", NATIVE / "source", "fetch", "--depth=1", "origin", revision])
-    fetched = subprocess.check_output(["git", "-C", str(NATIVE / "source"), "rev-parse", "FETCH_HEAD"], text=True).strip()
-    if fetched != revision:
-        raise ValueError("Source revision mismatch.")
-    archive = work / "source.tar"
-    run(["git", "-C", NATIVE / "source", "archive", "--format=tar", "--output=" + str(archive), revision])
-    with tarfile.open(archive) as tree:
-        tree.extractall(source, filter="data")
-    run(["cp", "-a", prior / "node_modules", source / "node_modules"])
-    run(["cp", "-a", prior / "apps/web/node_modules", source / "apps/web/node_modules"])
-    (work / "revision.txt").write_text(revision + "\n")
-    # No runtime, credentials, wallet state or production mount enters this builder.
-    run(["docker", "run", "--name", "nostos-commerce-build-" + revision[:12], "--user", "1001:1001",
-         "--network=host", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--read-only",
-         "--memory=2g", "--tmpfs", "/tmp:rw,nosuid,nodev,size=256m", "-e", "npm_config_cache=/tmp/npm-cache",
-         "-e", "NEXT_TELEMETRY_DISABLED=1", "-e", "NODE_OPTIONS=--max-old-space-size=1024",
-         "-v", str(source) + ":/app", "-w", "/app", IMAGE, "sh", "-c",
-         "npx --yes pnpm@11.25.0 check && npx --yes pnpm@11.25.0 --filter @nostos/web build"])
+    if resume:
+        verify_resume(work, source, revision)
+    else:
+        work.mkdir(mode=0o700, exist_ok=False)
+        source.mkdir(mode=0o700)
+        run(["git", "-C", NATIVE / "source", "fetch", "--depth=1", "origin", revision])
+        fetched = subprocess.check_output(["git", "-C", str(NATIVE / "source"), "rev-parse", "FETCH_HEAD"], text=True).strip()
+        if fetched != revision:
+            raise ValueError("Source revision mismatch.")
+        archive = work / "source.tar"
+        run(["git", "-C", NATIVE / "source", "archive", "--format=tar", "--output=" + str(archive), revision])
+        with tarfile.open(archive) as tree:
+            tree.extractall(source, filter="data")
+        run(["cp", "-a", prior / "node_modules", source / "node_modules"])
+        run(["cp", "-a", prior / "apps/web/node_modules", source / "apps/web/node_modules"])
+        (work / "revision.txt").write_text(revision + "\n")
+    run(web_build_command(work, source, revision))
     sdk = work / "zallet"
     run(["git", "clone", "--no-hardlinks", "--no-checkout", NATIVE / "upstream", sdk])
     run(["git", "checkout", "--detach", PIN], cwd=sdk)
@@ -84,4 +122,6 @@ def stage(revision):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--revision", required=True)
-    stage(parser.parse_args().revision)
+    parser.add_argument("--resume", action="store_true", help="Resume a verified staged web-build failure")
+    args = parser.parse_args()
+    stage(args.revision, resume=args.resume)
