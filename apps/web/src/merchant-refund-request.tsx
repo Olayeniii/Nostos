@@ -1,4 +1,5 @@
 "use client";
+import { ExternalWalletRefund } from "./external-wallet-refund.js";
 import { useRef, useState } from "react";
 import { requestJson, parseZec } from "./requests.js";
 import { zec, type ReceiptData } from "./receipt-card.js";
@@ -8,11 +9,13 @@ export function MerchantRefundRequest({
   request,
   refund,
   safe,
+  externalWallet = false,
   onRefresh,
 }: {
   request: RequestData;
   refund?: NonNullable<ReceiptData["refunds"]>[number];
   safe: boolean;
+  externalWallet?: boolean;
   onRefresh: () => void;
 }) {
   const [amount, setAmount] = useState(
@@ -126,7 +129,9 @@ export function MerchantRefundRequest({
             <div className="refund-review">
               <p>
                 {review === "approve"
-                  ? `Approve and send ${zec(parseZec(amount))} ZEC to the route supplied with this payment?`
+                  ? externalWallet
+                    ? `Approve ${zec(parseZec(amount))} ZEC? You will review and sign separately in your wallet.`
+                    : `Approve and send ${zec(parseZec(amount))} ZEC to the route supplied with this payment?`
                   : "Decline this request with the reason above? No funds will be sent."}
               </p>
               <button
@@ -137,7 +142,9 @@ export function MerchantRefundRequest({
                 {busy
                   ? "Saving decision"
                   : review === "approve"
-                    ? `Approve and send ${zec(parseZec(amount))} ZEC`
+                    ? externalWallet
+                      ? "Save approval"
+                      : `Approve and send ${zec(parseZec(amount))} ZEC`
                     : "Confirm decline"}
               </button>
               <button
@@ -160,7 +167,7 @@ export function MerchantRefundRequest({
           {request.approvedZat !== null && (
             <p>Approved: {zec(request.approvedZat)} ZEC.</p>
           )}
-          {request.status === "approved" && !refund && (
+          {request.status === "approved" && !refund && !externalWallet && (
             <button
               className="secondary"
               disabled={!safe || busy}
@@ -169,7 +176,7 @@ export function MerchantRefundRequest({
               Resume approved refund
             </button>
           )}
-          {request.status === "approved" && refund && (
+          {request.status === "approved" && refund && !externalWallet && (
             <p>
               Refund{" "}
               {refund.status === "broadcast"
@@ -179,6 +186,13 @@ export function MerchantRefundRequest({
             </p>
           )}
         </>
+      )}
+      {externalWallet && request.status === "approved" && (
+        <ExternalWalletRefund
+          requestId={request.id}
+          safe={safe}
+          onRefresh={onRefresh}
+        />
       )}
       {message && (
         <p className="warning" role="alert">

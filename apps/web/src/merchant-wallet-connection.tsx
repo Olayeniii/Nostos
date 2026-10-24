@@ -1,4 +1,5 @@
 "use client";
+import { useCommercePreview } from "./network-context.js";
 import { SettingsIcon } from "./settings-icon.js";
 import type { ObserverSyncStatus } from "./merchant-observer.js";
 import "./merchant-wallet.css";
@@ -10,6 +11,7 @@ export function MerchantWalletConnection({
 }: {
   onConnectionChange?: (connected: boolean) => void;
 } = {}) {
+  const commerce = useCommercePreview();
   const { data, refresh } = useRecord<{
     connection: { state: string; address: string; network: string } | null;
   }>("/api/product/wallet-connection");
@@ -147,7 +149,11 @@ export function MerchantWalletConnection({
       )}
       <p className="wallet-preview-notice">
         <SettingsIcon kind="info" />
-        <span>Preview: payments are disabled.</span>
+        <span>
+          {commerce
+            ? "Payment preview: your wallet signs every refund."
+            : "Preview: payments are disabled."}
+        </span>
       </p>
       <details className="wallet-privacy" open={!connected}>
         <summary>
@@ -166,8 +172,9 @@ export function MerchantWalletConnection({
           it does not import transparent view access.
         </p>
         <p>
-          Payment creation and signing remain disabled in this connection
-          preview. Do not fund this receiving address during connection testing.
+          {commerce
+            ? "Payments arrive in your connected business wallet. NOSTOS can verify them but cannot spend your funds. Approve refunds only after checking the address, amount, memo and fee in your wallet."
+            : "Payment creation and signing remain disabled in this connection preview. Do not fund this receiving address during connection testing."}
         </p>
       </details>
       {data?.connection?.state !== "connected" && (

@@ -1,5 +1,15 @@
 import {
+  observerCommerceEnabled,
+  newObservedRequest,
+  prepareObservedPayment,
+  decideObservedRefund,
+  walletPaymentUri,
+} from "../../../../src/observer-commerce.js";
+import {
   ObserverRecordError,
+  prepareObservedRefund,
+  claimObservedRefund,
+  bindObservedRefund,
   reconcileObservedPayment,
   reconcileObservedRefund,
 } from "../../../../src/observer-records.js";
@@ -98,7 +108,10 @@ async function handle(request: Request) {
   let core: ReturnType<typeof coreStore> | undefined;
   try {
     if (action(request) === "network" && request.method === "GET")
-      return json({ network: runtimeNetwork() });
+      return json({
+        network: runtimeNetwork(),
+        commerceEnabled: observerCommerceEnabled(),
+      });
     store = new ProductStore();
     core = coreStore(store);
     const route = action(request);
@@ -252,11 +265,39 @@ async function handle(request: Request) {
     if (
       route === "checkout" ||
       route === "prepare" ||
-      route === "refund-request"
+      route === "refund-request" ||
+      route === "payment-check"
     ) {
       const checkout = store.byToken(token(request));
       if (!checkout)
         return json({ error: "Private payment link required" }, 401);
+      if (route === "payment-check" && isPost) {
+        if (!observerCommerceEnabled())
+          return json({ error: "Payment preview unavailable." }, 403);
+        if (!identityLimit(store, "payment-check:" + checkout.id, 60))
+          return json({ error: "Wait before checking again." }, 429);
+        const txid = text(body.txid, 64, 64);
+        if (
+          !txid ||
+          !/^[a-f0-9]{64}$/.test(txid) ||
+          !["orchard", "ironwood"].includes(String(body.pool)) ||
+          Object.keys(body).some((k) => !["txid", "pool"].includes(k))
+        )
+          return json(
+            { error: "Enter the transaction reference and shielded pool." },
+            400,
+          );
+        return json({
+          receipt: await reconcileObservedPayment(
+            store,
+            core,
+            checkout.merchantId,
+            checkout.id,
+            txid,
+            body.pool as "orchard" | "ironwood",
+          ),
+        });
+      }
       if (route === "refund-request" && isPost) {
         const id = text(body.requestId, 36, 36);
         const value = amount(body.amountZat);
@@ -293,12 +334,30 @@ async function handle(request: Request) {
             { error: "Enter a fresh refund address on this network" },
             400,
           );
-        return json(await preparePayment(store, checkout, route, wallet()));
+        if (Object.keys(body).some((k) => k !== "route"))
+          return json({ error: "Invalid payment fields." }, 400);
+        return json(
+          sdkObserverSelected()
+            ? await prepareObservedPayment(store, checkout, route)
+            : await preparePayment(store, checkout, route, wallet()),
+        );
       }
       if (route === "checkout" && !isPost) {
         let syncWarning = false;
         try {
-          await reconcile(store, core, checkout, wallet());
+          if (sdkObserverSelected()) {
+            if (
+              observerCommerceEnabled() &&
+              (
+                await observerSyncStatus(
+                  store,
+                  checkout.merchantId,
+                  observerWallet(checkout.merchantId),
+                )
+              ).state !== "ready"
+            )
+              syncWarning = true;
+          } else await reconcile(store, core, checkout, wallet());
         } catch {
           syncWarning = true;
         }
@@ -555,6 +614,90 @@ async function handle(request: Request) {
         ),
       );
     }
+    if (
+      [
+        "refund-review",
+        "refund-handoff",
+        "refund-candidate",
+        "refund-check",
+      ].includes(route ?? "") &&
+      isPost
+    ) {
+      if (!observerCommerceEnabled())
+        return json({ error: "Payment preview unavailable." }, 403);
+      const requestId = text(body.requestId, 36, 36);
+      const allowed =
+        route === "refund-handoff"
+          ? ["requestId", "password"]
+          : route === "refund-candidate"
+            ? ["requestId", "txid"]
+            : ["requestId"];
+      if (!requestId || Object.keys(body).some((k) => !allowed.includes(k)))
+        return json({ error: "Saved refund request required." }, 400);
+      if (!identityLimit(store, "refund-wallet:" + merchant.id, 60))
+        return json({ error: "Wait before checking again." }, 429);
+      if (route === "refund-review")
+        return json(
+          await prepareObservedRefund(
+            store,
+            core,
+            merchant.id,
+            requestId,
+            10000,
+          ),
+        );
+      if (route === "refund-handoff") {
+        const password = typeof body.password === "string" ? body.password : "";
+        if (
+          password.length > 128 ||
+          !identityLimit(store, merchant.id + ":refund-approval", 10) ||
+          !reauthenticated(store, merchant.id, password)
+        )
+          return json(
+            { error: "Check your current password or try again later." },
+            403,
+          );
+        if (
+          (
+            await observerSyncStatus(
+              store,
+              merchant.id,
+              observerWallet(merchant.id),
+            )
+          ).state !== "ready"
+        )
+          return json({ error: "Wait for wallet synchronization." }, 409);
+        const instruction = claimObservedRefund(
+          store,
+          core,
+          merchant.id,
+          requestId,
+        );
+        return json({
+          ...instruction,
+          uri: walletPaymentUri(
+            instruction.recipient,
+            instruction.amountZat,
+            instruction.memo,
+          ),
+        });
+      }
+      if (route === "refund-candidate") {
+        const txid = text(body.txid, 64, 64);
+        if (!txid || !/^[a-f0-9]{64}$/.test(txid))
+          return json({ error: "Enter the transaction reference." }, 400);
+        bindObservedRefund(store, core, merchant.id, requestId, txid);
+        return json({ saved: true, confirmed: false });
+      }
+      return json({
+        receipt: await reconcileObservedRefund(
+          store,
+          core,
+          merchant.id,
+          requestId,
+        ),
+      });
+    }
     if (route === "refund-decision" && isPost) {
       const id = text(body.requestId, 36, 36);
       const reason = text(body.reason, 3, 1000);
@@ -569,6 +712,18 @@ async function handle(request: Request) {
         return json(
           { error: "Enter a decision, reason and approval amount." },
           400,
+        );
+      if (sdkObserverSelected())
+        return json(
+          decideObservedRefund(
+            store,
+            core,
+            merchant.id,
+            id,
+            decision,
+            reason,
+            value,
+          ),
         );
       return json(
         await decideCustomerRefund(
@@ -608,7 +763,11 @@ async function handle(request: Request) {
           { error: "Enter a description and an amount up to 1 ZEC" },
           400,
         );
-      return json(newRequest(store, merchant, description, value));
+      return json(
+        sdkObserverSelected()
+          ? await newObservedRequest(store, merchant.id, description, value)
+          : newRequest(store, merchant, description, value),
+      );
     }
     if (route === "dashboard" && !isPost) {
       const requests = store.requests(merchant.id);
@@ -625,7 +784,7 @@ async function handle(request: Request) {
                 ))),
         )
         .slice(0, 10);
-      if (pending.length) {
+      if (pending.length && !sdkObserverSelected()) {
         try {
           const rpc = wallet();
           const notes = await rpc.listUnspent();
@@ -649,6 +808,7 @@ async function handle(request: Request) {
         observerPreview:
           runtimeNetwork() === "mainnet" && sdkObserverSelected(),
         observerRecordChecksEnabled: observerRecordChecksEnabled(),
+        observerCommerceEnabled: observerCommerceEnabled(),
       });
     }
     if (route === "refund" && isPost) {

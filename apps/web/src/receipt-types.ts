@@ -1,4 +1,5 @@
 export type ReceiptData = {
+  network?: "mainnet" | "testnet";
   id?: string;
   merchantName?: string;
   description?: string;

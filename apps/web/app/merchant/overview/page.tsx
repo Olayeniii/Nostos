@@ -52,7 +52,9 @@ export default function Overview() {
         <Link
           className="primary overview-create"
           href={
-            data?.observerPreview && data.merchant.ready
+            data?.observerPreview &&
+            !data.observerCommerceEnabled &&
+            data.merchant.ready
               ? "/merchant/settings"
               : data?.merchant.ready
                 ? "/merchant#new"
@@ -60,7 +62,9 @@ export default function Overview() {
           }
         >
           <span aria-hidden="true">+</span>
-          {data?.observerPreview && data.merchant.ready
+          {data?.observerPreview &&
+          !data.observerCommerceEnabled &&
+          data.merchant.ready
             ? "Store settings"
             : data?.merchant.ready
               ? "Create payment link"
@@ -172,26 +176,30 @@ export default function Overview() {
           <div className="empty-state">
             <OverviewIcon kind="receipt" />
             <h3>
-              {data.observerPreview
+              {data.observerPreview && !data.observerCommerceEnabled
                 ? "Your store preview"
                 : "Ready for your first payment."}
             </h3>
             <p>
-              {data.observerPreview
+              {data.observerPreview && !data.observerCommerceEnabled
                 ? "Payment creation and signing remain disabled. You can review your store and check wallet sync in Settings."
                 : "Create a request and share the checkout link. Your customer needs no NOSTOS account."}
             </p>
             <Link
               className="primary"
               href={
-                data.observerPreview && data.merchant.ready
+                data.observerPreview &&
+                !data.observerCommerceEnabled &&
+                data.merchant.ready
                   ? "/merchant/settings"
                   : data.merchant.ready
                     ? "/merchant#new"
                     : "/setup"
               }
             >
-              {data.observerPreview && data.merchant.ready
+              {data.observerPreview &&
+              !data.observerCommerceEnabled &&
+              data.merchant.ready
                 ? "Store settings"
                 : data.merchant.ready
                   ? "Create payment"

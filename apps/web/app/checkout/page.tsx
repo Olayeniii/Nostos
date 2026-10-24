@@ -32,6 +32,40 @@ export default function Checkout() {
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletMessage, setWalletMessage] = useState("");
   const [walletRequested, setWalletRequested] = useState(false);
+  const [paymentTxid, setPaymentTxid] = useState("");
+  const [paymentPool, setPaymentPool] = useState<"ironwood" | "orchard">(
+    "ironwood",
+  );
+  const checking = useRef(false);
+  async function checkMainnetPayment(candidate = paymentTxid) {
+    if (checking.current || !/^[a-f0-9]{64}$/.test(candidate.trim())) return;
+    checking.current = true;
+    setBusy(true);
+    setWalletMessage("");
+    try {
+      await requestJson(
+        "/api/product/payment-check",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ txid: candidate.trim(), pool: paymentPool }),
+        },
+        30000,
+      );
+      setWalletMessage("Payment verified. Your receipt is ready.");
+      void refresh();
+    } catch {
+      setWalletMessage(
+        "Payment is not verified yet. Wait for three confirmations and check the transaction reference and pool in your wallet. Do not send again.",
+      );
+    } finally {
+      checking.current = false;
+      setBusy(false);
+    }
+  }
   const handoff = useRef(new NoirHandoff());
   useEffect(() => {
     const detect = () => setNoirAvailable(!!injectedNoir(window));
@@ -262,7 +296,7 @@ export default function Checkout() {
                             "Review the address, amount and memo in Noir before approving. Use shielded funds on the displayed network.",
                           );
                           try {
-                            await handoff.current.send(
+                            const txid = await handoff.current.send(
                               provider,
                               prepared,
                               async () => {
@@ -290,6 +324,7 @@ export default function Checkout() {
                                 }
                               },
                             );
+                            setPaymentTxid(txid);
                             setWalletMessage(
                               "Noir reported a transaction ID. Waiting for the merchant wallet to confirm your payment. Do not send again.",
                             );
@@ -426,6 +461,52 @@ export default function Checkout() {
                 </>
               )}
             </>
+          )}
+          {network === "mainnet" && r && !paid && (
+            <section
+              className="manual-payment"
+              aria-label="Verify sent payment"
+            >
+              <h3>Already sent your payment?</h3>
+              <p>
+                Paste its transaction ID from your wallet. NOSTOS checks the
+                exact address, amount and memo after three confirmations. Do not
+                send again while waiting.
+              </p>
+              <label>
+                Payment transaction ID
+                <input
+                  value={paymentTxid}
+                  maxLength={64}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={(e) => setPaymentTxid(e.target.value)}
+                />
+              </label>
+              <label>
+                Shielded pool
+                <select
+                  value={paymentPool}
+                  onChange={(e) =>
+                    setPaymentPool(e.target.value as "ironwood" | "orchard")
+                  }
+                >
+                  <option value="ironwood">Ironwood</option>
+                  <option value="orchard">Orchard</option>
+                </select>
+              </label>
+              <button
+                className="secondary"
+                disabled={busy || !/^[a-f0-9]{64}$/.test(paymentTxid.trim())}
+                onClick={() => void checkMainnetPayment()}
+              >
+                Verify payment transaction
+              </button>
+              {walletMessage && !prepared && (
+                <p role="status">{walletMessage}</p>
+              )}
+            </section>
           )}
           {(warning || data?.syncWarning) && (
             <p className="warning" role="alert">

@@ -64,7 +64,11 @@ export default function Merchant() {
     const paymentId = params.get("payment");
     if (paymentId && data.records.some((record) => record.id === paymentId))
       setSelected(paymentId);
-    if (params.has("new") && data.merchant.ready && !data.observerPreview)
+    if (
+      params.has("new") &&
+      data.merchant.ready &&
+      (!data.observerPreview || data.observerCommerceEnabled)
+    )
       setCreating(true);
   }, [data]);
 
@@ -94,6 +98,13 @@ export default function Merchant() {
     !warning &&
     !data?.syncWarning &&
     !data?.observerPreview &&
+    !loading &&
+    !busy &&
+    !uncertain;
+  const commerceSafe =
+    !!data?.observerCommerceEnabled &&
+    !warning &&
+    !data.syncWarning &&
     !loading &&
     !busy &&
     !uncertain;
@@ -160,7 +171,10 @@ export default function Merchant() {
             setShare("");
             setError("");
           }}
-          disabled={!data?.merchant.ready || data?.observerPreview}
+          disabled={
+            !data?.merchant.ready ||
+            (data?.observerPreview && !data.observerCommerceEnabled)
+          }
         >
           New payment +
         </button>
@@ -171,7 +185,7 @@ export default function Merchant() {
           <Link href="/setup">Set up store</Link>
         </aside>
       )}
-      {data?.observerPreview && (
+      {data?.observerPreview && !data.observerCommerceEnabled && (
         <aside className="info-panel">
           Store details can be saved. Payment creation and signing remain
           disabled in this preview.
@@ -419,7 +433,10 @@ export default function Merchant() {
               <button
                 className="secondary"
                 onClick={() => setCreating(true)}
-                disabled={!data?.merchant.ready || data?.observerPreview}
+                disabled={
+                  !data?.merchant.ready ||
+                  (data?.observerPreview && !data.observerCommerceEnabled)
+                }
               >
                 Create payment
               </button>
@@ -614,7 +631,10 @@ export default function Merchant() {
                       <button
                         key={state}
                         className="secondary"
-                        disabled={!safe || current.fulfillment === state}
+                        disabled={
+                          !(safe || commerceSafe) ||
+                          current.fulfillment === state
+                        }
                         onClick={async () => {
                           setBusy(true);
                           try {
@@ -682,7 +702,8 @@ export default function Merchant() {
                 key={r.id}
                 request={r}
                 refund={current.refunds?.find((f) => f.id === `refund_${r.id}`)}
-                safe={safe}
+                safe={safe || commerceSafe}
+                externalWallet={!!data?.observerCommerceEnabled}
                 onRefresh={() => void refresh()}
               />
             ))}
@@ -705,7 +726,7 @@ export default function Merchant() {
                 ))}
               </section>
             )}
-            {current.payment?.canRefund && (
+            {!data?.observerPreview && current.payment?.canRefund && (
               <p className="refund-instructions">
                 NOSTOS uses the refund route supplied with this payment. No
                 customer address is needed.{" "}
@@ -720,7 +741,7 @@ export default function Merchant() {
                 </button>
               </p>
             )}
-            {current.payment?.canRefund ? (
+            {!data?.observerPreview && current.payment?.canRefund ? (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -822,19 +843,21 @@ export default function Merchant() {
               </form>
             ) : (
               <p className="privacy">
-                {current.payment?.refundTxid
-                  ? current.routeClosedReason === "expired"
-                    ? "The refund window has ended."
-                    : current.canRecoverRoute
-                      ? "Verify the original route to refund the remaining value."
-                      : "The recorded refund history is shown above. Open requests need a merchant decision."
-                  : (current.pendingRefundAmountZat ?? 0) > 0
-                    ? "A refund is already processing. Wait for confirmation or reconciliation before another refund. Do not send again."
-                    : current.routeClosedReason === "expired"
-                      ? "The refund window has ended. No refund is available."
-                      : current.paymentStatus === "confirmed"
-                        ? "No refund is currently available. A valid shielded route and an open refund window are required."
-                        : "Refund eligibility is checked after payment confirmation."}
+                {data?.observerPreview
+                  ? "Review customer refund requests above. Your business wallet signs each approved refund."
+                  : current.payment?.refundTxid
+                    ? current.routeClosedReason === "expired"
+                      ? "The refund window has ended."
+                      : current.canRecoverRoute
+                        ? "Verify the original route to refund the remaining value."
+                        : "The recorded refund history is shown above. Open requests need a merchant decision."
+                    : (current.pendingRefundAmountZat ?? 0) > 0
+                      ? "A refund is already processing. Wait for confirmation or reconciliation before another refund. Do not send again."
+                      : current.routeClosedReason === "expired"
+                        ? "The refund window has ended. No refund is available."
+                        : current.paymentStatus === "confirmed"
+                          ? "No refund is currently available. A valid shielded route and an open refund window are required."
+                          : "Refund eligibility is checked after payment confirmation."}
               </p>
             )}
             <button

@@ -390,3 +390,21 @@ fn product_proofs_reject_ambiguous_outputs_and_changed_expectations() {
     }
 }
 
+
+#[test]
+fn shielded_display_routes_are_projected_to_canonical_orchard_without_transparent_fallback() {
+    let k=key(53); let bytes=receiver(&k).0;
+    let canonical=unified::Address::try_from_items(vec![unified::Receiver::Orchard(bytes)]).unwrap().encode(&MAIN_NETWORK.network_type());
+    let mixed=unified::Address::try_from_items(vec![unified::Receiver::Orchard(bytes),unified::Receiver::Sapling([0;43])]).unwrap();
+    let projected=refund_receivers(&mixed.encode(&MAIN_NETWORK.network_type())).unwrap();
+    assert_eq!(projected["orchard"].as_str(),Some(canonical.as_str()));
+    assert!(projected["sapling"].is_string());
+    assert_eq!(refund_receivers(&canonical).unwrap(),serde_json::json!({"orchard":canonical}));
+    assert!(OrchardReceiver::parse_mainnet(projected["orchard"].as_str().unwrap()).is_ok());
+    assert!(refund_receivers(&mixed.encode(&zcash_protocol::consensus::TEST_NETWORK.network_type())).is_err());
+    let transparent=unified::Address::try_from_items(vec![unified::Receiver::Orchard(bytes),unified::Receiver::P2pkh([0;20])]).unwrap();
+    assert!(refund_receivers(&transparent.encode(&MAIN_NETWORK.network_type())).is_err());
+    let sapling=unified::Address::try_from_items(vec![unified::Receiver::Sapling([0;43])]).unwrap();
+    assert!(refund_receivers(&sapling.encode(&MAIN_NETWORK.network_type())).is_err());
+    assert!(refund_receivers("t1invalid").is_err());
+}

@@ -95,7 +95,18 @@ beforeEach(() => {
       ] = request.params;
       expect(namespace).toBe(merchant);
       let result: unknown;
-      if (request.method === "z_listunifiedreceivers")
+      if (request.method === "getwalletstatus")
+        result = transform({
+          nostos_sdk_preview_v1: true,
+          payments_enabled: false,
+          observation_scope: "orchard-family-only",
+          account_connected: true,
+          locked: false,
+          node_tip: { height: 102, blockhash: "f".repeat(64) },
+          wallet_tip: { height: 102, blockhash: "f".repeat(64) },
+          fully_synced_height: 102,
+        });
+      else if (request.method === "z_listunifiedreceivers")
         result = { orchard: request.params[1] };
       else {
         expect(request.method).toBe("nostos_verify_output");
@@ -775,4 +786,277 @@ it("returns live wallet readiness through a tenant-scoped read-only endpoint wit
   const failed = await GET(new Request(url, { headers: { cookie } }));
   expect(failed.status).toBe(409);
   expect(await failed.text()).not.toContain("private provider details");
+});
+
+function commerce() {
+  vi.stubEnv("NOSTOS_WEB_TRUSTED_ORIGINS", "https://nostos.example");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RECORD_CHECKS", "yes");
+  vi.stubEnv("NOSTOS_MAINNET_COMMERCE_PREVIEW", "yes");
+}
+function customerRequest(action: string, receiptToken: string, body: unknown) {
+  return new Request(`https://nostos.example/api/product/${action}`, {
+    method: "POST",
+    headers: {
+      origin: "https://nostos.example",
+      authorization: `Bearer ${receiptToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+it("creates a merchant-controlled checkout and verifies payment through its private capability without any signing RPC", async () => {
+  commerce();
+  const created = await POST(
+    previewRequest("requests", {
+      description: "Merchant item",
+      amountZat: 100000,
+    }),
+  );
+  expect(created.status).toBe(200);
+  const { id, token } = await created.json();
+  const prepared = await POST(customerRequest("prepare", token, { route }));
+  expect(prepared.status).toBe(200);
+  const details = await prepared.json();
+  expect(details).toMatchObject({
+    destination,
+    amountZat: 100000,
+    network: "mainnet",
+  });
+  const uri = new URL(details.uri);
+  expect(uri.searchParams.get("amount")).toBe("0.00100000");
+  expect(
+    Buffer.from(uri.searchParams.get("memo")!, "base64url").toString(),
+  ).toBe(details.memo);
+  expect(details.memo).toContain(store.checkout(id)!.order);
+  expect(store.merchant(merchant)!.wallet).toBe("");
+  expect(store.merchant(merchant)!.destination).toBe("");
+  const proof = await POST(
+    customerRequest("payment-check", token, {
+      txid: paymentTx,
+      pool: "ironwood",
+    }),
+  );
+  expect(proof.status).toBe(200);
+  expect((await proof.json()).receipt).toMatchObject({
+    network: "mainnet",
+    paymentStatus: "confirmed",
+    paymentTxid: paymentTx,
+  });
+  expect(
+    requests.every((r) =>
+      [
+        "getwalletstatus",
+        "z_listunifiedreceivers",
+        "nostos_verify_output",
+      ].includes(r.method),
+    ),
+  ).toBe(true);
+});
+it("holds payment creation when either commerce flag is absent or the wallet is syncing", async () => {
+  commerce();
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RECORD_CHECKS", "no");
+  expect(
+    (
+      await POST(
+        previewRequest("requests", { description: "Item", amountZat: 1000 }),
+      )
+    ).status,
+  ).toBe(409);
+  expect(requests).toHaveLength(0);
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RECORD_CHECKS", "yes");
+  transform = (p) => ({ ...p, locked: true });
+  expect(
+    (
+      await POST(
+        previewRequest("requests", { description: "Item", amountZat: 1000 }),
+      )
+    ).status,
+  ).toBe(503);
+  expect(store.requests(merchant)).toHaveLength(0);
+});
+it("does not replace the attached return route and rejects capability or expectation injection", async () => {
+  commerce();
+  const c = checkout();
+  const token = store.receiptToken(c.id, merchant)!;
+  expect(
+    (
+      await POST(
+        customerRequest("prepare", token, { route: "u1" + "z".repeat(60) }),
+      )
+    ).status,
+  ).toBe(503);
+  expect(store.checkout(c.id)!.route).toBe(route);
+  requests = [];
+  expect(
+    (
+      await POST(
+        customerRequest("payment-check", "x".repeat(43), {
+          txid: paymentTx,
+          pool: "ironwood",
+        }),
+      )
+    ).status,
+  ).toBe(401);
+  expect(
+    (
+      await POST(
+        customerRequest("payment-check", token, {
+          txid: paymentTx,
+          pool: "ironwood",
+          amountZat: 1,
+        }),
+      )
+    ).status,
+  ).toBe(400);
+  expect(requests).toHaveLength(0);
+});
+it("saves approval without sending, claims once with password and verifies a manually signed refund", async () => {
+  commerce();
+  const c = await paid();
+  const id = randomUUID();
+  store.createRefundRequest(c.id, id, 40000, "Customer reason");
+  requests = [];
+  const decision = {
+    requestId: id,
+    decision: "approve",
+    amountZat: 40000,
+    reason: "Merchant approved",
+  };
+  expect((await POST(previewRequest("refund-decision", decision))).status).toBe(
+    200,
+  );
+  expect((await POST(previewRequest("refund-decision", decision))).status).toBe(
+    200,
+  );
+  expect(requests).toHaveLength(0);
+  expect(core.refundTotals(paymentTx).reservedZat).toBe(0);
+  const review = await POST(previewRequest("refund-review", { requestId: id }));
+  expect(review.status).toBe(200);
+  expect((await review.json()).handoffStarted).toBe(false);
+  expect(
+    (
+      await POST(
+        previewRequest("refund-handoff", {
+          requestId: id,
+          password: "incorrect",
+        }),
+      )
+    ).status,
+  ).toBe(403);
+  const handoff = await POST(
+    previewRequest("refund-handoff", {
+      requestId: id,
+      password: "test-password-long",
+    }),
+  );
+  expect(handoff.status).toBe(200);
+  const instruction = await handoff.json();
+  expect(instruction).toMatchObject({
+    recipient: route,
+    amountZat: 40000,
+    feeCapZat: 10000,
+    requiresWalletApproval: true,
+  });
+  expect(new URL(instruction.uri).searchParams.get("amount")).toBe(
+    "0.00040000",
+  );
+  expect(
+    (
+      await POST(
+        previewRequest("refund-handoff", {
+          requestId: id,
+          password: "test-password-long",
+        }),
+      )
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await POST(
+        previewRequest("refund-candidate", { requestId: id, txid: refundTx }),
+      )
+    ).status,
+  ).toBe(200);
+  expect(core.refundTotals(paymentTx).refundedZat).toBe(0);
+  expect(
+    (await POST(previewRequest("refund-check", { requestId: id }))).status,
+  ).toBe(200);
+  expect(core.refundTotals(paymentTx)).toMatchObject({
+    refundedZat: 40000,
+    reservedZat: 0,
+  });
+  expect(store.refundRequest(id)?.status).toBe("settled");
+  expect(
+    requests.every((r) =>
+      [
+        "getwalletstatus",
+        "z_listunifiedreceivers",
+        "nostos_verify_output",
+      ].includes(r.method),
+    ),
+  ).toBe(true);
+});
+it("rejects refund ownership, unknown fields, excessive approvals and changed decisions", async () => {
+  commerce();
+  const c = await paid();
+  const id = randomUUID();
+  store.createRefundRequest(c.id, id, 40000, "Customer reason");
+  const other = store.signup("other@example.com", "long-other-password").id;
+  store.db
+    .prepare("UPDATE merchants SET email_verified_at=? WHERE id=?")
+    .run(new Date().toISOString(), other);
+  requests = [];
+  expect(
+    (
+      await POST(
+        previewRequest("refund-review", { requestId: id }, { actor: other }),
+      )
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await POST(
+        previewRequest("refund-review", {
+          requestId: id,
+          recipient: destination,
+        }),
+      )
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await POST(
+        previewRequest("refund-decision", {
+          requestId: id,
+          decision: "approve",
+          amountZat: 40001,
+          reason: "Approved reason",
+        }),
+      )
+    ).status,
+  ).toBe(503);
+  expect(
+    (
+      await POST(
+        previewRequest("refund-decision", {
+          requestId: id,
+          decision: "decline",
+          reason: "Declined reason",
+        }),
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await POST(
+        previewRequest("refund-decision", {
+          requestId: id,
+          decision: "approve",
+          amountZat: 40000,
+          reason: "Approved reason",
+        }),
+      )
+    ).status,
+  ).toBe(503);
+  expect(requests).toHaveLength(0);
 });

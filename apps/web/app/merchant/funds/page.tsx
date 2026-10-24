@@ -1,4 +1,5 @@
 "use client";
+import { useNetwork } from "../../../src/network-context.js";
 import { OverviewIcon } from "../../../src/overview-icon.js";
 import { useRef, useState } from "react";
 import { AppFooter } from "../../../src/shell.js";
@@ -27,8 +28,12 @@ type Funds = {
 };
 import { MerchantWorkspace } from "../../../src/merchant-workspace.js";
 export default function FundsPage() {
-  const { data, warning, loading, refresh } =
-    useRecord<Funds>("/api/product/funds");
+  const network = useNetwork();
+  const { data, warning, loading, refresh } = useRecord<Funds>(
+    "/api/product/funds",
+    "",
+    network === "testnet",
+  );
   const [destination, setDestination] = useState(""),
     [amount, setAmount] = useState(""),
     [password, setPassword] = useState(""),
@@ -55,6 +60,26 @@ export default function FundsPage() {
       180000,
     );
   }
+  if (network === "mainnet")
+    return (
+      <MerchantWorkspace>
+        <section className="panel">
+          <p className="eyebrow">YOUR BUSINESS WALLET</p>
+          <h1>Your funds stay in your wallet</h1>
+          <p>
+            Payments go directly to the business account connected in Settings.
+            Check your balance and make transfers in ZODL.
+          </p>
+          <p>
+            NOSTOS has view access only. Review customer refund requests in
+            Payments, then approve and sign each refund in your wallet.
+          </p>
+          <a className="primary" href="/merchant">
+            Review payments
+          </a>
+        </section>
+      </MerchantWorkspace>
+    );
   return (
     <MerchantWorkspace>
       <div className="studio-funds">

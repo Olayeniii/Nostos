@@ -10,6 +10,7 @@ export type Dashboard = {
   records: RecordData[];
   syncWarning: boolean;
   observerPreview?: boolean;
+  observerCommerceEnabled?: boolean;
   observerRecordChecksEnabled?: boolean;
 };
 export function paymentRecordStatus(r: RecordData) {

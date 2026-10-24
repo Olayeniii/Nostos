@@ -259,19 +259,10 @@ try {
     await ready.click();
     await page.getByText(/Caught up at last check/).waitFor();
     if (process.env.NOSTOS_UI_CAPTURE_DIR) {
-      await page.reload();
-      await page
-        .getByRole("button", { name: "Check sync", exact: true })
-        .click();
-      await page.getByText(/Caught up at last check/).waitFor();
-      // A taller phone capture shows the whole approved wallet card for review.
-      if (viewport.width < 901)
-        await page.setViewportSize({ ...viewport, height: 1000 });
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({
         path: `${process.env.NOSTOS_UI_CAPTURE_DIR}/wallet-${viewport.width}.png`,
       });
-      await page.setViewportSize(viewport);
     }
     failure = true;
     await ready.click();

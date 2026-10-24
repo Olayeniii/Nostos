@@ -163,8 +163,7 @@ impl Connection {
             },
             "z_listunifiedreceivers" if params.len()==1 => {
                 let address=params[0].as_str().ok_or("address_format")?;
-                transactions::OrchardReceiver::parse_mainnet(address)?;
-                Ok(json!({"orchard":address}))
+                transactions::refund_receivers(address)
             },
             "nostos_sync" if params.is_empty() => {
                 if self.wallet.db_mut().get_account_ids().map_err(|_| "account_lookup")?.len()!=1 {return Err("account_not_connected");}

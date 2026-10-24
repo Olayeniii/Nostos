@@ -47,6 +47,33 @@ impl OrchardReceiver {
     }
 }
 
+// A shielded display UA may carry Sapling too. The saved return route still
+// contains exactly one validated Orchard receiver, never a transparent fallback.
+pub fn refund_receivers(address: &str) -> Result<serde_json::Value, &'static str> {
+    if address.len() > 512 { return Err("route_length"); }
+    let (network, ua) = unified::Address::decode(address).map_err(|_| "route_decode")?;
+    if network != MAIN_NETWORK.network_type() || ua.encode(&network) != address {
+        return Err("route_network_or_encoding");
+    }
+    let items = ua.items();
+    if items.iter().any(|r| !matches!(r, unified::Receiver::Orchard(_) | unified::Receiver::Sapling(_))) {
+        return Err("route_requires_shielded_receivers");
+    }
+    let bytes = items.iter().find_map(|r| match r { unified::Receiver::Orchard(bytes) => Some(*bytes), _ => None }).ok_or("route_requires_orchard")?;
+    let canonical = unified::Address::try_from_items(vec![unified::Receiver::Orchard(bytes)])
+        .map_err(|_| "route_scope")?.encode(&network);
+    OrchardReceiver::parse_mainnet(&canonical)?;
+    let mut result = serde_json::json!({"orchard":canonical});
+    if let Some(bytes) = items.iter().find_map(|r| match r { unified::Receiver::Sapling(bytes) => Some(*bytes), _ => None }) {
+        // Retain receiver type information so strict Orchard-only validation
+        // rejects the original mixed UA. This does not grant Sapling view access.
+        let sapling = unified::Address::try_from_items(vec![unified::Receiver::Sapling(bytes)])
+            .map_err(|_| "route_scope")?.encode(&network);
+        result["sapling"] = serde_json::Value::String(sapling);
+    }
+    Ok(result)
+}
+
 pub struct Expected<A> {
     account: A, receiver: OrchardReceiver, amount: u64, memo: MemoBytes,
     pool: ShieldedPool, direction: TransferType, confirmations: u32,

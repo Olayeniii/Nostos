@@ -68,7 +68,9 @@ export function ReceiptCard({
             <small>Private payment receipt</small>
           </span>
         </div>
-        <span className="receipt-network">TESTNET</span>
+        <span className="receipt-network">
+          {receipt.network === "mainnet" ? "MAINNET" : "TESTNET"}
+        </span>
       </div>
       <div className="receipt-total">
         <span>{paid ? "Payment received" : "Payment request"}</span>

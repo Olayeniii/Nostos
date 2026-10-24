@@ -8,7 +8,12 @@ import {
 } from "react";
 import type { Network } from "../../../packages/network/src/index.js";
 const Context = createContext<Network | undefined>(undefined);
+const CommerceContext = createContext(false);
+export function useCommercePreview() {
+  return useContext(CommerceContext);
+}
 export function NetworkProvider({ children }: { children: ReactNode }) {
+  const [commerce, setCommerce] = useState(false);
   const [network, setNetwork] = useState<Network>();
   useEffect(() => {
     const c = new AbortController();
@@ -17,14 +22,21 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
         if (!r.ok) throw new Error();
         return r.json();
       })
-      .then((v: { network?: unknown }) => {
+      .then((v: { network?: unknown; commerceEnabled?: unknown }) => {
+        setCommerce(v.network === "mainnet" && v.commerceEnabled === true);
         if (v.network === "testnet" || v.network === "mainnet")
           setNetwork(v.network);
       })
       .catch(() => {});
     return () => c.abort();
   }, []);
-  return <Context.Provider value={network}>{children}</Context.Provider>;
+  return (
+    <Context.Provider value={network}>
+      <CommerceContext.Provider value={commerce}>
+        {children}
+      </CommerceContext.Provider>
+    </Context.Provider>
+  );
 }
 export function useNetwork() {
   return useContext(Context);
@@ -35,10 +47,13 @@ export function NetworkLabel() {
 }
 export function NetworkNotice() {
   const n = useNetwork();
+  const commerce = useCommercePreview();
   return (
     <>
       {n === "mainnet"
-        ? "Mainnet connection preview. Merchant payments are disabled."
+        ? commerce
+          ? "Mainnet payment preview. Payments and refunds are signed in your wallet."
+          : "Mainnet connection preview. Merchant payments are disabled."
         : n === "testnet"
           ? "Testnet only. No real funds."
           : "Confirm the network before paying."}

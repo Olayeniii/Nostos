@@ -260,6 +260,7 @@ export function checkoutView(
     remaining > 0;
   return {
     id: checkout.id,
+    network: runtimeNetwork(),
     merchantName: merchant.name,
     description: checkout.description,
     orderReference: checkout.order,
