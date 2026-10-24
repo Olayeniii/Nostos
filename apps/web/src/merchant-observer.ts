@@ -78,6 +78,59 @@ export function observerConnection(store: ProductStore, merchantId: string) {
       }
     : null;
 }
+export function merchantStoreReady(store: ProductStore, merchantId: string) {
+  const merchant = store.merchant(merchantId);
+  if (!merchant) return false;
+  if (merchant.destination) return true;
+  if (runtimeNetwork() !== "mainnet" || !sdkObserverSelected()) return false;
+  const connection = observerConnection(store, merchantId);
+  return Boolean(
+    merchant.emailVerifiedAt &&
+      merchant.name.trim() &&
+      !merchant.wallet &&
+      connection?.state === "connected" &&
+      connection.network === "mainnet",
+  );
+}
+
+// Store metadata never turns observer access into a hosted signing account.
+export function setupObserverStore(
+  store: ProductStore,
+  merchantId: string,
+  name: string,
+) {
+  if (
+    runtimeNetwork() !== "mainnet" ||
+    !sdkObserverSelected() ||
+    name.trim().length < 2 ||
+    name.trim().length > 80
+  )
+    throw new ObserverError();
+  schema(store);
+  store.db.exec("BEGIN IMMEDIATE");
+  try {
+    const merchant = store.merchant(merchantId);
+    const connection = observerConnection(store, merchantId);
+    if (
+      !merchant?.emailVerifiedAt ||
+      merchant.wallet ||
+      merchant.destination ||
+      connection?.state !== "connected" ||
+      connection.network !== "mainnet" ||
+      !addressOnNetwork(connection.address, "mainnet")
+    )
+      throw new ObserverError();
+    store.db
+      .prepare(
+        "UPDATE merchants SET name=? WHERE id=? AND wallet='' AND destination=''",
+      )
+      .run(store.encrypt(name.trim()), merchantId);
+    store.db.exec("COMMIT");
+  } catch {
+    store.db.exec("ROLLBACK");
+    throw new ObserverError();
+  }
+}
 export async function connectObserver(
   store: ProductStore,
   merchantId: string,

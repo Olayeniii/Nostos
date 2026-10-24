@@ -22,7 +22,10 @@ try {
     let network = "mainnet",
       failure = false,
       preview = true,
-      checks = [];
+      checks = [],
+      connectionAvailable = true,
+      storeSaved = false,
+      setupCalls = [];
     const record = {
       id: "11111111-1111-4111-8111-111111111111",
       description: "Synthetic observer payment",
@@ -50,19 +53,25 @@ try {
           merchant: {
             name: "Synthetic QA store",
             email: "qa@example.com",
-            ready: false,
+            ready: storeSaved,
             setupPending: false,
             refundPolicy: "Refund policy fixture",
             refundWindowDays: 30,
           },
         };
-      else if (action === "wallet-connection")
+      else if (action === "setup") {
+        setupCalls.push(route.request().postDataJSON());
+        storeSaved = true;
+        data = { ok: true };
+      } else if (action === "wallet-connection")
         data = {
-          connection: {
-            state: "connected",
-            network: "mainnet",
-            address: "u1" + "b".repeat(60),
-          },
+          connection: connectionAvailable
+            ? {
+                state: "connected",
+                network: "mainnet",
+                address: "u1" + "b".repeat(60),
+              }
+            : null,
         };
       else if (action === "wallet-status") {
         status = failure ? 409 : 200;
@@ -79,8 +88,8 @@ try {
             };
       } else if (action === "dashboard")
         data = {
-          merchant: { name: "Synthetic QA store", ready: false },
-          records: [record],
+          merchant: { name: "Synthetic QA store", ready: storeSaved },
+          records: storeSaved ? [] : [record],
           syncWarning: true,
           observerPreview: true,
           observerRecordChecksEnabled: preview,
@@ -99,6 +108,56 @@ try {
         body: JSON.stringify(data),
       });
     });
+    const base = process.env.NOSTOS_UI_BASE_URL ?? "http://127.0.0.1:3107";
+    connectionAvailable = false;
+    await page.goto(`${base}/setup`);
+    await page
+      .getByLabel("Store name", { exact: true })
+      .fill("Phone preview store");
+    await page.waitForTimeout(250);
+    assert.equal(
+      await page
+        .getByRole("button", { name: "Create store", exact: true })
+        .isDisabled(),
+      true,
+    );
+    connectionAvailable = true;
+    await page.reload();
+    await page
+      .getByText("Your business wallet is connected", { exact: true })
+      .waitFor();
+    await page
+      .getByLabel("Store name", { exact: true })
+      .fill("Phone preview store");
+    await page
+      .getByRole("button", { name: "Create store", exact: true })
+      .click();
+    await page.waitForURL(`${base}/merchant`);
+    assert.deepEqual(setupCalls, [{ name: "Phone preview store" }]);
+    assert.equal(
+      await page
+        .getByRole("button", { name: "New payment +", exact: true })
+        .isDisabled(),
+      true,
+    );
+    await page.goto(`${base}/merchant/overview`);
+    await page
+      .getByRole("heading", { name: "Your store preview", exact: true })
+      .waitFor();
+    assert.equal(
+      await page
+        .getByRole("link", { name: "Store settings", exact: true })
+        .count(),
+      2,
+    );
+    assert.equal(
+      await page
+        .getByRole("link", { name: "Create payment", exact: true })
+        .count(),
+      0,
+    );
+    outcomes.push({ viewport, storeSetup: "passed", paymentsHeld: true });
+    storeSaved = false;
     await page.goto(
       `${process.env.NOSTOS_UI_BASE_URL ?? "http://127.0.0.1:3107"}/merchant/settings`,
     );

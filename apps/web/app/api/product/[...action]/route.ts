@@ -5,6 +5,8 @@ import {
 } from "../../../../src/observer-records.js";
 import {
   ObserverError,
+  merchantStoreReady,
+  setupObserverStore,
   observerWallet,
   observerConnection,
   connectObserver,
@@ -187,7 +189,7 @@ async function handle(request: Request) {
           },
           403,
         );
-      return json({ ready: Boolean(merchant.destination) }, 200, {
+      return json({ ready: merchantStoreReady(store, merchant.id) }, 200, {
         "Set-Cookie": accountHeader(store.session(merchant.id)),
       });
     }
@@ -233,7 +235,7 @@ async function handle(request: Request) {
           String(body.token ?? ""),
           typeof body.password === "string" ? body.password : "",
         );
-        return json({ ready: Boolean(merchant.destination) }, 200, {
+        return json({ ready: merchantStoreReady(store, merchant.id) }, 200, {
           "Set-Cookie": accountHeader(store.session(merchant.id)),
         });
       } catch {
@@ -521,7 +523,7 @@ async function handle(request: Request) {
           name: merchant.name,
           email: merchant.email,
           emailVerified: true,
-          ready: Boolean(merchant.destination),
+          ready: merchantStoreReady(store, merchant.id),
           setupPending: merchant.wallet === "provisioning",
           refundPolicy: merchant.refundPolicy,
           refundWindowDays: merchant.refundWindowDays,
@@ -588,7 +590,9 @@ async function handle(request: Request) {
     if (route === "setup" && isPost) {
       const name = text(body.name, 2, 80);
       if (!name) return json({ error: "Enter your store name" }, 400);
-      await setupMerchant(store, merchant, name, wallet());
+      if (runtimeNetwork() === "mainnet" && sdkObserverSelected())
+        setupObserverStore(store, merchant.id, name);
+      else await setupMerchant(store, merchant, name, wallet());
       return json({ ok: true });
     }
     if (route === "link" && isPost) {
@@ -634,7 +638,10 @@ async function handle(request: Request) {
         }
       }
       return json({
-        merchant: { name: merchant.name, ready: Boolean(merchant.destination) },
+        merchant: {
+          name: merchant.name,
+          ready: merchantStoreReady(store, merchant.id),
+        },
         records: store
           .requests(merchant.id)
           .map((r) => checkoutView(store!, core!, r, true)),

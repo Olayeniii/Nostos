@@ -7,6 +7,8 @@ import {
   connectObserver,
   observerConnection,
   observerWallet,
+  merchantStoreReady,
+  setupObserverStore,
   type ObserverRpc,
 } from "./merchant-observer.js";
 import { newRequest } from "./product-service.js";
@@ -29,6 +31,110 @@ const input = () => ({
   viewingKey: key,
   birthday: 10,
   consent: true,
+});
+it("saves observer store metadata through the API, survives reopen and keeps payments held", async () => {
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  await connectObserver(
+    store,
+    merchantId,
+    { ...input(), scopeConsent: true },
+    rpc,
+    node,
+  );
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RPC_URL", "http://127.0.0.1:38235");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RPC_COOKIE_FILE", "/observer/.cookie");
+  vi.stubEnv("NOSTOS_MAINNET_MERCHANT_WALLET_RPC_URL", "");
+  vi.stubEnv("NOSTOS_MAINNET_MERCHANT_WALLET_RPC_COOKIE_FILE", "");
+  expect(merchantStoreReady(store, merchantId)).toBe(false);
+  const cookie = accountHeader(store.session(merchantId)).split(";")[0]!;
+  const request = (name: string) =>
+    new Request("https://nostos.example/api/product/setup", {
+      method: "POST",
+      headers: { cookie, origin: "https://nostos.example" },
+      body: JSON.stringify({ name }),
+    });
+  expect((await POST(request("Preview store"))).status).toBe(200);
+  expect((await POST(request("Preview store"))).status).toBe(200);
+  store.close();
+  store = new ProductStore();
+  const merchant = store.merchant(merchantId)!;
+  expect(merchant).toMatchObject({
+    name: "Preview store",
+    wallet: "",
+    destination: "",
+  });
+  expect(merchantStoreReady(store, merchantId)).toBe(true);
+  const me = await GET(
+    new Request("https://nostos.example/api/product/me", {
+      headers: { cookie },
+    }),
+  );
+  expect((await me.json()).merchant.ready).toBe(true);
+  const dashboard = await GET(
+    new Request("https://nostos.example/api/product/dashboard", {
+      headers: { cookie },
+    }),
+  );
+  expect(await dashboard.json()).toMatchObject({
+    merchant: { ready: true },
+    observerPreview: true,
+  });
+  expect(() => newRequest(store, merchant, "Still held", 1000)).toThrow(
+    /Merchant-controlled/,
+  );
+  const payment = await POST(
+    new Request("https://nostos.example/api/product/requests", {
+      method: "POST",
+      headers: { cookie, origin: "https://nostos.example" },
+      body: JSON.stringify({ description: "Still held", amountZat: 1000 }),
+    }),
+  );
+  expect(payment.status).toBe(409);
+  expect(calls).toEqual(["getwalletstatus", "z_importviewingkey"]);
+});
+it("rejects store metadata before connection completes and never provisions a wallet", async () => {
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  expect(() =>
+    setupObserverStore(store, merchantId, "Preview store"),
+  ).toThrow();
+  mode = "timeout";
+  await expect(
+    connectObserver(
+      store,
+      merchantId,
+      { ...input(), scopeConsent: true },
+      rpc,
+      node,
+    ),
+  ).rejects.toThrow();
+  expect(() =>
+    setupObserverStore(store, merchantId, "Preview store"),
+  ).toThrow();
+  expect(store.merchant(merchantId)).toMatchObject({
+    name: "",
+    wallet: "",
+    destination: "",
+  });
+  expect(merchantStoreReady(store, merchantId)).toBe(false);
+});
+it("does not convert hosted accounts or allow observer setup outside its preview", async () => {
+  expect(() =>
+    setupObserverStore(store, merchantId, "Preview store"),
+  ).toThrow();
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_BACKEND", "sdk-preview");
+  vi.stubEnv("NOSTOS_MAINNET_WALLET_MODE", "observer-preview");
+  await connectObserver(
+    store,
+    merchantId,
+    { ...input(), scopeConsent: true },
+    rpc,
+    node,
+  );
+  store.finishSetup(merchantId, "Hosted store", "hosted-account", address);
+  expect(() => setupObserverStore(store, merchantId, "Replacement")).toThrow();
+  expect(store.merchant(merchantId)!.name).toBe("Hosted store");
 });
 function signup(email: string) {
   const m = store.signup(email, password);

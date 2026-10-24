@@ -1,15 +1,23 @@
 "use client";
 import type { ObserverSyncStatus } from "./merchant-observer.js";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { requestJson } from "./requests.js";
 import { useRecord } from "./use-record.js";
-export function MerchantWalletConnection() {
+export function MerchantWalletConnection({
+  onConnectionChange,
+}: {
+  onConnectionChange?: (connected: boolean) => void;
+} = {}) {
   const { data, refresh } = useRecord<{
     connection: { state: string; address: string; network: string } | null;
   }>("/api/product/wallet-connection");
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   const [sync, setSync] = useState<ObserverSyncStatus>();
+  const connected = data?.connection?.state === "connected";
+  useEffect(() => {
+    onConnectionChange?.(connected);
+  }, [connected, onConnectionChange]);
   return (
     <article className="panel">
       <h2>Connect your business wallet</h2>

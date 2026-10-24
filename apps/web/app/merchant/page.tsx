@@ -64,7 +64,8 @@ export default function Merchant() {
     const paymentId = params.get("payment");
     if (paymentId && data.records.some((record) => record.id === paymentId))
       setSelected(paymentId);
-    if (params.has("new") && data.merchant.ready) setCreating(true);
+    if (params.has("new") && data.merchant.ready && !data.observerPreview)
+      setCreating(true);
   }, [data]);
 
   useEffect(() => {
@@ -159,7 +160,7 @@ export default function Merchant() {
             setShare("");
             setError("");
           }}
-          disabled={!data?.merchant.ready}
+          disabled={!data?.merchant.ready || data?.observerPreview}
         >
           New payment +
         </button>
@@ -168,6 +169,12 @@ export default function Merchant() {
         <aside className="info-panel">
           Finish setting up your store before accepting payments.{" "}
           <Link href="/setup">Set up store</Link>
+        </aside>
+      )}
+      {data?.observerPreview && (
+        <aside className="info-panel">
+          Store details can be saved. Payment creation and signing remain
+          disabled in this preview.
         </aside>
       )}
       <section className="summary-grid" aria-label="Payment totals">
@@ -412,7 +419,7 @@ export default function Merchant() {
               <button
                 className="secondary"
                 onClick={() => setCreating(true)}
-                disabled={!data?.merchant.ready}
+                disabled={!data?.merchant.ready || data?.observerPreview}
               >
                 Create payment
               </button>

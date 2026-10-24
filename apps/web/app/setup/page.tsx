@@ -11,6 +11,8 @@ export default function Setup() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const setupAllowed = hostedSetupAllowed || connected;
   useEffect(() => {
     void requestJson<{ merchant: { ready: boolean; setupPending: boolean } }>(
       "/api/product/me",
@@ -33,11 +35,13 @@ export default function Setup() {
         <p className="eyebrow">STORE SETUP</p>
         <h1>Your store, ready for ZEC.</h1>
         <p>Customers see this name when they open your payment link.</p>
-        {network === "mainnet" && <MerchantWalletConnection />}
+        {network === "mainnet" && (
+          <MerchantWalletConnection onConnectionChange={setConnected} />
+        )}
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            if (busy || pending || !hostedSetupAllowed) return;
+            if (busy || pending || !setupAllowed) return;
             const name = new FormData(e.currentTarget).get("name");
             setBusy(true);
             setMessage("");
@@ -53,9 +57,11 @@ export default function Setup() {
               );
               window.location.assign("/merchant");
             } catch {
-              setPending(true);
+              setPending(hostedSetupAllowed);
               setMessage(
-                "Setup could not be confirmed. Refresh to check its saved state; do not create another store.",
+                hostedSetupAllowed
+                  ? "Setup could not be confirmed. Refresh to check its saved state; do not create another store."
+                  : "Store setup could not be confirmed. Refresh to check the saved connection and store name, then try again.",
               );
             } finally {
               setBusy(false);
@@ -70,18 +76,22 @@ export default function Setup() {
               maxLength={80}
               required
               autoComplete="organization"
-              disabled={busy || pending || !hostedSetupAllowed}
+              disabled={busy || pending}
             />
           </label>
           <aside className="info-panel">
             <strong>
               {network === "mainnet"
-                ? "Merchant wallet connection pending"
+                ? connected
+                  ? "Your business wallet is connected"
+                  : "Connect your business wallet"
                 : "Hosted testnet wallet"}
             </strong>
             <p>
               {network === "mainnet"
-                ? "Mainnet store setup is paused until you can connect a wallet whose signing keys you control. Do not enter a recovery phrase or spending key into NOSTOS."
+                ? connected
+                  ? "Save your store name to finish setup. Payment creation and signing remain disabled in this preview."
+                  : "Enter your store name and connect your business wallet above to finish setup. Your signing keys stay in your wallet."
                 : "The testnet demo creates an account in the operator wallet. NOSTOS holds its signing keys and can see payment and refund details. Use testnet funds only."}
             </p>
           </aside>
@@ -98,12 +108,19 @@ export default function Setup() {
           )}
           <button
             className="primary"
-            disabled={busy || pending || !hostedSetupAllowed}
+            disabled={busy || pending || !setupAllowed}
           >
             Create store
           </button>
           {busy && (
-            <StateLabel state="loading" text="Preparing your store wallet" />
+            <StateLabel
+              state="loading"
+              text={
+                hostedSetupAllowed
+                  ? "Preparing your store wallet"
+                  : "Saving your store"
+              }
+            />
           )}
         </form>
       </section>

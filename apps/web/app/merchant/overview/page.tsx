@@ -51,10 +51,20 @@ export default function Overview() {
         </div>
         <Link
           className="primary overview-create"
-          href={data?.merchant.ready ? "/merchant#new" : "/setup"}
+          href={
+            data?.observerPreview && data.merchant.ready
+              ? "/merchant/settings"
+              : data?.merchant.ready
+                ? "/merchant#new"
+                : "/setup"
+          }
         >
           <span aria-hidden="true">+</span>
-          {data?.merchant.ready ? "Create payment link" : "Set up store"}
+          {data?.observerPreview && data.merchant.ready
+            ? "Store settings"
+            : data?.merchant.ready
+              ? "Create payment link"
+              : "Set up store"}
         </Link>
       </div>
       {(warning || data?.syncWarning) && (
@@ -161,16 +171,31 @@ export default function Overview() {
         {data && records.length === 0 ? (
           <div className="empty-state">
             <OverviewIcon kind="receipt" />
-            <h3>Ready for your first payment.</h3>
+            <h3>
+              {data.observerPreview
+                ? "Your store preview"
+                : "Ready for your first payment."}
+            </h3>
             <p>
-              Create a request and share the checkout link. Your customer needs
-              no NOSTOS account.
+              {data.observerPreview
+                ? "Payment creation and signing remain disabled. You can review your store and check wallet sync in Settings."
+                : "Create a request and share the checkout link. Your customer needs no NOSTOS account."}
             </p>
             <Link
               className="primary"
-              href={data.merchant.ready ? "/merchant#new" : "/setup"}
+              href={
+                data.observerPreview && data.merchant.ready
+                  ? "/merchant/settings"
+                  : data.merchant.ready
+                    ? "/merchant#new"
+                    : "/setup"
+              }
             >
-              {data.merchant.ready ? "Create payment" : "Set up store"}
+              {data.observerPreview && data.merchant.ready
+                ? "Store settings"
+                : data.merchant.ready
+                  ? "Create payment"
+                  : "Set up store"}
             </Link>
           </div>
         ) : (
