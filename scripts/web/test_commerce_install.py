@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -55,7 +56,9 @@ class CommerceInstall(unittest.TestCase):
             return hashlib.sha256(path.read_bytes()).hexdigest()
         self.child = Mock(pid=456)
         self.child.poll.return_value = None
-        def http(path, port=3108):
+        def http(path, port=3108, method="GET"):
+            if port == 38235:
+                return (401 if method == "POST" else 403), b""
             if path == "/api/product/network":
                 return 200, b'{"network":"mainnet","commerceEnabled":true}'
             return (200 if path == "/sign-in" else 401), b""
@@ -120,6 +123,34 @@ class CommerceInstall(unittest.TestCase):
         self.assertEqual(module.start_broker.call_count, 2)
         self.assertEqual(module.start_broker.call_args.args[2], self.runtime / "observer-config.json")
         self.assertEqual(module.stop_pid.call_args.args[0], 456)
+
+    def test_retry_reuses_identical_private_config_and_refuses_changed_config(self):
+        next_config = self.runtime / "observer-config-commerce-c370ee2.json"
+        next_config.write_text(json.dumps(dict(self.config, binary=str(self.build / "nostos-sdk-worker"), binarySha256=self.new_hash)))
+        before = next_config.read_bytes()
+        module.run()
+        self.assertEqual(next_config.read_bytes(), before)
+        next_config.write_text(json.dumps(dict(self.config, port=9999)))
+        module.stop_pid.reset_mock()
+        with self.assertRaises(ValueError):
+            module.run()
+        module.stop_pid.assert_not_called()
+
+
+class ObserverProbeProtocol(unittest.TestCase):
+    def test_real_broker_rejects_get_and_challenges_unauthenticated_post(self):
+        service = Path(__file__).resolve().parents[1] / "lightclient/service.mjs"
+        source = ('import {createObserverService} from ' + json.dumps(service.as_uri()) + ';'
+                  'const server=createObserverService({authorization:"Basic '+ 'a' * 40 +'",broker:{request(){throw Error("unexpected worker access")}}});'
+                  'server.listen(0,"127.0.0.1",()=>process.stdout.write(String(server.address().port)+"\\n"));')
+        child = subprocess.Popen(["node", "--input-type=module", "-e", source], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            port = int(child.stdout.readline().strip())
+            self.assertEqual(module.http("/", port)[0], 403)
+            self.assertEqual(module.http("/", port, method="POST")[0], 401)
+        finally:
+            child.terminate()
+            child.communicate(timeout=5)
 
 
 if __name__ == "__main__":

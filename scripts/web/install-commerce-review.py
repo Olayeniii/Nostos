@@ -94,10 +94,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise ValueError("Preview health check redirected.")
 
 
-def http(path, port=3108):
+def http(path, port=3108, method="GET"):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    request = urllib.request.Request("http://127.0.0.1:" + str(port) + path, method=method,
+                                     data=b"{}" if method == "POST" else None,
+                                     headers={"Content-Type": "application/json"} if method == "POST" else {})
     try:
-        with opener.open("http://127.0.0.1:" + str(port) + path, timeout=3) as response:
+        with opener.open(request, timeout=3) as response:
             return response.status, response.read(8192)
     except urllib.error.HTTPError as error:
         return error.code, b""
@@ -151,9 +154,13 @@ def run():
     inspect_web()
     next_config = runtime / "observer-config-commerce-c370ee2.json"
     updated = dict(config, binary=str(binary), binarySha256=HASH)
-    with next_config.open("x") as output:
-        os.chmod(next_config, 0o600)
-        output.write(json.dumps(updated) + "\n")
+    if next_config.exists():
+        private(next_config)
+        require(json.loads(next_config.read_text()) == updated, "Existing replacement config differs. Preserve it for review.")
+    else:
+        with next_config.open("x") as output:
+            os.chmod(next_config, 0o600)
+            output.write(json.dumps(updated) + "\n")
     stopped_broker = False
     stopped_web = False
     child = None
@@ -162,7 +169,7 @@ def run():
         stop_pid(pid, launcher, old_config)
         stopped_broker = True
         child = start_broker(node, launcher, next_config, REVIEW / "observer-commerce.log")
-        wait_for(lambda: child.poll() is None and http("/", 38235)[0] == 401)
+        wait_for(lambda: child.poll() is None and http("/", 38235, method="POST")[0] == 401)
         docker("stop", "--time", "30", OLD_WEB)
         stopped_web = True
         new_web_attempted = True
@@ -195,7 +202,7 @@ def run():
             child.wait(timeout=5)
         if stopped_broker:
             previous = start_broker(node, launcher, old_config, REVIEW / "observer-rollback.log")
-            wait_for(lambda: previous.poll() is None and http("/", 38235)[0] == 401)
+            wait_for(lambda: previous.poll() is None and http("/", 38235, method="POST")[0] == 401)
         if stopped_web:
             docker("start", OLD_WEB)
             wait_for(lambda: http("/sign-in")[0] == 200 and http("/api/product/me")[0] == 401)
