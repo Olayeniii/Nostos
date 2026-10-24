@@ -1,3 +1,4 @@
+/* global window, document, getComputedStyle */
 /* eslint-disable no-console */
 // Synthetic browser transport only. Run against a local production build.
 const { chromium } = await import(
@@ -162,7 +163,7 @@ try {
       `${process.env.NOSTOS_UI_BASE_URL ?? "http://127.0.0.1:3107"}/merchant/settings`,
     );
     const ready = page.getByRole("button", {
-      name: "Check wallet sync",
+      name: "Check sync",
       exact: true,
     });
     await ready.waitFor();
@@ -176,19 +177,83 @@ try {
         .count(),
       0,
     );
-    await ready.click();
+    const wallet = page.getByRole("article", {
+      name: "Business wallet",
+      exact: true,
+    });
+    assert.equal(
+      await wallet
+        .getByRole("heading", { name: "Business wallet", exact: true })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await wallet.locator(".wallet-privacy").getAttribute("open"),
+      null,
+    );
+    assert.equal(await wallet.locator(".wallet-full-address").count(), 0);
+    await wallet
+      .getByRole("button", { name: "Show full address", exact: true })
+      .click();
+    assert.equal(
+      await wallet.locator(".wallet-full-address").textContent(),
+      "u1" + "b".repeat(60),
+    );
+    await wallet
+      .getByRole("button", { name: "Hide full address", exact: true })
+      .click();
     await page
-      .getByText(/At the last check, the observer was caught up/)
-      .waitFor();
+      .context()
+      .grantPermissions(["clipboard-read", "clipboard-write"], {
+        origin: base,
+      });
+    await wallet
+      .getByRole("button", { name: "Copy receiving address", exact: true })
+      .click();
+    await wallet.getByText("Address copied.", { exact: true }).waitFor();
+    assert.equal(
+      await page.evaluate(() => navigator.clipboard.readText()),
+      "u1" + "b".repeat(60),
+    );
+    const addressBox = await wallet.locator(".wallet-address").boundingBox();
+    const syncBox = await wallet.locator(".wallet-sync").boundingBox();
+    assert.ok(addressBox.y < syncBox.y);
+    const active = page.locator('.studio-rail [aria-current="page"]');
+    assert.equal(
+      await active.evaluate((el) => getComputedStyle(el).boxShadow),
+      "none",
+    );
+    if (viewport.width < 901) {
+      assert.equal(
+        await active.evaluate((el) => getComputedStyle(el).backgroundColor),
+        "rgba(0, 0, 0, 0)",
+      );
+      assert.equal(
+        await active.evaluate((el) => getComputedStyle(el, "::after").width),
+        "4px",
+      );
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      const footer = await page.locator(".studio-page footer").boundingBox();
+      const bar = await page.locator(".studio-rail").boundingBox();
+      assert.ok(
+        footer.y + footer.height < bar.y,
+        "last page content must clear the bottom menu",
+      );
+    }
+    await ready.click();
+    await page.getByText(/Caught up at last check/).waitFor();
+    if (process.env.NOSTOS_UI_CAPTURE_DIR) {
+      await page
+        .getByRole("heading", { name: "Business wallet", exact: true })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: `${process.env.NOSTOS_UI_CAPTURE_DIR}/wallet-${viewport.width}.png`,
+      });
+    }
     failure = true;
     await ready.click();
     await page.getByText(/Could not verify current sync readiness/).waitFor();
-    assert.equal(
-      await page
-        .getByText(/At the last check, the observer was caught up/)
-        .count(),
-      0,
-    );
+    assert.equal(await page.getByText(/Caught up at last check/).count(), 0);
     failure = false;
     await page.goto(
       `${process.env.NOSTOS_UI_BASE_URL ?? "http://127.0.0.1:3107"}/merchant`,
@@ -246,7 +311,7 @@ try {
     await page.getByText("Hosted by NOSTOS", { exact: true }).waitFor();
     assert.equal(
       await page
-        .getByRole("button", { name: "Check wallet sync", exact: true })
+        .getByRole("button", { name: "Check sync", exact: true })
         .count(),
       0,
     );

@@ -1,0 +1,166 @@
+/* Approved business wallet hierarchy, shared by setup and settings. */
+.panel.business-wallet,
+.refined-workspace .settings-grid .panel.business-wallet {
+  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid #d5ded4;
+  background: #fbfcf8;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 5px 20px #18382b04;
+}
+.business-wallet .business-wallet-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+.business-wallet .business-wallet-heading h2,
+.refined-workspace .settings-grid .business-wallet .business-wallet-heading h2 {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  font-size: 24px;
+}
+.wallet-connected {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #3f6653;
+  font-size: 13px;
+  font-weight: 600;
+}
+.wallet-connected i {
+  height: 7px;
+  width: 7px;
+  border-radius: 50%;
+  background: #338566;
+}
+.business-wallet .wallet-address {
+  background: #f1f5ef;
+  border: 1px solid #dfe6dc;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 0 0 20px;
+}
+.wallet-field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  color: #304d40;
+}
+.wallet-address-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+.wallet-address-row code {
+  font-size: 14px;
+  color: #193c2d;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.business-wallet .secondary {
+  min-height: 44px;
+  padding: 9px 16px;
+  border: 1px solid #b9cbbd;
+  border-radius: 9px;
+  background: #f8fbf6;
+  box-shadow: inset 0 1px 0 #fff;
+  color: #234c38;
+  font-size: 13px;
+  font-weight: 650;
+}
+.business-wallet .secondary:hover:not(:disabled) {
+  background: #e9f1e6;
+  border-color: #8da894;
+}
+.business-wallet .wallet-address-toggle {
+  display: block;
+  min-height: 44px;
+  padding: 10px 0;
+  margin-top: 8px;
+  text-align: left;
+  color: #3f6250;
+  font-size: 13px;
+}
+.wallet-full-address {
+  display: block;
+  padding: 12px 0 0;
+  border-top: 1px solid #dbe4d7;
+  overflow-wrap: anywhere;
+  user-select: all;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.business-wallet .wallet-sync {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px 0;
+  border-top: 1px solid #e0e6db;
+}
+.wallet-sync > div {
+  flex: 1 1 160px;
+}
+.wallet-sync strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+.merchant-studio .business-wallet .wallet-sync p,
+.business-wallet .wallet-sync p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 5px 0 0;
+  color: #607266;
+}
+.merchant-studio .business-wallet .wallet-preview-notice,
+.business-wallet .wallet-preview-notice {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #775b32;
+  padding: 12px 14px;
+  border: 1px solid #e9ddc6;
+  background: #faf7ef;
+  border-radius: 10px;
+  margin: 0 0 16px;
+}
+.wallet-privacy {
+  border: 1px solid #dfe5da;
+  border-radius: 10px;
+  padding: 0 14px;
+  margin: 0 0 16px;
+}
+.wallet-privacy summary {
+  min-height: 48px;
+  padding: 14px 0;
+  cursor: pointer;
+  color: #365a45;
+  font-size: 13px;
+  font-weight: 600;
+}
+.merchant-studio .business-wallet .wallet-privacy p,
+.business-wallet .wallet-privacy p {
+  font-size: 13px;
+  line-height: 1.75;
+  color: #526859;
+  margin: 0 0 14px;
+}
+.business-wallet .wallet-copy-feedback {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+.business-wallet form {
+  margin-top: 18px;
+}
+.business-wallet :focus-visible {
+  outline: 2px solid #416c54;
+  outline-offset: 4px;
+}

@@ -1,5 +1,6 @@
 "use client";
 import type { ObserverSyncStatus } from "./merchant-observer.js";
+import "./merchant-wallet.css";
 import { useEffect, useState } from "react";
 import { requestJson } from "./requests.js";
 import { useRecord } from "./use-record.js";
@@ -14,41 +15,86 @@ export function MerchantWalletConnection({
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   const [sync, setSync] = useState<ObserverSyncStatus>();
+  const [checkedAt, setCheckedAt] = useState<string>();
+  const [copied, setCopied] = useState("");
+  const [showAddress, setShowAddress] = useState(false);
+  const address = data?.connection?.address;
   const connected = data?.connection?.state === "connected";
   useEffect(() => {
     onConnectionChange?.(connected);
   }, [connected, onConnectionChange]);
   return (
-    <article className="panel">
-      <h2>Connect your business wallet</h2>
-      <p>
-        You keep the signing keys and recovery phrase in your wallet. Grant
-        NOSTOS view access to a dedicated business account so it can check
-        payments and refunds.
-      </p>
-      <p className="privacy">
-        A full viewing key reveals account activity and payment memos. It cannot
-        spend. Use a dedicated business account. Never enter a recovery phrase
-        or spending key here. Hosted chain services may see the server network
-        address and requested transaction IDs. SDK preview observes only the
-        Orchard pool family; it does not import transparent view access.
-      </p>
-      {data?.connection && (
-        <p role="status">
-          {data.connection.state === "connected"
-            ? "View access connected. Wallet sync and merchant signing still need verification. Payments remain disabled."
-            : "Connection pending. Use the same key and birthday when retrying."}
-        </p>
+    <article className="panel business-wallet" aria-label="Business wallet">
+      <div className="business-wallet-heading">
+        <h2>Business wallet</h2>
+        {connected && (
+          <span className="wallet-connected">
+            <i aria-hidden="true" />
+            Connected
+          </span>
+        )}
+      </div>
+      {connected && address && (
+        <section className="wallet-address" aria-label="Receiving address">
+          <span className="wallet-field-label">Receiving address</span>
+          <div className="wallet-address-row">
+            <code aria-label="Shortened receiving address">
+              {address.slice(0, 12)}...{address.slice(-8)}
+            </code>
+            <button
+              type="button"
+              className="secondary"
+              aria-label="Copy receiving address"
+              onClick={async () => {
+                setCopied("");
+                try {
+                  await navigator.clipboard.writeText(address);
+                  setCopied("Address copied.");
+                } catch {
+                  setShowAddress(true);
+                  setCopied("Could not copy. Select the full address below.");
+                }
+              }}
+            >
+              Copy
+            </button>
+          </div>
+          <button
+            type="button"
+            className="text-button wallet-address-toggle"
+            aria-expanded={showAddress}
+            onClick={() => setShowAddress(!showAddress)}
+          >
+            {showAddress ? "Hide full address" : "Show full address"}
+          </button>
+          {showAddress && (
+            <code className="wallet-full-address">{address}</code>
+          )}
+          {copied && (
+            <p role="status" className="wallet-copy-feedback">
+              {copied}
+            </p>
+          )}
+        </section>
       )}
-      {data?.connection?.state === "connected" && (
-        <section aria-label="Observer sync readiness">
-          <p role="status">
-            {sync
-              ? sync.state === "ready"
-                ? "At the last check, the observer was caught up. Payment creation and wallet signing remain disabled."
-                : `At the last check, the observer was syncing. Scanned block ${sync.scannedHeight ?? "not available"}; chain tip ${sync.nodeHeight}.`
-              : "Sync readiness has not been checked in this session."}
-          </p>
+      {connected && (
+        <section className="wallet-sync" aria-label="Observer sync readiness">
+          <div>
+            <strong role="status">
+              {sync
+                ? sync.state === "ready"
+                  ? "Caught up at last check"
+                  : "Wallet is syncing"
+                : "Sync not checked"}
+            </strong>
+            <p>
+              {sync
+                ? sync.state === "syncing"
+                  ? `Scanned block ${sync.scannedHeight ?? "not available"}; chain tip ${sync.nodeHeight}.`
+                  : `Checked at ${checkedAt}`
+                : "Check the latest wallet sync status."}
+            </p>
+          </div>
           <button
             className="secondary"
             type="button"
@@ -57,12 +103,19 @@ export function MerchantWalletConnection({
               if (busy) return;
               setBusy(true);
               setSync(undefined);
+              setCheckedAt(undefined);
               setMessage("");
               try {
                 const result = await requestJson<{
                   status: ObserverSyncStatus;
                 }>("/api/product/wallet-status", { cache: "no-store" }, 20000);
                 setSync(result.status);
+                setCheckedAt(
+                  new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                );
               } catch {
                 setMessage(
                   "Could not verify current sync readiness. Saved view access is unchanged. Try the status check again.",
@@ -72,16 +125,38 @@ export function MerchantWalletConnection({
               }
             }}
           >
-            {busy ? "Checking wallet" : "Check wallet sync"}
+            {busy ? "Checking" : "Check sync"}
           </button>
         </section>
       )}
-      {data?.connection?.address && (
-        <p className="privacy">
-          Observer receiving address: <code>{data.connection.address}</code>. Do
-          not fund it during connection testing.
+      {!connected && (
+        <p className="wallet-intro">
+          Connect your business account with view access. Your signing keys and
+          recovery phrase stay in your wallet.
         </p>
       )}
+      {data?.connection?.state === "importing" && (
+        <p role="status">
+          Connection pending. Use the same key and birthday when retrying.
+        </p>
+      )}
+      <p className="wallet-preview-notice">
+        Preview: payment creation and signing are disabled. Do not fund this
+        receiving address during connection testing.
+      </p>
+      <details className="wallet-privacy" open={!connected}>
+        <summary>View access and privacy</summary>
+        <p>
+          A full viewing key reveals account activity and payment memos. It
+          cannot spend. Use a dedicated business account. Never enter a recovery
+          phrase or spending key here.
+        </p>
+        <p>
+          Hosted chain services may see the server network address and requested
+          transaction IDs. This preview observes only the Orchard pool family;
+          it does not import transparent view access.
+        </p>
+      </details>
       {data?.connection?.state !== "connected" && (
         <form
           onSubmit={async (event) => {
@@ -110,9 +185,7 @@ export function MerchantWalletConnection({
                 },
                 45000,
               );
-              setMessage(
-                "View access recorded. Payments remain disabled until sync and merchant signing are proved.",
-              );
+              setMessage("");
               await refresh();
             } catch {
               setMessage(

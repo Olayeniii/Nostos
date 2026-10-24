@@ -29,8 +29,8 @@ export default function Settings() {
       <div className="dashboard-title">
         <div>
           <p className="eyebrow">STORE SETTINGS</p>
-          <h1>Your store</h1>
-          <p>Account, wallet and refund policy.</p>
+          <h1>Settings</h1>
+          <p>Manage your store and wallet.</p>
         </div>
       </div>
       {warning && (
