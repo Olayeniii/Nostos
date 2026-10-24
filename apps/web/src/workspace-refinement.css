@@ -533,3 +533,9 @@
     color: LinkText;
   }
 }
+
+/* Empty states use their real icon, without the retired decorative corner. */
+.refined-workspace .empty-state::before {
+  content: none;
+  display: none;
+}

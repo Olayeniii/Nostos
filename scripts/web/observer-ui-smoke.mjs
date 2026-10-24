@@ -158,7 +158,7 @@ try {
       0,
     );
     outcomes.push({ viewport, storeSetup: "passed", paymentsHeld: true });
-    storeSaved = false;
+    storeSaved = true;
     await page.goto(
       `${process.env.NOSTOS_UI_BASE_URL ?? "http://127.0.0.1:3107"}/merchant/settings`,
     );
@@ -177,6 +177,22 @@ try {
         .count(),
       0,
     );
+    await page
+      .getByRole("button", { name: "Manage merchant profile", exact: true })
+      .click();
+    await page
+      .getByRole("heading", { name: "Change account email", exact: true })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "Manage merchant profile", exact: true })
+      .click();
+    assert.equal(
+      await page
+        .getByRole("heading", { name: "Change account email", exact: true })
+        .isVisible(),
+      false,
+    );
+    assert.equal(await page.locator(".settings-store-icon svg").count(), 1);
     const wallet = page.getByRole("article", {
       name: "Business wallet",
       exact: true,
@@ -243,18 +259,26 @@ try {
     await ready.click();
     await page.getByText(/Caught up at last check/).waitFor();
     if (process.env.NOSTOS_UI_CAPTURE_DIR) {
+      await page.reload();
       await page
-        .getByRole("heading", { name: "Business wallet", exact: true })
-        .scrollIntoViewIfNeeded();
+        .getByRole("button", { name: "Check sync", exact: true })
+        .click();
+      await page.getByText(/Caught up at last check/).waitFor();
+      // A taller phone capture shows the whole approved wallet card for review.
+      if (viewport.width < 901)
+        await page.setViewportSize({ ...viewport, height: 1000 });
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({
         path: `${process.env.NOSTOS_UI_CAPTURE_DIR}/wallet-${viewport.width}.png`,
       });
+      await page.setViewportSize(viewport);
     }
     failure = true;
     await ready.click();
     await page.getByText(/Could not verify current sync readiness/).waitFor();
     assert.equal(await page.getByText(/Caught up at last check/).count(), 0);
     failure = false;
+    storeSaved = false;
     await page.goto(
       `${process.env.NOSTOS_UI_BASE_URL ?? "http://127.0.0.1:3107"}/merchant`,
     );

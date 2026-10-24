@@ -156,7 +156,10 @@ export function MerchantWorkspace({
         <header className="studio-header">
           <div className="studio-identity">
             <Link href="/merchant/overview" className="studio-wordmark">
-              <span className="overview-desktop-brand">Workspace</span>
+              {pathname === "/merchant/settings" && <Mark />}
+              <span className="overview-desktop-brand">
+                {pathname === "/merchant/settings" ? "NOSTOS" : "Workspace"}
+              </span>
               <span className="overview-mobile-brand">NOSTOS</span>
             </Link>
             <span>

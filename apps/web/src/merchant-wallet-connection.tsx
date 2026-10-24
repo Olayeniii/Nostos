@@ -1,4 +1,5 @@
 "use client";
+import { SettingsIcon } from "./settings-icon.js";
 import type { ObserverSyncStatus } from "./merchant-observer.js";
 import "./merchant-wallet.css";
 import { useEffect, useState } from "react";
@@ -56,7 +57,7 @@ export function MerchantWalletConnection({
                 }
               }}
             >
-              Copy
+              <SettingsIcon kind="copy" /> Copy
             </button>
           </div>
           <button
@@ -66,6 +67,7 @@ export function MerchantWalletConnection({
             onClick={() => setShowAddress(!showAddress)}
           >
             {showAddress ? "Hide full address" : "Show full address"}
+            <SettingsIcon kind="chevron" />
           </button>
           {showAddress && (
             <code className="wallet-full-address">{address}</code>
@@ -79,6 +81,9 @@ export function MerchantWalletConnection({
       )}
       {connected && (
         <section className="wallet-sync" aria-label="Observer sync readiness">
+          <span className="wallet-sync-icon">
+            <SettingsIcon kind="sync" />
+          </span>
           <div>
             <strong role="status">
               {sync
@@ -141,11 +146,15 @@ export function MerchantWalletConnection({
         </p>
       )}
       <p className="wallet-preview-notice">
-        Preview: payment creation and signing are disabled. Do not fund this
-        receiving address during connection testing.
+        <SettingsIcon kind="info" />
+        <span>Preview: payments are disabled.</span>
       </p>
       <details className="wallet-privacy" open={!connected}>
-        <summary>View access and privacy</summary>
+        <summary>
+          <SettingsIcon kind="lock" />
+          <span>View access and privacy</span>
+          <SettingsIcon kind="chevron" />
+        </summary>
         <p>
           A full viewing key reveals account activity and payment memos. It
           cannot spend. Use a dedicated business account. Never enter a recovery
@@ -155,6 +164,10 @@ export function MerchantWalletConnection({
           Hosted chain services may see the server network address and requested
           transaction IDs. This preview observes only the Orchard pool family;
           it does not import transparent view access.
+        </p>
+        <p>
+          Payment creation and signing remain disabled in this connection
+          preview. Do not fund this receiving address during connection testing.
         </p>
       </details>
       {data?.connection?.state !== "connected" && (
