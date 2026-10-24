@@ -21,11 +21,11 @@ def run(args, **kwargs):
     subprocess.run([str(x) for x in args], check=True, **kwargs)
 
 
-def verify_resume(work, source, revision):
+def verify_resume(work, source, revision, native=False):
     for path in (work, source):
         if path.resolve() != path or not path.is_dir() or path.stat().st_uid != os.getuid():
             raise ValueError("Unexpected staged directory. Preserve existing files.")
-    if (work / "revision.txt").read_text().strip() != revision or (work / "zallet").exists():
+    if (work / "revision.txt").read_text().strip() != revision or ((work / "zallet").exists() and not native):
         raise ValueError("Resume is limited to the staged web-build failure.")
     archive = work / "source.tar"
     expected = subprocess.check_output(["git", "-C", str(NATIVE / "source"), "archive", "--format=tar", revision])
@@ -61,7 +61,7 @@ def web_build_command(work, source, revision):
             'node /build-tools/node_modules/pnpm/bin/pnpm.cjs --filter @nostos/web build']
 
 
-def stage(revision, resume=False):
+def stage(revision, resume=False, resume_native=False):
     if not re.fullmatch(r"[a-f0-9]{40}", revision) or platform.machine() != "aarch64" or os.getuid() != 1001:
         raise ValueError("Expected the Ubuntu ARM64 operator and exact revision.")
     for root in (REVIEW, NATIVE, NATIVE / "source", NATIVE / "upstream"):
@@ -76,8 +76,11 @@ def stage(revision, resume=False):
             raise ValueError("Previous ARM64 dependencies are unavailable.")
     work = REVIEW / ("commerce-build-" + revision[:12])
     source = work / "source"
-    if resume:
-        verify_resume(work, source, revision)
+    if resume or resume_native:
+        verify_resume(work, source, revision, native=resume_native)
+        if resume_native:
+            finish_native(work, source, revision)
+            return
     else:
         work.mkdir(mode=0o700, exist_ok=False)
         source.mkdir(mode=0o700)
@@ -105,9 +108,28 @@ def stage(revision, resume=False):
     for old, new in (("worker.rs", "nostos_sdk_worker.rs"), ("observer_fixture.rs", "nostos_observer_fixture.rs")):
         shutil.copyfile(scripts / old, modules.parent / new)
     run(["python3", scripts / "prepare.py", sdk])
+    finish_native(work, source, revision)
+
+
+def finish_native(work, source, revision):
+    sdk = work / "zallet"
+    scripts = source / "scripts/lightclient"
+    if sdk.resolve() != sdk or not sdk.is_dir() or sdk.stat().st_uid != os.getuid():
+        raise ValueError("Unexpected native build directory.")
+    pinned = subprocess.check_output(["git", "-C", str(sdk), "rev-parse", "HEAD"], text=True).strip()
+    if pinned != PIN:
+        raise ValueError("Unexpected native source revision.")
+    modules = sdk / "zallet-core/examples/nostos_observer"
+    pairs = [(scripts / (name + ".rs"), modules / (name + ".rs")) for name in ("storage", "transactions", "transaction_tests", "connection")]
+    pairs += [(scripts / "observer.rs", modules / "mod.rs"), (scripts / "worker.rs", modules.parent / "nostos_sdk_worker.rs"),
+              (scripts / "observer_fixture.rs", modules.parent / "nostos_observer_fixture.rs")]
+    for original, copied in pairs:
+        if copied.is_symlink() or copied.read_bytes() != original.read_bytes():
+            raise ValueError("Native build module changed. Preserve it for review.")
     env = dict(os.environ, CARGO_TARGET_DIR=str(NATIVE / "build/target"), CARGO_BUILD_JOBS="2", CARGO_INCREMENTAL="0",
                CARGO_PROFILE_RELEASE_DEBUG="0", CARGO_PROFILE_RELEASE_LTO="false",
-               CARGO_PROFILE_RELEASE_CODEGEN_UNITS="16", CARGO_PROFILE_RELEASE_STRIP="debuginfo")
+               CARGO_PROFILE_RELEASE_CODEGEN_UNITS="16", CARGO_PROFILE_RELEASE_STRIP="debuginfo",
+               NOSTOS_BACKUP_FIXTURE=str(scripts / "backup_fixture.py"))
     run(["cargo", "+1.95.0", "test", "--locked", "--offline", "--release", "-p", "zallet-core", "--example", "nostos_observer_fixture"], cwd=sdk, env=env)
     run(["cargo", "+1.95.0", "build", "--locked", "--offline", "--release", "-p", "zallet-core", "--example", "nostos_sdk_worker"], cwd=sdk, env=env)
     binary = work / "nostos-sdk-worker"
@@ -123,5 +145,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--revision", required=True)
     parser.add_argument("--resume", action="store_true", help="Resume a verified staged web-build failure")
+    parser.add_argument("--resume-native", action="store_true", help="Resume verified native tests and worker build")
     args = parser.parse_args()
-    stage(args.revision, resume=args.resume)
+    if args.resume and args.resume_native:
+        parser.error("Choose one resume stage.")
+    stage(args.revision, resume=args.resume, resume_native=args.resume_native)

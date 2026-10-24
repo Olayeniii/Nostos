@@ -77,6 +77,34 @@ class CommerceBuilder(unittest.TestCase):
         self.assertNotIn("/preview", " ".join(first))
         self.assertNotIn("/wallets", " ".join(first))
 
+    def test_native_resume_supplies_backup_fixture_to_tests_and_build(self):
+        sdk = self.work / "zallet"
+        modules = sdk / "zallet-core/examples/nostos_observer"
+        modules.mkdir(parents=True)
+        scripts = self.source / "scripts/lightclient"
+        scripts.mkdir(parents=True)
+        for name in ("storage", "transactions", "transaction_tests", "connection"):
+            (scripts / (name + ".rs")).write_text(name)
+            (modules / (name + ".rs")).write_text(name)
+        for old, new in (("observer.rs", "nostos_observer/mod.rs"), ("worker.rs", "nostos_sdk_worker.rs"), ("observer_fixture.rs", "nostos_observer_fixture.rs")):
+            (scripts / old).write_text(old)
+            (modules.parent / new).write_text(old)
+        native = self.work / "cache"
+        binary = native / "build/target/release/examples/nostos_sdk_worker"
+        binary.parent.mkdir(parents=True)
+        binary.write_bytes(b"synthetic worker")
+        with patch.object(module, "NATIVE", native), patch.object(module.subprocess, "check_output", return_value=module.PIN + "\n"), patch.object(module, "run") as runner:
+            module.finish_native(self.work, self.source, REV)
+            self.assertEqual(runner.call_count, 2)
+            for call in runner.call_args_list:
+                self.assertEqual(call.kwargs["env"]["NOSTOS_BACKUP_FIXTURE"], str(scripts / "backup_fixture.py"))
+            self.assertTrue((self.work / "build-result.json").is_file())
+            (modules / "connection.rs").write_text("changed")
+            runner.reset_mock()
+            with self.assertRaises(ValueError):
+                module.finish_native(self.work, self.source, REV)
+            runner.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
