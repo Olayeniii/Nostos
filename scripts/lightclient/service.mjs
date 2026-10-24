@@ -107,6 +107,8 @@ export class PipeWorker {
 
 export class ObserverBroker {
   #workers = new Map();
+  #pending = new Map();
+  #queued = new Map();
   #root;
   #factory;
   #timer;
@@ -154,7 +156,7 @@ export class ObserverBroker {
         locked: true,
         payments_enabled: false,
       };
-    const result = await worker.request(method, params);
+    const result = await this.#request(worker, method, params);
     if (method === "getwalletstatus") worker.cache = result;
     if (
       this.#autoSync &&
@@ -168,11 +170,30 @@ export class ObserverBroker {
     }
     return result;
   }
+  async #request(worker, method, params) {
+    const count = this.#queued.get(worker) ?? 0;
+    if (count >= 8) throw unresolved();
+    this.#queued.set(worker, count + 1);
+    const previous = this.#pending.get(worker);
+    const next = (previous ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => worker.request(method, params));
+    this.#pending.set(worker, next);
+    try {
+      return await next;
+    } finally {
+      const remaining = this.#queued.get(worker) - 1;
+      if (remaining) this.#queued.set(worker, remaining);
+      else this.#queued.delete(worker);
+      if (this.#pending.get(worker) === next) this.#pending.delete(worker);
+    }
+  }
   async refresh(id) {
     const worker = this.#worker(id);
-    if (worker.busy || worker.dead) throw unresolved();
+    if (worker.busy || worker.dead || this.#pending.has(worker))
+      throw unresolved();
     try {
-      worker.cache = await worker.request("nostos_sync", []);
+      worker.cache = await this.#request(worker, "nostos_sync", []);
     } catch {
       worker.cache = null;
       throw unresolved();

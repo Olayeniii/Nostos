@@ -6,6 +6,67 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ObserverBroker, createObserverService } from "./service.mjs";
 
+test("address validation waits for background sync after import", async () => {
+  const root = mkdtempSync(join(tmpdir(), "nostos-broker-race-"));
+  chmodSync(root, 0o700);
+  const calls = [];
+  let finishSync, syncStarted;
+  const syncing = new Promise((resolve) => {
+    finishSync = resolve;
+  });
+  const started = new Promise((resolve) => {
+    syncStarted = resolve;
+  });
+  const worker = {
+    busy: false,
+    dead: false,
+    async request(method) {
+      assert.equal(this.busy, false, "pipe operations must never overlap");
+      calls.push(method);
+      this.busy = true;
+      try {
+        if (method === "nostos_sync") {
+          syncStarted();
+          await syncing;
+        }
+        if (method === "z_listunifiedreceivers")
+          return { orchard: "fixture-address" };
+        return { account_connected: true, payments_enabled: false };
+      } finally {
+        this.busy = false;
+      }
+    },
+    async close() {},
+  };
+  const broker = new ObserverBroker({ root, factory: () => worker });
+  const merchant = "4b723cba-3e4d-4536-9c2e-e8129e2fb731";
+  // Keep the event loop alive while the broker's unref timer starts sync.
+  const timeout = setTimeout(() => syncStarted(), 1000);
+  try {
+    await broker.request(merchant, "z_importviewingkey", []);
+    await started;
+    assert.equal(worker.busy, true);
+    const first = broker.request(merchant, "z_listunifiedreceivers", []);
+    const second = broker.request(merchant, "z_listunifiedreceivers", []);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(calls, ["z_importviewingkey", "nostos_sync"]);
+    finishSync();
+    assert.deepEqual(await first, { orchard: "fixture-address" });
+    assert.deepEqual(await second, { orchard: "fixture-address" });
+    assert.deepEqual(calls, [
+      "z_importviewingkey",
+      "nostos_sync",
+      "z_listunifiedreceivers",
+      "z_listunifiedreceivers",
+    ]);
+  } finally {
+    clearTimeout(timeout);
+    finishSync();
+    await broker.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("HTTP authentication, scope and method restrictions precede worker access", async () => {
   const calls = [];
   const authorization = `Basic ${Buffer.from("public-test-cookie:fixture-only").toString("base64")}`;
