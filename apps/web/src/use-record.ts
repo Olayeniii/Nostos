@@ -28,6 +28,8 @@ export function useRecord<T>(url: string, token?: string, enabled = true) {
       setWarning("");
     } catch (e) {
       if (version !== generation.current) return;
+      // Switching to a wallet can suspend mobile requests. Recheck on return.
+      if (document.visibilityState === "hidden") return;
       if (!token && e instanceof RequestError && e.status === 401)
         window.location.assign("/sign-in");
       else
