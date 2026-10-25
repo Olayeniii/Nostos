@@ -329,7 +329,8 @@ async function handle(request: Request) {
         });
       }
       if (route === "prepare" && isPost) {
-        const route = text(body.route, 20, 506);
+        const route =
+          body.route === undefined ? checkout.route : text(body.route, 20, 506);
         if (!route)
           return json(
             { error: "Enter a fresh refund address on this network" },
@@ -384,6 +385,7 @@ async function handle(request: Request) {
         return json({
           receipt: checkoutView(store, core, store.checkout(checkout.id)!),
           syncWarning,
+          refundRouteSaved: Boolean(store.checkout(checkout.id)?.route),
         });
       }
       return json({ error: "Method unavailable" }, 405);
