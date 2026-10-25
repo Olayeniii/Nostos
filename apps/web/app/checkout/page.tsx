@@ -405,6 +405,12 @@ export default function Checkout() {
                     fields, use manual entry below. QR and URI support varies by
                     wallet.
                   </p>
+                  <p className="privacy">
+                    ZODL requires its own scanner; use the QR image rather than
+                    the direct wallet link. Cake Wallet may omit the memo when
+                    opening a request. Paste the exact memo below before
+                    signing.
+                  </p>
                   {walletMessage && (
                     <p className="privacy" role="status">
                       {walletMessage}
@@ -541,7 +547,7 @@ export default function Checkout() {
           {(warning || data?.syncWarning) && (
             <p className="warning" role="alert">
               {warning ||
-                "Wallet sync is temporarily unavailable. Do not repeat a payment that you already sent."}
+                "Payment status checks are temporarily unavailable. The observer may be syncing or a lookup may have failed. Refresh to check again; do not repeat a payment already sent."}
             </p>
           )}
           {copyStatus && (
