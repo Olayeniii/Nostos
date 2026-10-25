@@ -12,6 +12,7 @@ const allowed = new Set([
   "z_listunifiedreceivers",
   "nostos_verify_output",
   "nostos_incoming_candidates",
+  "nostos_outgoing_candidates",
 ]);
 const unresolved = () => new Error("Observer request is unresolved.");
 function privateDirectory(path) {
@@ -281,7 +282,9 @@ export function createObserverService({ authorization, broker }) {
         typeof merchant !== "string" ||
         !merchantPattern.test(merchant) ||
         (body.method === "getwalletstatus" && params.length !== 0) ||
-        (body.method === "nostos_incoming_candidates" &&
+        (["nostos_incoming_candidates", "nostos_outgoing_candidates"].includes(
+          body.method,
+        ) &&
           (params.length !== 2 ||
             !merchantPattern.test(params[0]) ||
             !Number.isSafeInteger(params[1]) ||

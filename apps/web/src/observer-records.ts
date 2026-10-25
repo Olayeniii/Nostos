@@ -632,8 +632,49 @@ export async function reconcileObservedRefund(
     requireValue(request);
     dbFor(store, core, merchantId, request.checkoutId);
     const plan = find(core, `refund:${requestId}`);
-    requireValue(plan?.merchant_id === merchantId && plan.txid);
-    return await verifyAndApply(store, core, plan, plan.txid);
+    requireValue(
+      plan?.merchant_id === merchantId && plan.handoff_started === 1,
+    );
+    if (plan.txid) return await verifyAndApply(store, core, plan, plan.txid);
+    const expected = source(store, core, plan);
+    requireValue(expected.fingerprint === plan.fingerprint);
+    const db = core.withdrawalDatabase();
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS observer_refund_cursor (instruction_id TEXT PRIMARY KEY, cursor INTEGER NOT NULL)",
+    );
+    const cursor = Number(
+      db
+        .prepare(
+          "SELECT cursor FROM observer_refund_cursor WHERE instruction_id=?",
+        )
+        .get(plan.id)?.cursor ?? 0,
+    );
+    const result = await observerWallet(merchantId).call<{
+      candidates: unknown;
+    }>("nostos_outgoing_candidates", [expected.account, cursor]);
+    requireValue(
+      Array.isArray(result.candidates) && result.candidates.length <= 4,
+    );
+    let next = cursor;
+    for (const row of result.candidates as unknown[]) {
+      requireValue(
+        Array.isArray(row) &&
+          row.length === 2 &&
+          integer(row[0], next + 1) &&
+          typeof row[1] === "string" &&
+          hash.test(row[1]),
+      );
+      next = row[0];
+      try {
+        return await verifyAndApply(store, core, plan, row[1]);
+      } catch {
+        /* Keep reservation; a candidate is never send evidence. */
+      }
+    }
+    db.prepare(
+      "INSERT INTO observer_refund_cursor VALUES(?,?) ON CONFLICT(instruction_id) DO UPDATE SET cursor=excluded.cursor",
+    ).run(plan.id, result.candidates.length < 4 ? 0 : next);
+    throw new ObserverRecordError();
   } catch {
     throw new ObserverRecordError();
   }

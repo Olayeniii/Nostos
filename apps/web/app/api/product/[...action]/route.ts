@@ -349,6 +349,23 @@ async function handle(request: Request) {
           if (sdkObserverSelected()) {
             if (observerCommerceEnabled())
               await detectObservedPayment(store, core, checkout.id);
+            if (observerCommerceEnabled()) {
+              for (const refund of store
+                .refundRequests(checkout.id)
+                .filter((r) => r.status === "approved")
+                .slice(0, 1)) {
+                try {
+                  await reconcileObservedRefund(
+                    store,
+                    core,
+                    checkout.merchantId,
+                    refund.id,
+                  );
+                } catch {
+                  /* Pending or unknown outgoing evidence keeps the reservation. */
+                }
+              }
+            }
             if (
               observerCommerceEnabled() &&
               (

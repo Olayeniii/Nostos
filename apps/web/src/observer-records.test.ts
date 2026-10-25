@@ -107,6 +107,13 @@ beforeEach(() => {
           wallet_tip: { height: 102, blockhash: "f".repeat(64) },
           fully_synced_height: 102,
         });
+      else if (request.method === "nostos_outgoing_candidates")
+        result = transform({
+          nostos_sdk_preview_v1: true,
+          payments_enabled: false,
+          observation_scope: "orchard-family-only",
+          candidates: [[1, refundTx]],
+        });
       else if (request.method === "nostos_incoming_candidates")
         result = transform({
           nostos_sdk_preview_v1: true,
@@ -1105,4 +1112,32 @@ it("freezes a merchant-selected refund fee limit before wallet handoff", async (
     prepareObservedRefund(store, core, merchant, id, 30000),
   ).rejects.toThrow();
   expect(core.refundTotals(paymentTx).reservedZat).toBe(40000);
+});
+
+it("finds the signed refund without a merchant transaction reference and never grants another handoff", async () => {
+  const c = await paid();
+  const id = approve(c.id);
+  await prepareObservedRefund(store, core, merchant, id, 25000);
+  claimObservedRefund(store, core, merchant, id);
+  await reconcileObservedRefund(store, core, merchant, id);
+  expect(core.refundTotals(paymentTx).refundedZat).toBe(40000);
+  expect(() => claimObservedRefund(store, core, merchant, id)).toThrow();
+});
+it("keeps an unverified discovered refund reserved without binding the candidate", async () => {
+  const c = await paid();
+  const id = approve(c.id);
+  await prepareObservedRefund(store, core, merchant, id, 25000);
+  claimObservedRefund(store, core, merchant, id);
+  transform = (p) =>
+    p.nostos_output_proof_v1 ? { ...p, owned_spend: false } : p;
+  await expect(
+    reconcileObservedRefund(store, core, merchant, id),
+  ).rejects.toThrow();
+  expect(core.refundTotals(paymentTx).reservedZat).toBe(40000);
+  expect(core.refundTotals(paymentTx).refundedZat).toBe(0);
+  const plan = core
+    .withdrawalDatabase()
+    .prepare("SELECT txid FROM observer_record_instructions WHERE source_key=?")
+    .get(`refund:${id}`);
+  expect(plan?.txid).toBeNull();
 });

@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { requestJson } from "./requests.js";
 import { zec } from "./receipt-card.js";
 type Review = {
@@ -73,6 +73,13 @@ export function ExternalWalletRefund({
       active.current = false;
     }
   }
+  useEffect(() => {
+    if (!safe || !review?.handoffStarted) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void act("check");
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [safe, review?.handoffStarted, requestId]);
   return (
     <div className="refund-review">
       <p>
@@ -152,7 +159,8 @@ export function ExternalWalletRefund({
             </>
           )}
           {review.handoffStarted && (
-            <>
+            <details>
+              <summary>Refund recovery</summary>
               <label>
                 Refund transaction ID
                 <input
@@ -178,7 +186,7 @@ export function ExternalWalletRefund({
               >
                 Check refund confirmation
               </button>
-            </>
+            </details>
           )}
         </>
       )}

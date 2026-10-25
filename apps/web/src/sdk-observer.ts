@@ -24,6 +24,7 @@ export class SdkObserverClient extends ZalletRpcClient {
         "z_listunifiedreceivers",
         "nostos_verify_output",
         "nostos_incoming_candidates",
+        "nostos_outgoing_candidates",
       ].includes(method)
     )
       throw new Error("SDK observer operation is unavailable.");
