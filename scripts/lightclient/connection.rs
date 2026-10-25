@@ -34,11 +34,11 @@ impl Connection {
         let connected=db.get_account_ids().map_err(|_| "account_lookup")?.len()==1;
         let pending=db.transaction_data_requests().map_err(|_| "enhancement_status")?;
         let ready=full.as_ref().is_some_and(|b|u32::from(b.block_height())==height)
-            && wallet_tip.is_some_and(|(h,b)|u32::from(h)==height && b.to_string()==hash)
-            && pending.is_empty();
+            && wallet_tip.is_some_and(|(h,b)|u32::from(h)==height && b.to_string()==hash);
         Ok(json!({"node_tip":{"height":height,"blockhash":hash},
             "wallet_tip":wallet_tip.map(|(h,b)|json!({"height":u32::from(h),"blockhash":b.to_string()})),
             "fully_synced_height":full.map(|b|u32::from(b.block_height())),"locked":!ready,
+            "enhancement_pending":!pending.is_empty(),
             "account_connected":connected,"nostos_sdk_preview_v1":true,"observation_scope":"orchard-family-only","payments_enabled":false}))
     }
     pub async fn handle(&mut self,method:&str,params:&[Value]) -> Result<Value,&'static str> {

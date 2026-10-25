@@ -265,8 +265,12 @@ pub async fn enhance_pending(client: &mut Client, db: &mut Database) -> Result<u
         };
         // Any unavailable/unmined/conflicting result stays unresolved. No failed status,
         // reservation clearance, retry permission or send is inferred here.
-        enhance(client,db,id).await?.store(db)?;
-        stored += 1;
+        // An unrelated unavailable transaction must not block the remaining
+        // wallet records. It stays unresolved and is retried on the next sync.
+        if let Ok(tx) = enhance(client,db,id).await {
+            tx.store(db)?;
+            stored += 1;
+        }
     }
     Ok(stored)
 }
