@@ -15,6 +15,7 @@ import { coreStore, newRequest, checkoutView } from "./product-service.js";
 import { observerConnection } from "./merchant-observer.js";
 import {
   reconcileObservedPayment,
+  detectObservedPayment,
   prepareObservedRefund,
   claimObservedRefund,
   bindObservedRefund,
@@ -105,6 +106,13 @@ beforeEach(() => {
           node_tip: { height: 102, blockhash: "f".repeat(64) },
           wallet_tip: { height: 102, blockhash: "f".repeat(64) },
           fully_synced_height: 102,
+        });
+      else if (request.method === "nostos_incoming_candidates")
+        result = transform({
+          nostos_sdk_preview_v1: true,
+          payments_enabled: false,
+          observation_scope: "orchard-family-only",
+          candidates: [[1, paymentTx]],
         });
       else if (request.method === "z_listunifiedreceivers")
         result = { orchard: request.params[1] };
@@ -1059,4 +1067,31 @@ it("rejects refund ownership, unknown fields, excessive approvals and changed de
     ).status,
   ).toBe(503);
   expect(requests).toHaveLength(0);
+});
+
+it("automatically verifies saved incoming candidates without a customer transaction reference", async () => {
+  const c = checkout();
+  await detectObservedPayment(store, core, c.id);
+  expect(store.checkout(c.id)?.paymentTxid).toBe(paymentTx);
+  await detectObservedPayment(store, core, c.id);
+  expect(
+    requests.filter((r) => r.method === "nostos_incoming_candidates"),
+  ).toHaveLength(1);
+});
+it("revisits delayed candidates after an unresolved scan without credit", async () => {
+  const c = checkout();
+  transform = (p) =>
+    p.nostos_output_proof_v1 ? { ...p, exact_match: false } : p;
+  await detectObservedPayment(store, core, c.id);
+  expect(store.checkout(c.id)?.paymentTxid).toBeFalsy();
+  transform = (p) => p;
+  await detectObservedPayment(store, core, c.id);
+  expect(store.checkout(c.id)?.paymentTxid).toBe(paymentTx);
+});
+it("rejects malformed candidate batches before output verification", async () => {
+  const c = checkout();
+  transform = (p) =>
+    p.candidates ? { ...p, candidates: [[1, "invalid"]] } : p;
+  await expect(detectObservedPayment(store, core, c.id)).rejects.toThrow();
+  expect(requests.some((r) => r.method === "nostos_verify_output")).toBe(false);
 });

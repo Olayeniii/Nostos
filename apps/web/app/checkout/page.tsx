@@ -480,11 +480,8 @@ export default function Checkout() {
             </>
           )}
           {network === "mainnet" && r && !paid && (
-            <section
-              className="manual-payment"
-              aria-label="Verify sent payment"
-            >
-              <h3>Already sent your payment?</h3>
+            <details className="manual-payment">
+              <summary>Payment recovery</summary>
               <p>
                 Paste its transaction ID from your wallet. NOSTOS checks the
                 exact address, amount and memo after three confirmations. Do not
@@ -523,7 +520,7 @@ export default function Checkout() {
               {walletMessage && !prepared && (
                 <p role="status">{walletMessage}</p>
               )}
-            </section>
+            </details>
           )}
           {(warning || data?.syncWarning) && (
             <p className="warning" role="alert">

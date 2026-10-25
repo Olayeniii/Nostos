@@ -2,7 +2,7 @@
 use std::{fs::{self,File,OpenOptions}, os::unix::fs::{MetadataExt,OpenOptionsExt}, path::Path};
 use super::Database;
 
-pub struct ProtectedWallet {db: Database, _lock: File}
+pub struct ProtectedWallet {db: Database, _lock: File, root: std::path::PathBuf}
 const FILES: [&str;5] = ["wallet.sqlite","wallet.sqlite-wal","wallet.sqlite-shm","wallet.sqlite-journal","writer.lock"];
 
 fn private_file(meta: &fs::Metadata, uid: u32) -> Result<(), &'static str> {
@@ -58,7 +58,19 @@ impl ProtectedWallet {
         let _file=open_private(root,"wallet.sqlite",uid)?;
         let db=super::open_fixture(&root.join("wallet.sqlite"))?;
         validate(root)?;
-        Ok(Self{db,_lock:lock})
+        Ok(Self{db,_lock:lock,root:root.to_path_buf()})
+    }
+    pub fn incoming_candidates(&self, account: &str, after: i64) -> Result<Vec<(i64,String)>, &'static str> {
+        let account=uuid::Uuid::parse_str(account).map_err(|_| "candidate_account")?;
+        let conn=rusqlite::Connection::open_with_flags(self.root.join("wallet.sqlite"),rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|_| "candidate_open")?;
+        let mut stmt=conn.prepare("SELECT DISTINCT t.id_tx,t.txid FROM v_received_outputs ro JOIN accounts a ON a.id=ro.account_id JOIN transactions t ON t.id_tx=ro.transaction_id WHERE a.uuid=? AND t.id_tx>? ORDER BY t.id_tx LIMIT 4").map_err(|_| "candidate_query")?;
+        let rows=stmt.query_map(rusqlite::params![account.as_bytes().as_slice(),after],|row| {
+            let id:i64=row.get(0)?;
+            let mut bytes:Vec<u8>=row.get(1)?;
+            bytes.reverse();
+            Ok((id,hex::encode(bytes)))
+        }).map_err(|_| "candidate_read")?;
+        rows.collect::<Result<Vec<_>,_>>().map_err(|_| "candidate_read")
     }
     pub fn db_mut(&mut self) -> &mut Database {&mut self.db}
     pub fn audit(root: &Path) -> Result<(), &'static str> {validate(root).map(|_|())}
@@ -120,3 +132,4 @@ mod tests {
         assert!(ProtectedWallet::open(root.path()).is_err());
     }
 }
+

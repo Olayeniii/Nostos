@@ -638,3 +638,74 @@ export async function reconcileObservedRefund(
     throw new ObserverRecordError();
   }
 }
+
+// Only the server sees candidate references. Exact native output proof remains
+// the sole authority for credit, including candidates from spent incoming notes.
+const incomingScans = new Map<string, Promise<void>>();
+export async function detectObservedPayment(
+  store: ProductStore,
+  core: SqlitePaymentStore,
+  checkoutId: string,
+) {
+  const checkout = store.checkout(checkoutId);
+  if (!checkout?.route || checkout.status !== "unpaid") return;
+  const key = checkout.merchantId;
+  if (incomingScans.has(key)) return;
+  const scan = (async () => {
+    const plan = savePlan(store, core, key, checkoutId, null, "ironwood", 0);
+    const expected = source(store, core, plan);
+    const db = core.withdrawalDatabase();
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS observer_incoming_cursor (checkout_id TEXT PRIMARY KEY, cursor INTEGER NOT NULL)",
+    );
+    const cursor = Number(
+      db
+        .prepare(
+          "SELECT cursor FROM observer_incoming_cursor WHERE checkout_id=?",
+        )
+        .get(checkoutId)?.cursor ?? 0,
+    );
+    const result = await observerWallet(key).call<{ candidates: unknown }>(
+      "nostos_incoming_candidates",
+      [expected.account, cursor],
+    );
+    requireValue(
+      Array.isArray(result.candidates) && result.candidates.length <= 4,
+    );
+    let next = cursor;
+    for (const row of result.candidates as unknown[]) {
+      requireValue(
+        Array.isArray(row) &&
+          row.length === 2 &&
+          integer(row[0], next + 1) &&
+          typeof row[1] === "string" &&
+          hash.test(row[1]),
+      );
+      next = row[0];
+      for (const pool of ["ironwood", "orchard"] as const) {
+        try {
+          await reconcileObservedPayment(
+            store,
+            core,
+            key,
+            checkoutId,
+            row[1],
+            pool,
+          );
+          return;
+        } catch {
+          // Unconfirmed, unrelated and mismatched candidates never earn credit.
+        }
+      }
+    }
+    db.prepare(
+      "INSERT INTO observer_incoming_cursor VALUES(?,?) ON CONFLICT(checkout_id) DO UPDATE SET cursor=excluded.cursor",
+    ).run(checkoutId, result.candidates.length < 4 ? 0 : next);
+  })();
+  incomingScans.set(key, scan);
+  try {
+    await scan;
+  } finally {
+    if (incomingScans.get(key) === scan) incomingScans.delete(key);
+  }
+}

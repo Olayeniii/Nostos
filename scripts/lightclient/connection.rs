@@ -43,6 +43,14 @@ impl Connection {
     }
     pub async fn handle(&mut self,method:&str,params:&[Value]) -> Result<Value,&'static str> {
         match method {
+            "nostos_incoming_candidates" if params.len()==2 => {
+                let account=params[0].as_str().ok_or("candidate_account")?;
+                let after=params[1].as_i64().filter(|n|*n>=0).ok_or("candidate_cursor")?;
+                let accounts=self.wallet.db_mut().get_account_ids().map_err(|_| "candidate_account")?;
+                if accounts.len()!=1 || accounts[0].expose_uuid().to_string()!=account {return Err("candidate_account");}
+                let rows=self.wallet.incoming_candidates(account,after)?;
+                Ok(json!({"nostos_sdk_preview_v1":true,"payments_enabled":false,"observation_scope":"orchard-family-only","candidates":rows}))
+            },
             "nostos_verify_output" if params.len()==9 => {
                 use zcash_client_backend::{TransferType,data_api::NullifierQuery};
                 use zcash_protocol::{ShieldedPool,memo::MemoBytes};
@@ -192,4 +200,5 @@ mod tests {
         assert!(scoped_key("not-a-viewing-key").is_err());
     }
 }
+
 

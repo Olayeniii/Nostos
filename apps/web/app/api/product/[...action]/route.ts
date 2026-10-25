@@ -11,6 +11,7 @@ import {
   claimObservedRefund,
   bindObservedRefund,
   reconcileObservedPayment,
+  detectObservedPayment,
   reconcileObservedRefund,
 } from "../../../../src/observer-records.js";
 import {
@@ -346,6 +347,8 @@ async function handle(request: Request) {
         let syncWarning = false;
         try {
           if (sdkObserverSelected()) {
+            if (observerCommerceEnabled())
+              await detectObservedPayment(store, core, checkout.id);
             if (
               observerCommerceEnabled() &&
               (
