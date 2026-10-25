@@ -46,16 +46,22 @@ test("address validation waits for background sync after import", async () => {
     await broker.request(merchant, "z_importviewingkey", []);
     await started;
     assert.equal(worker.busy, true);
+    const status = broker.request(merchant, "getwalletstatus", []);
     const first = broker.request(merchant, "z_listunifiedreceivers", []);
     const second = broker.request(merchant, "z_listunifiedreceivers", []);
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(calls, ["z_importviewingkey", "nostos_sync"]);
     finishSync();
+    assert.deepEqual(await status, {
+      account_connected: true,
+      payments_enabled: false,
+    });
     assert.deepEqual(await first, { orchard: "fixture-address" });
     assert.deepEqual(await second, { orchard: "fixture-address" });
     assert.deepEqual(calls, [
       "z_importviewingkey",
       "nostos_sync",
+      "getwalletstatus",
       "z_listunifiedreceivers",
       "z_listunifiedreceivers",
     ]);
@@ -231,10 +237,14 @@ test("persisted account status resumes sync without another viewing-key import",
     await broker.request(merchant, "getwalletstatus", []);
     await started;
     assert.deepEqual(calls, ["getwalletstatus", "nostos_sync"]);
-    const busy = await broker.request(merchant, "getwalletstatus", []);
-    assert.equal(busy.locked, true);
-    assert.equal(busy.payments_enabled, false);
+    const pending = broker.request(merchant, "getwalletstatus", []);
+    await new Promise((resolve) => setImmediate(resolve));
     assert.equal(calls.length, 2);
+    finishSync();
+    const fresh = await pending;
+    assert.equal(fresh.locked, false);
+    assert.equal(fresh.payments_enabled, false);
+    assert.equal(calls.length, 3);
   } finally {
     clearTimeout(timeout);
     finishSync();

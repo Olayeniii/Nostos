@@ -152,12 +152,6 @@ export class ObserverBroker {
   async request(id, method, params) {
     if (!allowed.has(method)) throw unresolved();
     const worker = this.#worker(id);
-    if (method === "getwalletstatus" && worker.busy)
-      return {
-        ...(worker.cache ?? { node_tip: null }),
-        locked: true,
-        payments_enabled: false,
-      };
     const result = await this.#request(worker, method, params);
     if (method === "getwalletstatus") worker.cache = result;
     if (
