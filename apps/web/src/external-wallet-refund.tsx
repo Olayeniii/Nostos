@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { requestJson } from "./requests.js";
+import QRCode from "qrcode";
 import { zec } from "./receipt-card.js";
 type Review = {
   recipient: string;
@@ -21,6 +22,8 @@ export function ExternalWalletRefund({
 }) {
   const [feeCapZat, setFeeCapZat] = useState("10000");
   const [review, setReview] = useState<Review>();
+  const [qr, setQr] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
   const [password, setPassword] = useState("");
   const [txid, setTxid] = useState("");
   const [busy, setBusy] = useState(false);
@@ -74,6 +77,31 @@ export function ExternalWalletRefund({
     }
   }
   useEffect(() => {
+    let current = true;
+    setQr("");
+    if (review?.handoffStarted && review.uri) {
+      void QRCode.toDataURL(review.uri, { width: 320, margin: 4 })
+        .then((value) => {
+          if (current) setQr(value);
+        })
+        .catch(() => {
+          if (current)
+            setCopyStatus("QR unavailable. Use the exact saved details below.");
+        });
+    }
+    return () => {
+      current = false;
+    };
+  }, [review?.handoffStarted, review?.uri]);
+  async function copy(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyStatus(`${label} copied.`);
+    } catch {
+      setCopyStatus("Could not copy. Select and copy the saved value shown.");
+    }
+  }
+  useEffect(() => {
     if (!safe || !review?.handoffStarted) return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void act("check");
@@ -121,6 +149,13 @@ export function ExternalWalletRefund({
             Exact refund memo
             <textarea readOnly value={review.memo} />
           </label>
+          <button
+            className="secondary"
+            type="button"
+            onClick={() => void copy(review.memo, "Refund memo")}
+          >
+            Copy exact refund memo
+          </button>
           {!review.handoffStarted ? (
             <>
               <label>
@@ -147,9 +182,46 @@ export function ExternalWalletRefund({
           ) : (
             <>
               {review.uri && (
-                <a className="primary" href={review.uri}>
-                  Open refund in wallet
-                </a>
+                <>
+                  <p>
+                    ZODL requires its own scanner for external payment requests.
+                    Save this QR, then select the image in ZODL's scanner. Check
+                    the refund amount and memo before signing once.
+                  </p>
+                  {qr && (
+                    <>
+                      <img
+                        src={qr}
+                        width={320}
+                        height={320}
+                        style={{ maxWidth: "100%", height: "auto" }}
+                        alt="Saved refund request QR including recipient, amount and memo"
+                      />
+                      <a
+                        className="secondary"
+                        href={qr}
+                        download="nostos-refund-qr.png"
+                      >
+                        Save refund QR
+                      </a>
+                    </>
+                  )}
+                  <a className="secondary" href={review.uri}>
+                    Open in a compatible wallet
+                  </a>
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => void copy(review.uri!, "Refund request")}
+                  >
+                    Copy complete refund request
+                  </button>
+                  <p>
+                    Cake Wallet may fill the address and amount without the
+                    memo. Paste the exact refund memo into its transaction memo
+                    field before signing.
+                  </p>
+                </>
               )}
               <p>
                 Wallet approval was requested. Check wallet history before
@@ -190,6 +262,7 @@ export function ExternalWalletRefund({
           )}
         </>
       )}
+      {copyStatus && <p role="status">{copyStatus}</p>}
       {message && <p role="status">{message}</p>}
     </div>
   );
