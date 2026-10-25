@@ -1,3 +1,5 @@
+import { chainWallet } from "./wallet-runtime.js";
+import type { ZalletRpcClient } from "../../../packages/zcash-adapter/src/index.js";
 import { randomUUID } from "node:crypto";
 import type { SqlitePaymentStore } from "../../../packages/database/src/index.js";
 import { encodeMemo } from "../../../packages/memo/src/index.js";
@@ -83,6 +85,15 @@ function dbFor(
     txid TEXT PRIMARY KEY, pool TEXT NOT NULL, output_index INTEGER NOT NULL,
     instruction_id TEXT UNIQUE NOT NULL REFERENCES observer_record_instructions(id),
     UNIQUE(txid,pool,output_index)
+  ); CREATE TABLE IF NOT EXISTS observer_refund_cursor (
+    instruction_id TEXT PRIMARY KEY, cursor INTEGER NOT NULL
+  ); CREATE TABLE IF NOT EXISTS observer_refund_attempt_history (
+    expired_txid TEXT PRIMARY KEY, instruction_id TEXT NOT NULL,
+    refund_id TEXT NOT NULL, old_fingerprint TEXT NOT NULL, old_memo TEXT NOT NULL,
+    replacement_fingerprint TEXT NOT NULL, expiry_height INTEGER NOT NULL,
+    wallet_scanned_height INTEGER NOT NULL, checked_tip_height INTEGER NOT NULL,
+    checked_tip_hash TEXT NOT NULL, evidence_kind TEXT NOT NULL,
+    recorded_at TEXT NOT NULL
   )`);
   return db;
 }
@@ -380,6 +391,13 @@ export function bindObservedRefund(
         (!plan.txid || plan.txid === txid),
     );
     requireValue(plan.state === "pending");
+    requireValue(
+      !db
+        .prepare(
+          "SELECT 1 FROM observer_refund_attempt_history WHERE expired_txid=?",
+        )
+        .get(txid),
+    );
     requireValue(source(store, core, plan).fingerprint === plan.fingerprint);
     const result = db
       .prepare(
@@ -506,6 +524,13 @@ async function verifyAndApply(
 ) {
   const db = dbFor(store, core, plan.merchant_id, plan.checkout_id);
   requireValue(hash.test(txid) && (!plan.txid || plan.txid === txid));
+  requireValue(
+    !db
+      .prepare(
+        "SELECT 1 FROM observer_refund_attempt_history WHERE expired_txid=?",
+      )
+      .get(txid),
+  );
   if (plan.state !== "pending") return finish(store, core, plan);
   const expected = source(store, core, plan);
   requireValue(expected.fingerprint === plan.fingerprint);
@@ -621,6 +646,249 @@ export async function reconcileObservedPayment(
     throw new ObserverRecordError();
   }
 }
+export type ExpiredRefundEvidence = {
+  txid: string;
+  memo: string;
+  amountZat: number;
+  feeZat: number;
+  expiryHeight: number;
+  walletScannedHeight: number;
+  minedHeight: null;
+  walletStatus: "expired";
+  operatorReviewed: true;
+};
+
+// Private operator recovery ONLY. No HTTP route accepts this evidence. The
+// operator reviews a local wallet export; it is not a cryptographic expiry proof.
+// Never infer expiry from a timeout, missing candidate or missing mempool entry.
+export async function recoverExpiredObservedRefund(
+  store: ProductStore,
+  core: SqlitePaymentStore,
+  merchantId: string,
+  requestId: string,
+  evidence: ExpiredRefundEvidence,
+  apply = false,
+  chain: Pick<ZalletRpcClient, "call"> = chainWallet(),
+) {
+  requireValue(uuid.test(merchantId) && uuid.test(requestId));
+  requireValue(
+    evidence &&
+      Object.keys(evidence).sort().join(",") ===
+        "amountZat,expiryHeight,feeZat,memo,minedHeight,operatorReviewed,txid,walletScannedHeight,walletStatus",
+  );
+  requireValue(
+    hash.test(evidence.txid) &&
+      evidence.operatorReviewed === true &&
+      evidence.walletStatus === "expired" &&
+      evidence.minedHeight === null &&
+      integer(evidence.expiryHeight, 1, 0xffffffff - 100) &&
+      integer(
+        evidence.walletScannedHeight,
+        evidence.expiryHeight + 100,
+        0xffffffff,
+      ) &&
+      integer(evidence.amountZat, 1) &&
+      integer(evidence.feeZat, 1) &&
+      /^nostos:refund:[a-f0-9-]{36}$/.test(evidence.memo),
+  );
+  const request = store.refundRequest(requestId);
+  requireValue(request);
+  const db = dbFor(store, core, merchantId, request.checkoutId);
+  const plan = find(core, `refund:${requestId}`);
+  requireValue(plan?.merchant_id === merchantId && plan.kind === "refund");
+  const previous = db
+    .prepare(
+      "SELECT * FROM observer_refund_attempt_history WHERE expired_txid=?",
+    )
+    .get(evidence.txid);
+  if (previous) {
+    requireValue(
+      previous.instruction_id === plan.id &&
+        previous.refund_id === plan.refund_id &&
+        previous.expiry_height === evidence.expiryHeight &&
+        store.decrypt(String(previous.old_memo)) === evidence.memo,
+    );
+    return {
+      recovered: true,
+      alreadyRecovered: true,
+      sendsRequested: 0,
+      reservationPreserved: true,
+      evidenceKind: "operator_reviewed_wallet_export_v1",
+    };
+  }
+  const expected = source(store, core, plan);
+  const refund = core.findRefund(plan.refund_id!);
+  requireValue(
+    plan.state === "pending" &&
+      plan.handoff_started === 1 &&
+      (!plan.txid || plan.txid === evidence.txid) &&
+      expected.fingerprint === plan.fingerprint &&
+      store.decrypt(plan.memo) === evidence.memo &&
+      evidence.amountZat === expected.amount &&
+      evidence.feeZat <= plan.fee_cap &&
+      refund &&
+      ["broadcasting", "broadcast_unknown", "broadcast"].includes(
+        refund.status,
+      ) &&
+      (!refund.txid || refund.txid === evidence.txid) &&
+      refund.amountZat === expected.amount,
+  );
+  requireValue(
+    !db
+      .prepare(
+        "SELECT 1 FROM observer_output_claims WHERE txid=? OR instruction_id=?",
+      )
+      .get(evidence.txid, plan.id),
+  );
+  const info = await chain.call<{
+    chain: string;
+    blocks: number;
+    bestblockhash: string;
+  }>("getblockchaininfo", []);
+  requireValue(
+    info.chain === "main" &&
+      integer(info.blocks, evidence.walletScannedHeight, 0xffffffff) &&
+      info.blocks >= evidence.expiryHeight + 100 &&
+      hash.test(info.bestblockhash),
+  );
+  // Any returned raw transaction blocks recovery, regardless of confirmations.
+  let missing = false;
+  try {
+    await chain.call("getrawtransaction", [evidence.txid]);
+  } catch (error) {
+    missing = error instanceof Error && /failed \(-5\)\.$/.test(error.message);
+  }
+  requireValue(missing);
+  const mempool = await chain.call<unknown>("getrawmempool", []);
+  requireValue(
+    Array.isArray(mempool) &&
+      mempool.every((id) => typeof id === "string" && hash.test(id)) &&
+      !mempool.includes(evidence.txid),
+  );
+  const status = await observerWallet(merchantId).call<Record<string, unknown>>(
+    "getwalletstatus",
+    [],
+  );
+  const tip = status.node_tip as
+    | { height?: number; blockhash?: string }
+    | undefined;
+  const walletTip = status.wallet_tip as
+    | { height?: number; blockhash?: string }
+    | undefined;
+  requireValue(
+    status.locked === false &&
+      status.account_connected === true &&
+      status.fully_synced_height === info.blocks &&
+      tip?.height === info.blocks &&
+      walletTip?.height === info.blocks &&
+      tip.blockhash === info.bestblockhash &&
+      walletTip.blockhash === info.bestblockhash,
+  );
+  const currentChain = await chain.call<typeof info>("getblockchaininfo", []);
+  requireValue(
+    currentChain.chain === info.chain &&
+      currentChain.blocks === info.blocks &&
+      currentChain.bestblockhash === info.bestblockhash,
+  );
+  const report = {
+    recovered: false,
+    ready: true,
+    evidenceKind: "operator_reviewed_wallet_export_v1",
+    expiryHeight: evidence.expiryHeight,
+    checkedTipHeight: info.blocks,
+    amountZat: expected.amount,
+    reservationPreserved: true,
+    sendsRequested: 0,
+  };
+  if (!apply) return report;
+  let productLocked = false,
+    coreLocked = false;
+  try {
+    store.db.exec("BEGIN IMMEDIATE");
+    productLocked = true;
+    db.exec("BEGIN IMMEDIATE");
+    coreLocked = true;
+    const current = find(core, plan.source_key);
+    const currentRefund = core.findRefund(plan.refund_id!);
+    requireValue(
+      current &&
+        current.state === "pending" &&
+        current.handoff_started === 1 &&
+        current.fingerprint === plan.fingerprint &&
+        current.memo === plan.memo &&
+        current.txid === plan.txid &&
+        source(store, core, current).fingerprint === plan.fingerprint &&
+        currentRefund &&
+        currentRefund.status === refund.status &&
+        currentRefund.txid === refund.txid &&
+        currentRefund.amountZat === expected.amount &&
+        !db
+          .prepare(
+            "SELECT 1 FROM observer_output_claims WHERE txid=? OR instruction_id=?",
+          )
+          .get(evidence.txid, plan.id),
+    );
+    const replacement = {
+      ...current,
+      memo: store.encrypt(`nostos:refund:${randomUUID()}`),
+      txid: null,
+      handoff_started: 0,
+    };
+    replacement.fingerprint = source(store, core, replacement).fingerprint;
+    const now = new Date().toISOString();
+    db.prepare(
+      "INSERT INTO observer_refund_attempt_history VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+    ).run(
+      evidence.txid,
+      plan.id,
+      plan.refund_id,
+      plan.fingerprint,
+      plan.memo,
+      replacement.fingerprint,
+      evidence.expiryHeight,
+      evidence.walletScannedHeight,
+      info.blocks,
+      info.bestblockhash,
+      "operator_reviewed_wallet_export_v1",
+      now,
+    );
+    requireValue(
+      db
+        .prepare(
+          "UPDATE refund_events SET status='pending',txid=NULL,retry_count=retry_count+1,updated_at=? WHERE id=? AND status=?",
+        )
+        .run(now, plan.refund_id, refund.status).changes === 1,
+    );
+    db.prepare(
+      "UPDATE refunds SET status='pending',txid=NULL,retry_count=retry_count+1,updated_at=? WHERE id=?",
+    ).run(now, plan.refund_id);
+    requireValue(
+      db
+        .prepare(
+          "UPDATE observer_record_instructions SET memo=?,fingerprint=?,txid=NULL,handoff_started=0,proof='' WHERE id=? AND state='pending' AND handoff_started=1 AND fingerprint=?",
+        )
+        .run(
+          replacement.memo,
+          replacement.fingerprint,
+          plan.id,
+          plan.fingerprint,
+        ).changes === 1,
+    );
+    db.prepare("DELETE FROM observer_refund_cursor WHERE instruction_id=?").run(
+      plan.id,
+    );
+    db.exec("COMMIT");
+    coreLocked = false;
+    store.db.exec("COMMIT");
+    productLocked = false;
+    return { ...report, recovered: true, freshWalletApprovalRequired: true };
+  } catch {
+    if (coreLocked) db.exec("ROLLBACK");
+    if (productLocked) store.db.exec("ROLLBACK");
+    throw new ObserverRecordError();
+  }
+}
+
 export async function reconcileObservedRefund(
   store: ProductStore,
   core: SqlitePaymentStore,
