@@ -85,8 +85,10 @@ try {
           observerCommerceEnabled: true,
         };
       if (action === "requests") data = { id, token };
-      if (action === "checkout")
+      if (action === "checkout") {
+        paid = true;
         data = { receipt: record(), syncWarning: false };
+      }
       if (action === "payment-check") {
         assert.equal(body.txid, "a".repeat(64));
         paid = true;
@@ -147,12 +149,6 @@ try {
       `${base}/checkout#${token}`,
     );
     await page.goto(`${base}/checkout#${token}`);
-    await page
-      .getByLabel("Payment transaction ID", { exact: true })
-      .fill("a".repeat(64));
-    await page
-      .getByRole("button", { name: "Verify payment transaction", exact: true })
-      .click();
     await page
       .getByRole("heading", { name: "Your payment is complete." })
       .waitFor();

@@ -634,11 +634,25 @@ async function handle(request: Request) {
           ? ["requestId", "password"]
           : route === "refund-candidate"
             ? ["requestId", "txid"]
-            : ["requestId"];
+            : route === "refund-review"
+              ? ["requestId", "feeCapZat"]
+              : ["requestId"];
       if (!requestId || Object.keys(body).some((k) => !allowed.includes(k)))
         return json({ error: "Saved refund request required." }, 400);
       if (!identityLimit(store, "refund-wallet:" + merchant.id, 60))
         return json({ error: "Wait before checking again." }, 429);
+      if (
+        route === "refund-review" &&
+        body.feeCapZat !== undefined &&
+        (typeof body.feeCapZat !== "number" ||
+          !Number.isSafeInteger(body.feeCapZat) ||
+          body.feeCapZat < 1 ||
+          body.feeCapZat > 100000000)
+      )
+        return json(
+          { error: "Enter a whole-number fee limit up to 1 ZEC in zats." },
+          400,
+        );
       if (route === "refund-review")
         return json(
           await prepareObservedRefund(
@@ -646,7 +660,7 @@ async function handle(request: Request) {
             core,
             merchant.id,
             requestId,
-            10000,
+            body.feeCapZat === undefined ? 10000 : Number(body.feeCapZat),
           ),
         );
       if (route === "refund-handoff") {

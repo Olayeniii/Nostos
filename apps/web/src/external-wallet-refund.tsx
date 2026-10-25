@@ -19,6 +19,7 @@ export function ExternalWalletRefund({
   safe: boolean;
   onRefresh: () => void;
 }) {
+  const [feeCapZat, setFeeCapZat] = useState("10000");
   const [review, setReview] = useState<Review>();
   const [password, setPassword] = useState("");
   const [txid, setTxid] = useState("");
@@ -38,6 +39,7 @@ export function ExternalWalletRefund({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             requestId,
+            ...(action === "review" ? { feeCapZat: Number(feeCapZat) } : {}),
             ...(action === "handoff" ? { password } : {}),
             ...(action === "candidate" ? { txid: txid.trim() } : {}),
           }),
@@ -77,6 +79,20 @@ export function ExternalWalletRefund({
         Your wallet signs this refund. NOSTOS verifies the exact outgoing
         payment after three confirmations.
       </p>
+      {!review && (
+        <label>
+          Maximum wallet fee (zats)
+          <input
+            inputMode="numeric"
+            value={feeCapZat}
+            onChange={(e) => setFeeCapZat(e.target.value)}
+          />
+          <span>
+            Set this before review. Check the fee in ZODL before signing. A
+            saved refund limit cannot be changed.
+          </span>
+        </label>
+      )}
       <button
         className="secondary"
         disabled={!safe || busy}

@@ -1095,3 +1095,14 @@ it("rejects malformed candidate batches before output verification", async () =>
   await expect(detectObservedPayment(store, core, c.id)).rejects.toThrow();
   expect(requests.some((r) => r.method === "nostos_verify_output")).toBe(false);
 });
+
+it("freezes a merchant-selected refund fee limit before wallet handoff", async () => {
+  const c = await paid();
+  const id = approve(c.id);
+  const review = await prepareObservedRefund(store, core, merchant, id, 25000);
+  expect(review.feeCapZat).toBe(25000);
+  await expect(
+    prepareObservedRefund(store, core, merchant, id, 30000),
+  ).rejects.toThrow();
+  expect(core.refundTotals(paymentTx).reservedZat).toBe(40000);
+});
