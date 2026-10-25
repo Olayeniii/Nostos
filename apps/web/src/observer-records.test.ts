@@ -20,6 +20,8 @@ import {
   claimObservedRefund,
   bindObservedRefund,
   reconcileObservedRefund,
+  recoverExpiredObservedRefund,
+  type ExpiredRefundEvidence,
 } from "./observer-records.js";
 
 let root: string,
@@ -1184,4 +1186,327 @@ it("resumes a saved refund route with only the checkout token and rejects replac
   );
   expect(unauthenticated.status).toBe(401);
   expect(requests.some((r) => /send|broadcast/.test(r.method))).toBe(false);
+});
+
+const expiredTx = "e".repeat(64);
+async function expiredAttempt() {
+  const c = await paid();
+  const id = approve(c.id, 50000);
+  const plan = await prepareObservedRefund(store, core, merchant, id, 10000);
+  claimObservedRefund(store, core, merchant, id);
+  const evidence: ExpiredRefundEvidence = {
+    txid: expiredTx,
+    memo: plan.memo,
+    amountZat: 50000,
+    feeZat: 10000,
+    expiryHeight: 1,
+    walletScannedHeight: 101,
+    minedHeight: null,
+    walletStatus: "expired",
+    operatorReviewed: true,
+  };
+  return { c, id, plan, evidence };
+}
+function recoveryChain(
+  options: {
+    found?: boolean;
+    mempool?: string[];
+    unavailable?: boolean;
+    hook?: () => void;
+  } = {},
+) {
+  return {
+    async call<T>(method: string): Promise<T> {
+      if (options.unavailable) throw Error("Unavailable");
+      if (method === "getblockchaininfo") {
+        options.hook?.();
+        return {
+          chain: "main",
+          blocks: 102,
+          bestblockhash: "f".repeat(64),
+        } as T;
+      }
+      if (method === "getrawtransaction") {
+        if (options.found) return "raw fixture" as T;
+        throw Error("Zallet RPC request failed (-5).");
+      }
+      if (method === "getrawmempool") return (options.mempool ?? []) as T;
+      throw Error("Unexpected operation");
+    },
+  };
+}
+it("dry-runs operator expiry recovery without reopening handoff or releasing principal", async () => {
+  const { c, id, plan, evidence } = await expiredAttempt();
+  const result = await recoverExpiredObservedRefund(
+    store,
+    core,
+    merchant,
+    id,
+    evidence,
+    false,
+    recoveryChain(),
+  );
+  expect(result).toMatchObject({
+    ready: true,
+    recovered: false,
+    sendsRequested: 0,
+    evidenceKind: "operator_reviewed_wallet_export_v1",
+  });
+  expect(core.refundTotals(c.paymentTxid!).reservedZat).toBe(50000);
+  expect(
+    (await prepareObservedRefund(store, core, merchant, id, 10000)).memo,
+  ).toBe(plan.memo);
+  expect(() => claimObservedRefund(store, core, merchant, id)).toThrow();
+});
+it("recovers once, retains expired evidence, rotates memo and preserves amount, cap and reservation", async () => {
+  const { c, id, plan, evidence } = await expiredAttempt();
+  await recoverExpiredObservedRefund(
+    store,
+    core,
+    merchant,
+    id,
+    evidence,
+    true,
+    recoveryChain(),
+  );
+  const review = await prepareObservedRefund(store, core, merchant, id, 10000);
+  expect(review).toMatchObject({
+    amountZat: 50000,
+    feeCapZat: 10000,
+    recipient: route,
+    handoffStarted: false,
+  });
+  expect(review.memo).not.toBe(plan.memo);
+  expect(core.refundTotals(c.paymentTxid!)).toMatchObject({
+    reservedZat: 50000,
+    refundedZat: 0,
+  });
+  const history = core
+    .withdrawalDatabase()
+    .prepare("SELECT * FROM observer_refund_attempt_history")
+    .all();
+  expect(history).toHaveLength(1);
+  expect(history[0]).toMatchObject({
+    expired_txid: expiredTx,
+    evidence_kind: "operator_reviewed_wallet_export_v1",
+  });
+  expect(JSON.stringify(history)).not.toContain(plan.memo);
+  claimObservedRefund(store, core, merchant, id);
+  expect(() => claimObservedRefund(store, core, merchant, id)).toThrow();
+  expect(() =>
+    bindObservedRefund(store, core, merchant, id, expiredTx),
+  ).toThrow();
+  const again = await recoverExpiredObservedRefund(
+    store,
+    core,
+    merchant,
+    id,
+    evidence,
+    true,
+    recoveryChain(),
+  );
+  expect(again).toMatchObject({ alreadyRecovered: true, sendsRequested: 0 });
+  expect(() => claimObservedRefund(store, core, merchant, id)).toThrow();
+  await expect(
+    reconcileObservedPayment(store, core, merchant, c.id, expiredTx),
+  ).rejects.toThrow();
+  await reconcileObservedRefund(store, core, merchant, id);
+  expect(core.refundTotals(c.paymentTxid!)).toMatchObject({
+    refundedZat: 50000,
+    reservedZat: 0,
+  });
+});
+it.each([{ found: true }, { mempool: [expiredTx] }, { unavailable: true }])(
+  "blocks expiry recovery when chain evidence is present or unavailable: %j",
+  async (options) => {
+    const { id, evidence } = await expiredAttempt();
+    await expect(
+      recoverExpiredObservedRefund(
+        store,
+        core,
+        merchant,
+        id,
+        evidence,
+        true,
+        recoveryChain(options),
+      ),
+    ).rejects.toThrow();
+    expect(() => claimObservedRefund(store, core, merchant, id)).toThrow();
+  },
+);
+it.each([
+  { minedHeight: 100 },
+  { walletStatus: "pending" },
+  { operatorReviewed: false },
+  { walletScannedHeight: 100 },
+  { memo: "nostos:refund:11111111-1111-4111-8111-111111111111" },
+  { amountZat: 60000 },
+  { feeZat: 10001 },
+  { expiryHeight: 0 },
+])(
+  "rejects incomplete or conflicting reviewed export evidence: %j",
+  async (changes) => {
+    const { id, evidence } = await expiredAttempt();
+    await expect(
+      recoverExpiredObservedRefund(
+        store,
+        core,
+        merchant,
+        id,
+        { ...evidence, ...changes } as ExpiredRefundEvidence,
+        true,
+        recoveryChain(),
+      ),
+    ).rejects.toThrow();
+    expect(() => claimObservedRefund(store, core, merchant, id)).toThrow();
+  },
+);
+it("keeps reservation if observer scan is not ready", async () => {
+  const { id, evidence } = await expiredAttempt();
+  transform = (p) => ({ ...p, locked: true });
+  await expect(
+    recoverExpiredObservedRefund(
+      store,
+      core,
+      merchant,
+      id,
+      evidence,
+      true,
+      recoveryChain(),
+    ),
+  ).rejects.toThrow();
+  expect(() => claimObservedRefund(store, core, merchant, id)).toThrow();
+});
+it("rechecks a changed approval after asynchronous chain checks", async () => {
+  const { id, evidence } = await expiredAttempt();
+  await expect(
+    recoverExpiredObservedRefund(
+      store,
+      core,
+      merchant,
+      id,
+      evidence,
+      true,
+      recoveryChain({
+        hook: () =>
+          store.db
+            .prepare("UPDATE refund_requests SET approved_zat=60000 WHERE id=?")
+            .run(id),
+      }),
+    ),
+  ).rejects.toThrow();
+  expect(
+    core
+      .withdrawalDatabase()
+      .prepare("SELECT COUNT(*) AS n FROM observer_refund_attempt_history")
+      .get()?.n,
+  ).toBe(0);
+});
+it("rolls back history, memo and accounting together if recovery cannot commit", async () => {
+  const { c, id, plan, evidence } = await expiredAttempt();
+  core
+    .withdrawalDatabase()
+    .exec(
+      "CREATE TRIGGER prevent_recovery BEFORE UPDATE ON observer_record_instructions BEGIN SELECT RAISE(ABORT,'fixture failure'); END",
+    );
+  await expect(
+    recoverExpiredObservedRefund(
+      store,
+      core,
+      merchant,
+      id,
+      evidence,
+      true,
+      recoveryChain(),
+    ),
+  ).rejects.toThrow();
+  expect(
+    core
+      .withdrawalDatabase()
+      .prepare("SELECT COUNT(*) AS n FROM observer_refund_attempt_history")
+      .get()?.n,
+  ).toBe(0);
+  expect(core.refundTotals(c.paymentTxid!)).toMatchObject({
+    reservedZat: 50000,
+    refundedZat: 0,
+  });
+  expect(
+    (await prepareObservedRefund(store, core, merchant, id, 10000)).memo,
+  ).toBe(plan.memo);
+  expect(() => claimObservedRefund(store, core, merchant, id)).toThrow();
+});
+it("does not recover a different merchant's request or a settled instruction", async () => {
+  const { id, evidence } = await expiredAttempt();
+  await expect(
+    recoverExpiredObservedRefund(
+      store,
+      core,
+      randomUUID(),
+      id,
+      evidence,
+      true,
+      recoveryChain(),
+    ),
+  ).rejects.toThrow();
+  bindObservedRefund(store, core, merchant, id, refundTx);
+  await reconcileObservedRefund(store, core, merchant, id);
+  await expect(
+    recoverExpiredObservedRefund(
+      store,
+      core,
+      merchant,
+      id,
+      evidence,
+      true,
+      recoveryChain(),
+    ),
+  ).rejects.toThrow();
+});
+it("rejects an old output check that finishes after recovery rotated its expectation", async () => {
+  const { c, id, evidence } = await expiredAttempt();
+  bindObservedRefund(store, core, merchant, id, expiredTx);
+  const original = globalThis.fetch;
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  vi.stubGlobal("fetch", async (url: unknown, options: RequestInit) => {
+    const request = JSON.parse(String(options.body));
+    if (
+      request.method === "nostos_verify_output" &&
+      request.params[2] === expiredTx
+    ) {
+      started();
+      await gate;
+    }
+    return original(url as string, options);
+  });
+  const pending = reconcileObservedRefund(store, core, merchant, id);
+  const outcome = pending.then(
+    () => "applied",
+    () => "rejected",
+  );
+  await waiting;
+  await recoverExpiredObservedRefund(
+    store,
+    core,
+    merchant,
+    id,
+    evidence,
+    true,
+    recoveryChain(),
+  );
+  release();
+  expect(await outcome).toBe("rejected");
+  expect(core.refundTotals(c.paymentTxid!)).toMatchObject({
+    refundedZat: 0,
+    reservedZat: 50000,
+  });
+  expect(
+    (await prepareObservedRefund(store, core, merchant, id, 10000))
+      .handoffStarted,
+  ).toBe(false);
 });
