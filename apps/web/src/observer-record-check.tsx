@@ -48,78 +48,80 @@ export function ObserverRecordCheck({
       className="refund-request-panel"
       aria-label="Observer transaction checks"
     >
-      <h3>Verify an existing transaction</h3>
-      <p>
-        These checks compare confirmed outputs with this saved payment or
-        refund. They cannot sign or send. Payment creation and wallet signing
-        remain disabled.
-      </p>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void check("observer-payment-check", {
-            id: record.id,
-            txid: txid.trim(),
-            pool,
-          });
-        }}
-      >
-        <label>
-          Payment transaction reference
-          <input
-            value={txid}
-            onChange={(e) => setTxid(e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            minLength={64}
-            maxLength={64}
-            pattern="[a-f0-9]{64}"
-            required
-            disabled={busy}
-          />
-        </label>
-        <label>
-          Shielded output pool
-          <select
-            value={pool}
-            onChange={(e) => setPool(e.target.value)}
-            disabled={busy}
-          >
-            <option value="ironwood">Ironwood</option>
-            <option value="orchard">Orchard</option>
-          </select>
-        </label>
-        <button
-          className="secondary"
-          disabled={busy || !/^[a-f0-9]{64}$/.test(txid.trim())}
+      <details>
+        <summary>Payment recovery</summary>
+        <p>
+          Payments are checked automatically. Use these recovery checks only if
+          a sent payment has not appeared. They verify saved details and cannot
+          sign or send.
+        </p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void check("observer-payment-check", {
+              id: record.id,
+              txid: txid.trim(),
+              pool,
+            });
+          }}
         >
-          {busy ? "Checking output" : "Verify payment output"}
-        </button>
-      </form>
-      {record.refundRequests
-        ?.filter((r) => r.status === "approved" || r.status === "settled")
-        .map((r) => (
-          <div key={r.id}>
-            <p>
-              Refund request: <code>{r.id}</code>
-            </p>
-            <button
-              className="secondary"
-              type="button"
+          <label>
+            Payment transaction reference
+            <input
+              value={txid}
+              onChange={(e) => setTxid(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              minLength={64}
+              maxLength={64}
+              pattern="[a-f0-9]{64}"
+              required
               disabled={busy}
-              onClick={() =>
-                void check("observer-refund-check", { requestId: r.id })
-              }
+            />
+          </label>
+          <label>
+            Shielded output pool
+            <select
+              value={pool}
+              onChange={(e) => setPool(e.target.value)}
+              disabled={busy}
             >
-              Check saved refund output
-            </button>
-          </div>
-        ))}
-      <p className="privacy">
-        A refund check requires an existing saved instruction and transaction
-        reference. This screen does not prepare or authorize a wallet handoff.
-      </p>
-      {message && <p role="status">{message}</p>}
+              <option value="ironwood">Ironwood</option>
+              <option value="orchard">Orchard</option>
+            </select>
+          </label>
+          <button
+            className="secondary"
+            disabled={busy || !/^[a-f0-9]{64}$/.test(txid.trim())}
+          >
+            {busy ? "Checking output" : "Verify payment output"}
+          </button>
+        </form>
+        {record.refundRequests
+          ?.filter((r) => r.status === "approved" || r.status === "settled")
+          .map((r) => (
+            <div key={r.id}>
+              <p>
+                Refund request: <code>{r.id}</code>
+              </p>
+              <button
+                className="secondary"
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void check("observer-refund-check", { requestId: r.id })
+                }
+              >
+                Check saved refund output
+              </button>
+            </div>
+          ))}
+        <p className="privacy">
+          Refund checks use the saved instruction and look for matching outgoing
+          transactions. This screen does not authorize another send.
+        </p>
+        {message && <p role="status">{message}</p>}
+      </details>
     </section>
   );
 }
