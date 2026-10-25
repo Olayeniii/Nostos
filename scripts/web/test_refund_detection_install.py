@@ -56,7 +56,7 @@ class CommerceInstall(unittest.TestCase):
             return ""
         def digest(path):
             if path.name == "service.mjs":
-                return "ad6bc7f5fe86ef5b2d4c3057cecbdfd67db3ec74e9dbc415a4e7ef46a6b29952"
+                return "ca83248014b6d6bc910f892d54d8e67732b97086b8c3749481d48aca916521ea"
             return hashlib.sha256(path.read_bytes()).hexdigest()
         self.child = Mock(pid=456)
         self.child.poll.return_value = None

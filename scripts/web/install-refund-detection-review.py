@@ -150,7 +150,7 @@ def run():
     private(runtime / "rpc/service.cookie")
     require(cookie.read_bytes() == (runtime / "rpc/service.cookie").read_bytes(), "Preview credential copy differs. Preserve existing credentials.")
     launcher = REVIEW / "commerce-build-b7a441806e88/source/scripts/lightclient/run-service.mjs"
-    require(digest(launcher.parent / "service.mjs") == "ad6bc7f5fe86ef5b2d4c3057cecbdfd67db3ec74e9dbc415a4e7ef46a6b29952", "Installed broker code changed.")
+    require(digest(launcher.parent / "service.mjs") == "ca83248014b6d6bc910f892d54d8e67732b97086b8c3749481d48aca916521ea", "Installed broker code changed.")
     node = Path("/usr/bin/node").resolve()
     pid = broker_pid(launcher, old_config)
     inspect_web()
