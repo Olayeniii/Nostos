@@ -1141,3 +1141,47 @@ it("keeps an unverified discovered refund reserved without binding the candidate
     .get(`refund:${id}`);
   expect(plan?.txid).toBeNull();
 });
+
+it("resumes a saved refund route with only the checkout token and rejects replacement", async () => {
+  vi.stubEnv("NOSTOS_WEB_TRUSTED_ORIGINS", "https://nostos.example");
+  vi.stubEnv("NOSTOS_MAINNET_OBSERVER_RECORD_CHECKS", "yes");
+  vi.stubEnv("NOSTOS_MAINNET_COMMERCE_PREVIEW", "yes");
+  const c = checkout();
+  const headers = {
+    origin: "https://nostos.example",
+    "content-type": "application/json",
+    authorization: `Bearer ${store.receiptToken(c.id, merchant)}`,
+  };
+  const resume = () =>
+    POST(
+      new Request("https://nostos.example/api/product/prepare", {
+        method: "POST",
+        headers,
+        body: "{}",
+      }),
+    );
+  const first = await resume();
+  expect(first.status).toBe(200);
+  const prepared = await first.json();
+  expect(prepared.memo).toContain(route);
+  const again = await resume();
+  expect(await again.json()).toEqual(prepared);
+  const changed = await POST(
+    new Request("https://nostos.example/api/product/prepare", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ route: "u1" + "s".repeat(60) }),
+    }),
+  );
+  expect(changed.status).not.toBe(200);
+  expect(store.checkout(c.id)?.route).toBe(route);
+  const unauthenticated = await POST(
+    new Request("https://nostos.example/api/product/prepare", {
+      method: "POST",
+      headers: { origin: headers.origin, "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  expect(unauthenticated.status).toBe(401);
+  expect(requests.some((r) => /send|broadcast/.test(r.method))).toBe(false);
+});
