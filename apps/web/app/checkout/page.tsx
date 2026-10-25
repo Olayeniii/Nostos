@@ -76,6 +76,7 @@ export default function Checkout() {
   const { data, loading, warning, refresh } = useRecord<{
     receipt: ReceiptData;
     syncWarning: boolean;
+    refundRouteSaved: boolean;
   }>("/api/product/checkout", token, !!token);
   useEffect(() => {
     const t = window.location.hash.slice(1);
@@ -214,7 +215,9 @@ export default function Checkout() {
                             "Content-Type": "application/json",
                             Authorization: `Bearer ${token}`,
                           },
-                          body: JSON.stringify({ route }),
+                          body: JSON.stringify(
+                            data?.refundRouteSaved ? {} : { route },
+                          ),
                         },
                         15000,
                       );
@@ -231,37 +234,49 @@ export default function Checkout() {
                         "Could not prepare the payment. Check the address network and connection. Once attached, the return address cannot be changed.",
                       );
                     } finally {
+                      void refresh();
                       setBusy(false);
                     }
                   }}
                 >
-                  <label>
-                    Your fresh refund address
-                    <input
-                      name="route"
-                      type="text"
-                      autoComplete="off"
-                      spellCheck={false}
-                      minLength={26}
-                      maxLength={506}
-                      placeholder={
-                        network === "mainnet" ? "u1..." : "utest1..."
-                      }
-                      required
-                      disabled={busy}
-                    />
-                  </label>
-                  <p className="privacy">
-                    Use an address you control. NOSTOS checks Orchard
-                    capability, not ownership or prior use. The hosted service
-                    and merchant wallet can read this route; the receipt omits
-                    it.
-                  </p>
+                  {data?.refundRouteSaved ? (
+                    <p>
+                      Your refund address is already saved. Continue with the
+                      original payment details.
+                    </p>
+                  ) : (
+                    <>
+                      <label>
+                        Your fresh refund address
+                        <input
+                          name="route"
+                          type="text"
+                          autoComplete="off"
+                          spellCheck={false}
+                          minLength={26}
+                          maxLength={506}
+                          placeholder={
+                            network === "mainnet" ? "u1..." : "utest1..."
+                          }
+                          required
+                          disabled={busy}
+                        />
+                      </label>
+                      <p className="privacy">
+                        Use an address you control. NOSTOS checks Orchard
+                        capability, not ownership or prior use. The hosted
+                        service and merchant wallet can read this route; the
+                        receipt omits it.
+                      </p>
+                    </>
+                  )}
                   <button
                     className="primary"
                     disabled={busy || loading || !!warning || data?.syncWarning}
                   >
-                    Prepare payment
+                    {data?.refundRouteSaved
+                      ? "Continue payment"
+                      : "Prepare payment"}
                   </button>
                   {busy && (
                     <StateLabel
@@ -318,6 +333,7 @@ export default function Checkout() {
                                 const latest = await requestJson<{
                                   receipt: ReceiptData;
                                   syncWarning: boolean;
+                                  refundRouteSaved: boolean;
                                 }>(
                                   "/api/product/checkout",
                                   {
