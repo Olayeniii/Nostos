@@ -83,6 +83,21 @@ export default function Checkout() {
     setInitialized(true);
   }, []);
   const r = data?.receipt;
+  useEffect(() => {
+    if (
+      network !== "mainnet" ||
+      !paymentTxid ||
+      !r ||
+      r.paymentStatus !== "unpaid"
+    )
+      return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible")
+        void checkMainnetPayment(paymentTxid);
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [network, paymentTxid, r?.paymentStatus, token]);
+
   const paid = (r?.paymentConfirmations ?? 0) > 0;
   async function copy(value: string, label: string) {
     setCopyStatus("");
@@ -328,7 +343,9 @@ export default function Checkout() {
                             setWalletMessage(
                               "Noir reported a transaction ID. Waiting for the merchant wallet to confirm your payment. Do not send again.",
                             );
-                            void refresh();
+                            if (network === "mainnet")
+                              void checkMainnetPayment(txid);
+                            else void refresh();
                           } catch (error) {
                             setWalletMessage(
                               error instanceof NoirHandoffError
