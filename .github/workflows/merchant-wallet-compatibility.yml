@@ -1,0 +1,110 @@
+name: Merchant wallet compatibility gate
+# Manual while the hosted Actions allowance is exhausted.
+# See docs/CI_VALIDATION.md before restoring automatic events.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+jobs:
+  offline-wallet-gate:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_RELEASE_DEBUG: 0
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16
+      CARGO_PROFILE_RELEASE_STRIP: debuginfo
+      CARGO_TARGET_DIR: backends/zaino/target
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: nostos
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zcash/zallet
+          ref: 987382f67e622915228686e9f956c6a9c9a7514c
+          path: zallet
+          persist-credentials: false
+      - name: Install test prerequisites on runner only
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libssl-dev protobuf-compiler age
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/backends/zaino/target
+          key: merchant-wallet-gate-${{ runner.arch }}-987382f-v1
+          restore-keys: |
+            sdk-observer-arm64-v1-987382f
+            observer-arm64-release-v2-
+      - name: Prepare pinned offline examples
+        run: |
+          test "$(git -C zallet rev-parse HEAD)" = 987382f67e622915228686e9f956c6a9c9a7514c
+          mkdir -p zallet/zallet-core/examples/nostos_observer
+          for module in storage transactions transaction_tests connection; do
+            cp "nostos/scripts/lightclient/$module.rs" "zallet/zallet-core/examples/nostos_observer/$module.rs"
+          done
+          cp nostos/scripts/lightclient/observer.rs zallet/zallet-core/examples/nostos_observer/mod.rs
+          cp nostos/scripts/lightclient/observer_fixture.rs zallet/zallet-core/examples/nostos_observer_fixture.rs
+          cp nostos/scripts/lightclient/wallet_check.rs zallet/zallet-core/examples/nostos_wallet_check.rs
+          cp nostos/scripts/lightclient/operator_check.rs zallet/zallet-core/examples/nostos_operator_check.rs
+          cp nostos/scripts/lightclient/worker.rs zallet/zallet-core/examples/nostos_sdk_worker.rs
+          python3 nostos/scripts/lightclient/prepare.py zallet
+      - name: Test public wallet export, account binding, memo and outgoing recovery
+        working-directory: zallet
+        env:
+          NOSTOS_BACKUP_FIXTURE: ${{ github.workspace }}/nostos/scripts/lightclient/backup_fixture.py
+        run: cargo +1.95.0 test --locked --release -p zallet-core --example nostos_observer_fixture
+      - name: Build and test isolated offline operator checker
+        working-directory: zallet
+        run: |
+          cargo +1.95.0 test --locked --release -p zallet-core --example nostos_operator_check
+          cargo +1.95.0 build --locked --release -p zallet-core --example nostos_operator_check
+          python3 ../nostos/scripts/lightclient/package-operator-check.py backends/zaino/target/release/examples/nostos_operator_check ../operator-check
+      - name: Verify runner-only backup and broker boundaries
+        run: |
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_backup.py
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_operator_check.py
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_control.py
+          python3 -m unittest discover -s nostos/scripts/lightclient -p test_control_package.py
+          node --test nostos/scripts/lightclient/service.test.mjs
+      - name: Build control worker without live wallet access
+        working-directory: zallet
+        run: cargo +1.95.0 build --locked --release -p zallet-core --example nostos_sdk_worker
+      - name: Check control worker native linkage
+        run: ldd zallet/backends/zaino/target/release/examples/nostos_sdk_worker
+      - name: Package private operator control harness
+        run: python3 nostos/scripts/lightclient/package-control.py zallet/backends/zaino/target/release/examples/nostos_sdk_worker control-harness '${{ github.sha }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: control-harness-${{ runner.arch }}
+          path: control-harness/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-operator-check-${{ runner.arch }}
+          path: operator-check/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/cache/save@v4
+        if: success()
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zallet/backends/zaino/target
+          key: merchant-wallet-gate-${{ runner.arch }}-987382f-v1

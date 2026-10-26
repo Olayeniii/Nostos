@@ -22,6 +22,9 @@ export class SdkObserverClient extends ZalletRpcClient {
         "getwalletstatus",
         "z_importviewingkey",
         "z_listunifiedreceivers",
+        "nostos_verify_output",
+        "nostos_incoming_candidates",
+        "nostos_outgoing_candidates",
       ].includes(method)
     )
       throw new Error("SDK observer operation is unavailable.");
@@ -30,7 +33,10 @@ export class SdkObserverClient extends ZalletRpcClient {
       const result = value as Record<string, unknown> | null;
       if (
         !result ||
-        result.nostos_sdk_preview_v1 !== true ||
+        (method === "nostos_verify_output"
+          ? result.nostos_output_proof_v1 !== true ||
+            result.payments_enabled !== false
+          : result.nostos_sdk_preview_v1 !== true) ||
         result.observation_scope !== "orchard-family-only" ||
         (method === "getwalletstatus" && result.payments_enabled !== false)
       )

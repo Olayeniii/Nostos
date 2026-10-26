@@ -34,15 +34,121 @@ impl Connection {
         let connected=db.get_account_ids().map_err(|_| "account_lookup")?.len()==1;
         let pending=db.transaction_data_requests().map_err(|_| "enhancement_status")?;
         let ready=full.as_ref().is_some_and(|b|u32::from(b.block_height())==height)
-            && wallet_tip.is_some_and(|(h,b)|u32::from(h)==height && b.to_string()==hash)
-            && pending.is_empty();
+            && wallet_tip.is_some_and(|(h,b)|u32::from(h)==height && b.to_string()==hash);
         Ok(json!({"node_tip":{"height":height,"blockhash":hash},
             "wallet_tip":wallet_tip.map(|(h,b)|json!({"height":u32::from(h),"blockhash":b.to_string()})),
             "fully_synced_height":full.map(|b|u32::from(b.block_height())),"locked":!ready,
+            "enhancement_pending":!pending.is_empty(),
             "account_connected":connected,"nostos_sdk_preview_v1":true,"observation_scope":"orchard-family-only","payments_enabled":false}))
     }
     pub async fn handle(&mut self,method:&str,params:&[Value]) -> Result<Value,&'static str> {
         match method {
+            "nostos_incoming_candidates" | "nostos_outgoing_candidates" if params.len()==2 => {
+                let account=params[0].as_str().ok_or("candidate_account")?;
+                let after=params[1].as_i64().filter(|n|*n>=0).ok_or("candidate_cursor")?;
+                let accounts=self.wallet.db_mut().get_account_ids().map_err(|_| "candidate_account")?;
+                if accounts.len()!=1 || accounts[0].expose_uuid().to_string()!=account {return Err("candidate_account");}
+                let rows=if method=="nostos_outgoing_candidates" {self.wallet.outgoing_candidates(account,after)?} else {self.wallet.incoming_candidates(account,after)?};
+                Ok(json!({"nostos_sdk_preview_v1":true,"payments_enabled":false,"observation_scope":"orchard-family-only","candidates":rows}))
+            },
+            "nostos_verify_output" if params.len()==9 => {
+                use zcash_client_backend::{TransferType,data_api::NullifierQuery};
+                use zcash_protocol::{ShieldedPool,memo::MemoBytes};
+                let account_uuid=params[0].as_str().ok_or("product_account")?;
+                let accounts=self.wallet.db_mut().get_account_ids().map_err(|_| "account_lookup")?;
+                if accounts.len()!=1 || accounts[0].expose_uuid().to_string()!=account_uuid {
+                    return Err("product_account");
+                }
+                let account=accounts[0];
+                let id=params[1].as_str().ok_or("product_txid")?;
+                if id.len()!=64 || !id.bytes().all(|b|b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                    return Err("product_txid");
+                }
+                let mut bytes:[u8;32]=hex::decode(id).map_err(|_| "product_txid")?.try_into().map_err(|_| "product_txid")?;
+                bytes.reverse();
+                let txid=zcash_primitives::transaction::TxId::from_bytes(bytes);
+                let receiver=transactions::OrchardReceiver::parse_mainnet(params[2].as_str().ok_or("product_receiver")?)?;
+                let amount=params[3].as_u64().ok_or("product_amount")?;
+                let encoded=params[4].as_str().ok_or("product_memo")?;
+                if encoded.len()>1024 || encoded.len()%2!=0 {return Err("product_memo");}
+                let memo=MemoBytes::from_bytes(&hex::decode(encoded).map_err(|_| "product_memo")?).map_err(|_| "product_memo")?;
+                let pool=match params[5].as_str() {Some("ironwood")=>ShieldedPool::Ironwood,Some("orchard")=>ShieldedPool::Orchard,_=>return Err("product_pool")};
+                let direction=match params[6].as_str() {Some("incoming")=>TransferType::Incoming,Some("outgoing")=>TransferType::Outgoing,_=>return Err("product_direction")};
+                let binding=params[7].as_str().ok_or("product_binding")?;
+                if uuid::Uuid::parse_str(binding).map_err(|_| "product_binding")?.to_string()!=binding {
+                    return Err("product_binding");
+                }
+                let fee_cap=params[8].as_u64().ok_or("product_fee_cap")?;
+                let expected=transactions::Expected::new(account,receiver,amount,memo,pool,direction,3)?;
+                let keys=self.wallet.db_mut().get_unified_full_viewing_keys().map_err(|_| "product_keys")?;
+                let before=self.tip().await?;
+                let tx=transactions::enhance(&mut self.client,self.wallet.db_mut(),txid).await?;
+                let owned=if direction==TransferType::Outgoing {
+                    let pairs=match pool {
+                        ShieldedPool::Ironwood=>self.wallet.db_mut().get_ironwood_nullifiers(NullifierQuery::All),
+                        _=>self.wallet.db_mut().get_orchard_nullifiers(NullifierQuery::All),
+                    }.map_err(|_| "product_nullifiers")?;
+                    pairs.into_iter().filter_map(|(owner,nf)|(owner==account).then_some(nf)).collect::<Vec<_>>()
+                } else {vec![]};
+                let after=self.tip().await?;
+                let scanned=self.wallet.db_mut().get_max_height_hash().map_err(|_| "product_tip")?.ok_or("product_tip")?;
+                if before!=after || u32::from(scanned.0)!=after.0 || scanned.1.to_string()!=after.1 {
+                    return Err("product_chain_changed");
+                }
+                let result=tx.verify_product(&keys,&expected,&owned,after.0,fee_cap,binding,account_uuid,&after.1)?;
+                tx.store(self.wallet.db_mut())?;
+                Ok(result)
+            },
+            // Private operator pipe only. The HTTP broker does not allow this
+            // method. This never settles a product instruction or enables payments.
+            "nostos_control" if params.len()==4 => {
+                use zcash_client_backend::{TransferType, data_api::NullifierQuery};
+                use zcash_protocol::{ShieldedPool, memo::MemoBytes};
+                use zcash_primitives::transaction::TxId;
+                let receiver=transactions::OrchardReceiver::parse_mainnet(params[1].as_str().ok_or("control_receiver")?)?;
+                let memo=params[2].as_str().ok_or("control_memo")?;
+                if memo.len()!=47 || !memo.starts_with("nostos:control:")
+                    || !memo[15..].bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                    return Err("control_memo");
+                }
+                let account_id=params[3].as_str().ok_or("control_account")?;
+                let accounts=self.wallet.db_mut().get_account_ids().map_err(|_| "account_lookup")?;
+                if accounts.len()!=1 || accounts[0].expose_uuid().to_string()!=account_id {
+                    return Err("control_account");
+                }
+                let account=accounts[0];
+                let keys=self.wallet.db_mut().get_unified_full_viewing_keys().map_err(|_| "control_keys")?;
+                let key=keys.get(&account).ok_or("control_keys")?;
+                receiver.require_external_to(key)?;
+                let expected=transactions::Expected::new(account,receiver,10_000,
+                    MemoBytes::from_bytes(memo.as_bytes()).map_err(|_| "control_memo")?,
+                    ShieldedPool::Ironwood,TransferType::Outgoing,3)?;
+                if params[0].is_null() {
+                    if self.status().await?.get("locked").and_then(Value::as_bool)!=Some(false) {
+                        return Err("control_not_synced");
+                    }
+                    return Ok(json!({"nostos_control_plan_v1":true,"amount_zats":10_000,
+                        "fee_cap_zats":10_000,"pool":"ironwood","minimum_confirmations":3,
+                        "payments_enabled":false}));
+                }
+                let id=params[0].as_str().ok_or("control_txid")?;
+                if id.len()!=64 || !id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                    return Err("control_txid");
+                }
+                let mut bytes: [u8;32]=hex::decode(id).map_err(|_| "control_txid")?.try_into().map_err(|_| "control_txid")?;
+                bytes.reverse();
+                let txid=TxId::from_bytes(bytes);
+                let before=self.tip().await?;
+                let tx=transactions::enhance(&mut self.client,self.wallet.db_mut(),txid).await?;
+                let owned=self.wallet.db_mut().get_ironwood_nullifiers(NullifierQuery::All)
+                    .map_err(|_| "control_nullifiers")?.into_iter()
+                    .filter_map(|(owner,nf)| (owner==account).then_some(nf)).collect::<Vec<_>>();
+                let after=self.tip().await?;
+                if before!=after {return Err("control_chain_changed");}
+                let result=tx.verify_control(&keys,&expected,&owned,after.0)?;
+                tx.store(self.wallet.db_mut())?;
+                Ok(result)
+            },
             "getwalletstatus" if params.is_empty() => self.status().await,
             "z_importviewingkey" if params.len()==3 => {
                 let key=scoped_key(params[0].as_str().ok_or("view_key_format")?)?;
@@ -65,8 +171,7 @@ impl Connection {
             },
             "z_listunifiedreceivers" if params.len()==1 => {
                 let address=params[0].as_str().ok_or("address_format")?;
-                transactions::OrchardReceiver::parse_mainnet(address)?;
-                Ok(json!({"orchard":address}))
+                transactions::refund_receivers(address)
             },
             "nostos_sync" if params.is_empty() => {
                 if self.wallet.db_mut().get_account_ids().map_err(|_| "account_lookup")?.len()!=1 {return Err("account_not_connected");}
@@ -95,3 +200,5 @@ mod tests {
         assert!(scoped_key("not-a-viewing-key").is_err());
     }
 }
+
+

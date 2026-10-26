@@ -20,7 +20,7 @@ export function useRecord<T>(url: string, token?: string, enabled = true) {
           cache: "no-store",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         },
-        12000,
+        30000,
         controller.signal,
       );
       if (version !== generation.current) return;
@@ -28,6 +28,8 @@ export function useRecord<T>(url: string, token?: string, enabled = true) {
       setWarning("");
     } catch (e) {
       if (version !== generation.current) return;
+      // Switching to a wallet can suspend mobile requests. Recheck on return.
+      if (document.visibilityState === "hidden") return;
       if (!token && e instanceof RequestError && e.status === 401)
         window.location.assign("/sign-in");
       else
@@ -48,9 +50,18 @@ export function useRecord<T>(url: string, token?: string, enabled = true) {
     void refresh();
     const onVisible = () => {
       if (document.visibilityState === "visible") void refresh();
+      else {
+        // Discard suspended reads so returning from a wallet starts a fresh one.
+        generation.current++;
+        active.current?.abort();
+        active.current = null;
+        setLoading(false);
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    window.addEventListener("focus", onVisible);
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
     }, 8000);
@@ -61,6 +72,8 @@ export function useRecord<T>(url: string, token?: string, enabled = true) {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", onVisible);
+      window.removeEventListener("pageshow", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
   }, [url, token, enabled]);
   return { data, loading, warning, refresh };

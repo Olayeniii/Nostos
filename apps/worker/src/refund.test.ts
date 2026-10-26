@@ -21,6 +21,96 @@ function storeWithPayment(): SqlitePaymentStore {
 }
 
 describe("partial refund execution", () => {
+  it.each(["runtime", "ledger", "receiver"])(
+    "holds mainnet hosted signing before wallet calls or reservation: %s",
+    async (boundary) => {
+      const store = new SqlitePaymentStore(":memory:");
+      if (boundary === "ledger") store.bindNetwork("mainnet");
+      store.insertPayment({
+        ...payment,
+        refundAddress:
+          boundary === "receiver"
+            ? `u1${"b".repeat(80)}`
+            : payment.refundAddress,
+      });
+      vi.stubEnv(
+        "NOSTOS_NETWORK",
+        boundary === "runtime" ? "mainnet" : "testnet",
+      );
+      const broadcaster = {
+        spendableShieldedBalanceZat: vi.fn(),
+        decodeUnifiedAddress: vi.fn(),
+        sendFromAccount: vi.fn(),
+      };
+      const authorizeBeforePrepare = vi.fn();
+      try {
+        await expect(
+          executePartialRefund({
+            store,
+            broadcaster,
+            merchantAccountUuid: "merchant-account",
+            paymentTxid: payment.paymentTxId,
+            amountZat: 500000,
+            idempotencyKey: "held_refund",
+            authorizeBeforePrepare,
+          }),
+        ).rejects.toThrow("Hosted refund signing is disabled on mainnet.");
+        expect(broadcaster.decodeUnifiedAddress).not.toHaveBeenCalled();
+        expect(broadcaster.spendableShieldedBalanceZat).not.toHaveBeenCalled();
+        expect(broadcaster.sendFromAccount).not.toHaveBeenCalled();
+        expect(authorizeBeforePrepare).not.toHaveBeenCalled();
+        expect(store.findRefundByPayment(payment.id)).toBeUndefined();
+      } finally {
+        store.close();
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+
+  it("keeps an existing mainnet reservation intact when hosted execution is held", async () => {
+    const store = new SqlitePaymentStore(":memory:");
+    store.bindNetwork("mainnet");
+    store.insertPayment(payment);
+    store.prepareRefund(payment.paymentTxId, {
+      id: "held",
+      paymentId: payment.id,
+      idempotencyKey: "held",
+      amountZat: 500000,
+    });
+    store.claimRefundBroadcast(payment.id, "held");
+    store.markRefundBroadcastUnknown(payment.id, "held");
+    vi.stubEnv("NOSTOS_NETWORK", "testnet");
+    const broadcaster = {
+      spendableShieldedBalanceZat: vi.fn(),
+      decodeUnifiedAddress: vi.fn(),
+      sendFromAccount: vi.fn(),
+    };
+    try {
+      await expect(
+        executePartialRefund({
+          store,
+          broadcaster,
+          merchantAccountUuid: "merchant-account",
+          paymentTxid: payment.paymentTxId,
+          amountZat: 500000,
+          idempotencyKey: "held",
+        }),
+      ).rejects.toThrow("disabled on mainnet");
+      expect(store.refundTotals(payment.id)).toEqual({
+        refundedZat: 0,
+        reservedZat: 500000,
+        inProgress: true,
+      });
+      expect(store.findRefund("held")?.status).toBe("broadcast_unknown");
+      expect(store.findByTxid(payment.paymentTxId)?.refundAddress).toBe(
+        payment.refundAddress,
+      );
+      expect(broadcaster.sendFromAccount).not.toHaveBeenCalled();
+    } finally {
+      store.close();
+      vi.unstubAllEnvs();
+    }
+  });
   it("blocks a concurrent retry without corrupting the active broadcast", async () => {
     const store = storeWithPayment();
     let finish!: (txid: string) => void;

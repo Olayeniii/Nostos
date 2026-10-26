@@ -1,4 +1,5 @@
 "use client";
+import { refundStageLabel, refundCheckMessages } from "./refund-status.js";
 import { useState } from "react";
 import { Mark } from "./mark.js";
 import { StateLabel } from "./status-label.js";
@@ -34,21 +35,25 @@ export function ReceiptCard({
     receipt.status,
   );
   const refundFailed = receipt.status === "failed";
-  const refundText = refundFailed
-    ? hasRefund
-      ? "Partially refunded"
-      : "Refund attempt closed"
-    : refundConfirmed
-      ? (receipt.remainingAmountZat ?? 0) > 0
-        ? "Partially refunded"
-        : "Refund confirmed"
-      : refundUnknown
-        ? "Refund state being checked"
-        : receipt.status === "broadcast"
-          ? "Refund sent, awaiting confirmation"
-          : receipt.status === "pending"
-            ? "Refund being prepared"
-            : "No refund issued";
+  const observation = receipt.refunds?.at(-1)?.observation;
+  const refundText =
+    observation && !refundConfirmed && !refundFailed
+      ? refundStageLabel(observation.stage)
+      : refundFailed
+        ? hasRefund
+          ? "Partially refunded"
+          : "Refund attempt closed"
+        : refundConfirmed
+          ? (receipt.remainingAmountZat ?? 0) > 0
+            ? "Partially refunded"
+            : "Refund confirmed"
+          : refundUnknown
+            ? "Refund state being checked"
+            : receipt.status === "broadcast"
+              ? "Refund sent, awaiting confirmation"
+              : receipt.status === "pending"
+                ? "Refund being prepared"
+                : "No refund issued";
   async function copy(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -68,7 +73,9 @@ export function ReceiptCard({
             <small>Private payment receipt</small>
           </span>
         </div>
-        <span className="receipt-network">TESTNET</span>
+        <span className="receipt-network">
+          {receipt.network === "mainnet" ? "MAINNET" : "TESTNET"}
+        </span>
       </div>
       <div className="receipt-total">
         <span>{paid ? "Payment received" : "Payment request"}</span>
@@ -147,9 +154,11 @@ export function ReceiptCard({
                 ? "The latest attempt was closed without settlement. This total includes earlier confirmed refunds only."
                 : refundConfirmed
                   ? "The shielded refund transaction is confirmed. Your wallet can verify receipt."
-                  : refundUnknown
-                    ? "Do not request another send while this transaction is being reconciled."
-                    : "Sent to the refund route supplied with this payment."}
+                  : observation
+                    ? refundCheckMessages[observation.stage]
+                    : refundUnknown
+                      ? "Do not request another send while this transaction is being reconciled."
+                      : "Sent to the refund route supplied with this payment."}
             </p>
           </>
         ) : (

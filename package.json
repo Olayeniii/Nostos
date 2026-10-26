@@ -27,7 +27,7 @@
     "intake:verify": "tsx scripts/payment-intake/verify-restart.ts",
     "refund:send": "tsx scripts/refund-core/send.ts",
     "refund:verify": "tsx scripts/refund-core/verify.ts",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --passWithNoTests --exclude scripts/lightclient/service.test.mjs --exclude scripts/web/mainnet-refund-attempt.test.mjs --exclude scripts/web/saved-wallet-binding.test.mjs && node --test scripts/lightclient/service.test.mjs scripts/web/mainnet-refund-attempt.test.mjs scripts/web/saved-wallet-binding.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

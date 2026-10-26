@@ -1,3 +1,4 @@
+import { refundStageLabel } from "./refund-status.js";
 import type { ReceiptData } from "./receipt-types.js";
 import type { PaymentView } from "../../api/src/index.js";
 export type RecordData = ReceiptData & {
@@ -9,8 +10,14 @@ export type Dashboard = {
   merchant: { name: string; ready: boolean };
   records: RecordData[];
   syncWarning: boolean;
+  observerPreview?: boolean;
+  observerCommerceEnabled?: boolean;
+  observerRecordChecksEnabled?: boolean;
 };
 export function paymentRecordStatus(r: RecordData) {
+  const observation = r.refunds?.at(-1)?.observation;
+  if (observation && !["confirmed", "failed"].includes(r.status))
+    return refundStageLabel(observation.stage);
   if (r.status === "broadcast_unknown") return "Refund outcome unknown";
   if (r.status === "broadcasting") return "Refund being submitted";
   if (r.status === "failed")
@@ -61,6 +68,9 @@ export const paymentHref = (id: string) =>
   `/merchant#payment=${encodeURIComponent(id)}`;
 
 export function refundRecordLabel(record: RecordData) {
+  const observation = record.refunds?.at(-1)?.observation;
+  if (observation && !["confirmed", "failed"].includes(record.status))
+    return refundStageLabel(observation.stage);
   const states = [
     record.status,
     ...(record.refunds ?? []).map((refund) => refund.status),

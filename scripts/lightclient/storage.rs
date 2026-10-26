@@ -2,7 +2,7 @@
 use std::{fs::{self,File,OpenOptions}, os::unix::fs::{MetadataExt,OpenOptionsExt}, path::Path};
 use super::Database;
 
-pub struct ProtectedWallet {db: Database, _lock: File}
+pub struct ProtectedWallet {db: Database, _lock: File, root: std::path::PathBuf}
 const FILES: [&str;5] = ["wallet.sqlite","wallet.sqlite-wal","wallet.sqlite-shm","wallet.sqlite-journal","writer.lock"];
 
 fn private_file(meta: &fs::Metadata, uid: u32) -> Result<(), &'static str> {
@@ -58,16 +58,63 @@ impl ProtectedWallet {
         let _file=open_private(root,"wallet.sqlite",uid)?;
         let db=super::open_fixture(&root.join("wallet.sqlite"))?;
         validate(root)?;
-        Ok(Self{db,_lock:lock})
+        Ok(Self{db,_lock:lock,root:root.to_path_buf()})
+    }
+    pub fn incoming_candidates(&self, account: &str, after: i64) -> Result<Vec<(i64,String)>, &'static str> {
+        let account=uuid::Uuid::parse_str(account).map_err(|_| "candidate_account")?;
+        let conn=rusqlite::Connection::open_with_flags(self.root.join("wallet.sqlite"),rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|_| "candidate_open")?;
+        candidate_rows(&conn, account, after)
+    }
+    pub fn outgoing_candidates(&self, account: &str, after: i64) -> Result<Vec<(i64,String)>, &'static str> {
+        let account=uuid::Uuid::parse_str(account).map_err(|_| "candidate_account")?;
+        let conn=rusqlite::Connection::open_with_flags(self.root.join("wallet.sqlite"),rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|_| "candidate_open")?;
+        let mut stmt=conn.prepare("SELECT DISTINCT t.id_tx,t.txid FROM v_received_output_spends ro JOIN accounts a ON a.id=ro.account_id JOIN transactions t ON t.id_tx=ro.transaction_id WHERE a.uuid=? AND t.id_tx>? ORDER BY t.id_tx LIMIT 4").map_err(|_| "candidate_query")?;
+        let rows=stmt.query_map(rusqlite::params![account.as_bytes().as_slice(),after],|row| {
+            let id:i64=row.get(0)?;
+            let mut bytes:Vec<u8>=row.get(1)?;
+            bytes.reverse();
+            Ok((id,hex::encode(bytes)))
+        }).map_err(|_| "candidate_read")?;
+        rows.collect::<Result<Vec<_>,_>>().map_err(|_| "candidate_read")
     }
     pub fn db_mut(&mut self) -> &mut Database {&mut self.db}
     pub fn audit(root: &Path) -> Result<(), &'static str> {validate(root).map(|_|())}
 }
 
+fn candidate_rows(conn: &rusqlite::Connection, account: uuid::Uuid, after: i64) -> Result<Vec<(i64,String)>, &'static str> {
+        let mut stmt=conn.prepare("SELECT DISTINCT t.id_tx,t.txid FROM v_received_outputs ro JOIN accounts a ON a.id=ro.account_id JOIN transactions t ON t.id_tx=ro.transaction_id WHERE a.uuid=? AND t.id_tx>? ORDER BY t.id_tx LIMIT 4").map_err(|_| "candidate_query")?;
+        let rows=stmt.query_map(rusqlite::params![account.as_bytes().as_slice(),after],|row| {
+            let id:i64=row.get(0)?;
+            let mut bytes:Vec<u8>=row.get(1)?;
+            bytes.reverse();
+            Ok((id,hex::encode(bytes)))
+        }).map_err(|_| "candidate_read")?;
+        rows.collect::<Result<Vec<_>,_>>().map_err(|_| "candidate_read")
+    }
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::os::unix::fs::{symlink,PermissionsExt};
+    #[test]
+    fn candidates_include_spent_notes_deduplicate_and_page_with_account_isolation() {
+        let conn=rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE accounts(id INTEGER,uuid BLOB); CREATE TABLE transactions(id_tx INTEGER,txid BLOB); CREATE TABLE v_received_outputs(account_id INTEGER,transaction_id INTEGER,pool TEXT,spent INTEGER);").unwrap();
+        let account=uuid::Uuid::from_bytes([1;16]);
+        conn.execute("INSERT INTO accounts VALUES(1,?)",rusqlite::params![account.as_bytes().as_slice()]).unwrap();
+        conn.execute("INSERT INTO accounts VALUES(2,?)",rusqlite::params![&[2u8;16][..]]).unwrap();
+        for id in 1i64..=6 {
+            conn.execute("INSERT INTO transactions VALUES(?,?)",rusqlite::params![id,vec![id as u8;32]]).unwrap();
+            conn.execute("INSERT INTO v_received_outputs VALUES(1,?,'orchard',1)",[id]).unwrap();
+            conn.execute("INSERT INTO v_received_outputs VALUES(1,?,'ironwood',0)",[id]).unwrap();
+        }
+        conn.execute("INSERT INTO transactions VALUES(7,?)",rusqlite::params![vec![7u8;32]]).unwrap();
+        conn.execute_batch("INSERT INTO v_received_outputs VALUES(2,7,'orchard',0)").unwrap();
+        let first=candidate_rows(&conn,account,0).unwrap();
+        assert_eq!(first.iter().map(|r|r.0).collect::<Vec<_>>(),vec![1,2,3,4]);
+        assert_eq!(candidate_rows(&conn,account,4).unwrap().iter().map(|r|r.0).collect::<Vec<_>>(),vec![5,6]);
+    }
     fn private_root() -> tempfile::TempDir {
         let root=tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(),fs::Permissions::from_mode(0o700)).unwrap();
@@ -120,3 +167,4 @@ mod tests {
         assert!(ProtectedWallet::open(root.path()).is_err());
     }
 }
+

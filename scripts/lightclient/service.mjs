@@ -10,6 +10,9 @@ const allowed = new Set([
   "getwalletstatus",
   "z_importviewingkey",
   "z_listunifiedreceivers",
+  "nostos_verify_output",
+  "nostos_incoming_candidates",
+  "nostos_outgoing_candidates",
 ]);
 const unresolved = () => new Error("Observer request is unresolved.");
 function privateDirectory(path) {
@@ -106,6 +109,8 @@ export class PipeWorker {
 
 export class ObserverBroker {
   #workers = new Map();
+  #pending = new Map();
+  #queued = new Map();
   #root;
   #factory;
   #timer;
@@ -147,13 +152,7 @@ export class ObserverBroker {
   async request(id, method, params) {
     if (!allowed.has(method)) throw unresolved();
     const worker = this.#worker(id);
-    if (method === "getwalletstatus" && worker.busy)
-      return {
-        ...(worker.cache ?? { node_tip: null }),
-        locked: true,
-        payments_enabled: false,
-      };
-    const result = await worker.request(method, params);
+    const result = await this.#request(worker, method, params);
     if (method === "getwalletstatus") worker.cache = result;
     if (
       this.#autoSync &&
@@ -167,11 +166,30 @@ export class ObserverBroker {
     }
     return result;
   }
+  async #request(worker, method, params) {
+    const count = this.#queued.get(worker) ?? 0;
+    if (count >= 8) throw unresolved();
+    this.#queued.set(worker, count + 1);
+    const previous = this.#pending.get(worker);
+    const next = (previous ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => worker.request(method, params));
+    this.#pending.set(worker, next);
+    try {
+      return await next;
+    } finally {
+      const remaining = this.#queued.get(worker) - 1;
+      if (remaining) this.#queued.set(worker, remaining);
+      else this.#queued.delete(worker);
+      if (this.#pending.get(worker) === next) this.#pending.delete(worker);
+    }
+  }
   async refresh(id) {
     const worker = this.#worker(id);
-    if (worker.busy || worker.dead) throw unresolved();
+    if (worker.busy || worker.dead || this.#pending.has(worker))
+      throw unresolved();
     try {
-      worker.cache = await worker.request("nostos_sync", []);
+      worker.cache = await this.#request(worker, "nostos_sync", []);
     } catch {
       worker.cache = null;
       throw unresolved();
@@ -258,6 +276,31 @@ export function createObserverService({ authorization, broker }) {
         typeof merchant !== "string" ||
         !merchantPattern.test(merchant) ||
         (body.method === "getwalletstatus" && params.length !== 0) ||
+        (["nostos_incoming_candidates", "nostos_outgoing_candidates"].includes(
+          body.method,
+        ) &&
+          (params.length !== 2 ||
+            !merchantPattern.test(params[0]) ||
+            !Number.isSafeInteger(params[1]) ||
+            params[1] < 0)) ||
+        (body.method === "nostos_verify_output" &&
+          (params.length !== 9 ||
+            !merchantPattern.test(params[0]) ||
+            !/^[a-f0-9]{64}$/.test(params[1]) ||
+            typeof params[2] !== "string" ||
+            params[2].length > 512 ||
+            !Number.isSafeInteger(params[3]) ||
+            params[3] <= 0 ||
+            params[3] > 2100000000000000 ||
+            typeof params[4] !== "string" ||
+            !/^(?:[a-f0-9]{2}){0,512}$/.test(params[4]) ||
+            !["orchard", "ironwood"].includes(params[5]) ||
+            !["incoming", "outgoing"].includes(params[6]) ||
+            !merchantPattern.test(params[7]) ||
+            !Number.isSafeInteger(params[8]) ||
+            params[8] < 0 ||
+            params[8] > 2100000000000000 ||
+            (params[6] === "outgoing" && params[8] === 0))) ||
         (body.method === "z_listunifiedreceivers" &&
           (params.length !== 1 ||
             typeof params[0] !== "string" ||

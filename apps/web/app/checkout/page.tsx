@@ -32,6 +32,40 @@ export default function Checkout() {
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletMessage, setWalletMessage] = useState("");
   const [walletRequested, setWalletRequested] = useState(false);
+  const [paymentTxid, setPaymentTxid] = useState("");
+  const [paymentPool, setPaymentPool] = useState<"ironwood" | "orchard">(
+    "ironwood",
+  );
+  const checking = useRef(false);
+  async function checkMainnetPayment(candidate = paymentTxid) {
+    if (checking.current || !/^[a-f0-9]{64}$/.test(candidate.trim())) return;
+    checking.current = true;
+    setBusy(true);
+    setWalletMessage("");
+    try {
+      await requestJson(
+        "/api/product/payment-check",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ txid: candidate.trim(), pool: paymentPool }),
+        },
+        30000,
+      );
+      setWalletMessage("Payment verified. Your receipt is ready.");
+      void refresh();
+    } catch {
+      setWalletMessage(
+        "Payment is not verified yet. Wait for three confirmations and check the transaction reference and pool in your wallet. Do not send again.",
+      );
+    } finally {
+      checking.current = false;
+      setBusy(false);
+    }
+  }
   const handoff = useRef(new NoirHandoff());
   useEffect(() => {
     const detect = () => setNoirAvailable(!!injectedNoir(window));
@@ -42,6 +76,7 @@ export default function Checkout() {
   const { data, loading, warning, refresh } = useRecord<{
     receipt: ReceiptData;
     syncWarning: boolean;
+    refundRouteSaved: boolean;
   }>("/api/product/checkout", token, !!token);
   useEffect(() => {
     const t = window.location.hash.slice(1);
@@ -49,6 +84,21 @@ export default function Checkout() {
     setInitialized(true);
   }, []);
   const r = data?.receipt;
+  useEffect(() => {
+    if (
+      network !== "mainnet" ||
+      !paymentTxid ||
+      !r ||
+      r.paymentStatus !== "unpaid"
+    )
+      return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible")
+        void checkMainnetPayment(paymentTxid);
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [network, paymentTxid, r?.paymentStatus, token]);
+
   const paid = (r?.paymentConfirmations ?? 0) > 0;
   async function copy(value: string, label: string) {
     setCopyStatus("");
@@ -165,7 +215,9 @@ export default function Checkout() {
                             "Content-Type": "application/json",
                             Authorization: `Bearer ${token}`,
                           },
-                          body: JSON.stringify({ route }),
+                          body: JSON.stringify(
+                            data?.refundRouteSaved ? {} : { route },
+                          ),
                         },
                         15000,
                       );
@@ -182,37 +234,49 @@ export default function Checkout() {
                         "Could not prepare the payment. Check the address network and connection. Once attached, the return address cannot be changed.",
                       );
                     } finally {
+                      void refresh();
                       setBusy(false);
                     }
                   }}
                 >
-                  <label>
-                    Your fresh refund address
-                    <input
-                      name="route"
-                      type="text"
-                      autoComplete="off"
-                      spellCheck={false}
-                      minLength={26}
-                      maxLength={506}
-                      placeholder={
-                        network === "mainnet" ? "u1..." : "utest1..."
-                      }
-                      required
-                      disabled={busy}
-                    />
-                  </label>
-                  <p className="privacy">
-                    Use an address you control. NOSTOS checks Orchard
-                    capability, not ownership or prior use. The hosted service
-                    and merchant wallet can read this route; the receipt omits
-                    it.
-                  </p>
+                  {data?.refundRouteSaved ? (
+                    <p>
+                      Your refund address is already saved. Continue with the
+                      original payment details.
+                    </p>
+                  ) : (
+                    <>
+                      <label>
+                        Your fresh refund address
+                        <input
+                          name="route"
+                          type="text"
+                          autoComplete="off"
+                          spellCheck={false}
+                          minLength={26}
+                          maxLength={506}
+                          placeholder={
+                            network === "mainnet" ? "u1..." : "utest1..."
+                          }
+                          required
+                          disabled={busy}
+                        />
+                      </label>
+                      <p className="privacy">
+                        Use an address you control. NOSTOS checks Orchard
+                        capability, not ownership or prior use. The hosted
+                        service and merchant wallet can read this route; the
+                        receipt omits it.
+                      </p>
+                    </>
+                  )}
                   <button
                     className="primary"
                     disabled={busy || loading || !!warning || data?.syncWarning}
                   >
-                    Prepare payment
+                    {data?.refundRouteSaved
+                      ? "Continue payment"
+                      : "Prepare payment"}
                   </button>
                   {busy && (
                     <StateLabel
@@ -262,13 +326,14 @@ export default function Checkout() {
                             "Review the address, amount and memo in Noir before approving. Use shielded funds on the displayed network.",
                           );
                           try {
-                            await handoff.current.send(
+                            const txid = await handoff.current.send(
                               provider,
                               prepared,
                               async () => {
                                 const latest = await requestJson<{
                                   receipt: ReceiptData;
                                   syncWarning: boolean;
+                                  refundRouteSaved: boolean;
                                 }>(
                                   "/api/product/checkout",
                                   {
@@ -290,10 +355,13 @@ export default function Checkout() {
                                 }
                               },
                             );
+                            setPaymentTxid(txid);
                             setWalletMessage(
                               "Noir reported a transaction ID. Waiting for the merchant wallet to confirm your payment. Do not send again.",
                             );
-                            void refresh();
+                            if (network === "mainnet")
+                              void checkMainnetPayment(txid);
+                            else void refresh();
                           } catch (error) {
                             setWalletMessage(
                               error instanceof NoirHandoffError
@@ -336,6 +404,12 @@ export default function Checkout() {
                     before sending. If the wallet does not fill all three
                     fields, use manual entry below. QR and URI support varies by
                     wallet.
+                  </p>
+                  <p className="privacy">
+                    ZODL requires its own scanner; use the QR image rather than
+                    the direct wallet link. Cake Wallet may omit the memo when
+                    opening a request. Paste the exact memo below before
+                    signing.
                   </p>
                   {walletMessage && (
                     <p className="privacy" role="status">
@@ -427,10 +501,53 @@ export default function Checkout() {
               )}
             </>
           )}
+          {network === "mainnet" && r && !paid && (
+            <details className="manual-payment">
+              <summary>Payment recovery</summary>
+              <p>
+                Paste its transaction ID from your wallet. NOSTOS checks the
+                exact address, amount and memo after three confirmations. Do not
+                send again while waiting.
+              </p>
+              <label>
+                Payment transaction ID
+                <input
+                  value={paymentTxid}
+                  maxLength={64}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={(e) => setPaymentTxid(e.target.value)}
+                />
+              </label>
+              <label>
+                Shielded pool
+                <select
+                  value={paymentPool}
+                  onChange={(e) =>
+                    setPaymentPool(e.target.value as "ironwood" | "orchard")
+                  }
+                >
+                  <option value="ironwood">Ironwood</option>
+                  <option value="orchard">Orchard</option>
+                </select>
+              </label>
+              <button
+                className="secondary"
+                disabled={busy || !/^[a-f0-9]{64}$/.test(paymentTxid.trim())}
+                onClick={() => void checkMainnetPayment()}
+              >
+                Verify payment transaction
+              </button>
+              {walletMessage && !prepared && (
+                <p role="status">{walletMessage}</p>
+              )}
+            </details>
+          )}
           {(warning || data?.syncWarning) && (
             <p className="warning" role="alert">
               {warning ||
-                "Wallet sync is temporarily unavailable. Do not repeat a payment that you already sent."}
+                "Payment status checks are temporarily unavailable. The observer may be syncing or a lookup may have failed. Refresh to check again; do not repeat a payment already sent."}
             </p>
           )}
           {copyStatus && (

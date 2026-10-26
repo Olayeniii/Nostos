@@ -55,6 +55,43 @@ class PackageTests(unittest.TestCase):
                 inspector.verify(artifact, "1" * 40, hashlib.sha256(artifact.read_bytes()).hexdigest())
             self.assertFalse((root / "wallet.sqlite").exists())
 
+    def test_local_origin_is_explicit_and_wrong_cpu_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary, lock = root / "binary", root / "lock"
+            header = bytearray(64)
+            header[:6] = b"\x7fELF\x02\x01"
+            struct.pack_into("<H", header, 18, 62)
+            binary.write_bytes(header)
+            lock.write_text("synthetic local fixture")
+            with self.assertRaises(ValueError):
+                packager.package(binary, lock, root / "wrong", local_revision="1" * 40)
+            self.assertFalse((root / "wrong").exists())
+            struct.pack_into("<H", header, 18, 183)
+            binary.write_bytes(header)
+            with contextlib.redirect_stdout(io.StringIO()):
+                packager.package(binary, lock, root / "bundle", local_revision="1" * 40)
+            artifact = root / "local.zip"
+            with zipfile.ZipFile(artifact, "w") as output:
+                for file in (root / "bundle").iterdir():
+                    output.write(file, file.name)
+            proof = inspector.verify(artifact, "1" * 40, hashlib.sha256(artifact.read_bytes()).hexdigest())
+            self.assertEqual(proof["build_origin"], "local")
+            self.assertIsNone(proof["workflow_run_id"])
+
+    def test_local_builder_requires_matching_host_and_clean_exact_checkouts(self):
+        builder = module("local_sdk_builder", ROOT / "scripts/lightclient/build-local-arm64.py")
+        builder.validate_host("aarch64", dict(ID="ubuntu", VERSION_ID="24.04"))
+        for machine, release in [("x86_64", dict(ID="ubuntu", VERSION_ID="24.04")), ("aarch64", dict(ID="ubuntu", VERSION_ID="22.04"))]:
+            with self.assertRaises(ValueError):
+                builder.validate_host(machine, release)
+        with patch.object(builder, "git", side_effect=["1" * 40, " M file"]):
+            with self.assertRaises(ValueError):
+                builder.validate_checkout(ROOT, "1" * 40)
+        with patch.object(builder, "git", return_value="2" * 40):
+            with self.assertRaises(ValueError):
+                builder.validate_checkout(ROOT, "1" * 40)
+
 
 if __name__ == "__main__":
     unittest.main()

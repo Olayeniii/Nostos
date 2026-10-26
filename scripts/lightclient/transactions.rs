@@ -27,6 +27,14 @@ pub fn client(channel: Channel) -> Client {
 #[derive(Clone)]
 pub struct OrchardReceiver([u8;43]);
 impl OrchardReceiver {
+    pub fn require_external_to(&self, key: &UnifiedFullViewingKey) -> Result<(), &'static str> {
+        let address=Option::<orchard::Address>::from(orchard::Address::from_raw_address_bytes(&self.0))
+            .ok_or("control_receiver")?;
+        if key.orchard().ok_or("control_keys")?.scope_for_address(&address).is_some() {
+            return Err("control_self_transfer");
+        }
+        Ok(())
+    }
     pub fn parse_mainnet(address: &str) -> Result<Self, &'static str> {
         if address.len()>512 {return Err("route_length");}
         let (network, ua) = unified::Address::decode(address).map_err(|_| "route_decode")?;
@@ -37,6 +45,33 @@ impl OrchardReceiver {
             _ => Err("route_requires_only_orchard"),
         }
     }
+}
+
+// A shielded display UA may carry Sapling too. The saved return route still
+// contains exactly one validated Orchard receiver, never a transparent fallback.
+pub fn refund_receivers(address: &str) -> Result<serde_json::Value, &'static str> {
+    if address.len() > 512 { return Err("route_length"); }
+    let (network, ua) = unified::Address::decode(address).map_err(|_| "route_decode")?;
+    if network != MAIN_NETWORK.network_type() || ua.encode(&network) != address {
+        return Err("route_network_or_encoding");
+    }
+    let items = ua.items();
+    if items.iter().any(|r| !matches!(r, unified::Receiver::Orchard(_) | unified::Receiver::Sapling(_))) {
+        return Err("route_requires_shielded_receivers");
+    }
+    let bytes = items.iter().find_map(|r| match r { unified::Receiver::Orchard(bytes) => Some(*bytes), _ => None }).ok_or("route_requires_orchard")?;
+    let canonical = unified::Address::try_from_items(vec![unified::Receiver::Orchard(bytes)])
+        .map_err(|_| "route_scope")?.encode(&network);
+    OrchardReceiver::parse_mainnet(&canonical)?;
+    let mut result = serde_json::json!({"orchard":canonical});
+    if let Some(bytes) = items.iter().find_map(|r| match r { unified::Receiver::Sapling(bytes) => Some(*bytes), _ => None }) {
+        // Retain receiver type information so strict Orchard-only validation
+        // rejects the original mixed UA. This does not grant Sapling view access.
+        let sapling = unified::Address::try_from_items(vec![unified::Receiver::Sapling(bytes)])
+            .map_err(|_| "route_scope")?.encode(&network);
+        result["sapling"] = serde_json::Value::String(sapling);
+    }
+    Ok(result)
 }
 
 pub struct Expected<A> {
@@ -60,7 +95,82 @@ impl<A> Expected<A> {
 pub struct VerifiedTransaction {tx: Transaction, height: u32, tip: u32, anchor: zcash_primitives::block::BlockHash}
 impl VerifiedTransaction {
     pub fn txid(&self) -> TxId {self.tx.txid()}
+    pub fn verify_product<A: Copy+Eq+std::hash::Hash>(&self,
+        keys: &HashMap<A,UnifiedFullViewingKey>, expected: &Expected<A>,
+        owned: &[orchard::note::Nullifier], remote_tip: u32, fee_cap: u64,
+        binding: &str, account_uuid: &str, tip_hash: &str)
+        -> Result<serde_json::Value, &'static str> {
+        if expected.confirmations<3 || remote_tip!=self.tip || self.tx.transparent_bundle().is_some()
+            || self.tx.sprout_bundle().is_some() {return Err("product_context");}
+        let outgoing=expected.direction==TransferType::Outgoing;
+        let fee=if outgoing {
+            expected.receiver.require_external_to(keys.get(&expected.account).ok_or("product_keys")?)?;
+            if self.tx.sapling_bundle().is_some() {return Err("product_input_pool");}
+            let bundle=match expected.pool {
+                ShieldedPool::Orchard=>self.tx.orchard_bundle(),
+                ShieldedPool::Ironwood=>self.tx.ironwood_bundle(),
+                _=>None,
+            }.ok_or("product_output_pool")?;
+            if !bundle.actions().iter().any(|a| owned.contains(a.nullifier())) {
+                return Err("product_owned_spend");
+            }
+            let fee=self.tx.fee_paid::<zcash_protocol::value::BalanceError,_>(|_| Ok(None))
+                .map_err(|_| "product_fee")?.ok_or("product_fee")?.into_u64();
+            if fee_cap==0 || fee>fee_cap {return Err("product_fee_cap");}
+            Some(fee)
+        } else {None};
+        let index=self.matching_output(keys,expected)?;
+        Ok(serde_json::json!({"nostos_output_proof_v1":true,"network":"mainnet",
+            "observation_scope":"orchard-family-only","payments_enabled":false,
+            "binding":binding,"account_uuid":account_uuid,"txid":self.txid().to_string(),
+            "pool":if expected.pool==ShieldedPool::Ironwood {"ironwood"} else {"orchard"},
+            "direction":if outgoing {"outgoing"} else {"incoming"},"amount_zat":expected.amount,
+            "output_index":index,"height":self.height,"block_hash":self.anchor.to_string(),
+            "tip_height":self.tip,"tip_hash":tip_hash,"confirmations":self.tip-self.height+1,
+            "fee_zat":fee,"exact_match":true,"owned_spend":outgoing}))
+    }
+    // Control-only check. The caller must source these nullifiers from the
+    // already-bound account, including notes now marked spent after scanning.
+    fn control_policy(&self, owned: &[orchard::note::Nullifier]) -> Result<u64, &'static str> {
+        if self.tx.transparent_bundle().is_some() || self.tx.sprout_bundle().is_some()
+            || self.tx.sapling_bundle().is_some() || self.tx.orchard_bundle().is_some() {
+            return Err("control_unexpected_pool");
+        }
+        let bundle = self.tx.ironwood_bundle().ok_or("control_ironwood_required")?;
+        if !bundle.actions().iter().any(|a| owned.contains(a.nullifier())) {
+            return Err("control_owned_spend_required");
+        }
+        let fee = self.tx.fee_paid::<zcash_protocol::value::BalanceError, _>(|_| Ok(None))
+            .map_err(|_| "control_fee_unresolved")?.ok_or("control_fee_unresolved")?.into_u64();
+        if fee > 10_000 {return Err("control_fee_cap");}
+        Ok(fee)
+    }
+    pub fn verify_control<A: Copy+Eq+std::hash::Hash>(&self,
+        keys: &HashMap<A,UnifiedFullViewingKey>, expected: &Expected<A>,
+        owned: &[orchard::note::Nullifier], remote_tip: u32)
+        -> Result<serde_json::Value, &'static str> {
+        if expected.amount!=10_000 || expected.pool!=ShieldedPool::Ironwood
+            || expected.direction!=TransferType::Outgoing || expected.confirmations<3 {
+            return Err("control_expectation");
+        }
+        if remote_tip!=self.tip {return Err("control_chain_changed");}
+        expected.receiver.require_external_to(keys.get(&expected.account).ok_or("control_keys")?)?;
+        let fee=self.control_policy(owned)?;
+        let output_index=self.matching_output(keys,expected)?;
+        Ok(serde_json::json!({"nostos_control_v1":true,"txid":self.txid().to_string(),
+            "height":self.height,"block_hash":self.anchor.to_string(),
+            "confirmations":self.tip-self.height+1,"pool":"ironwood",
+            "output_index":output_index,"amount_zats":10_000,"fee_zats":fee,
+            "exact_output_match":true,"owned_spend_match":true,
+            "payments_enabled":false}))
+    }
     pub fn store(&self, db: &mut Database) -> Result<(), &'static str> {
+        require_current_context(
+            self.height, self.tip, self.anchor,
+            db.chain_height().map_err(|_| "chain_height")?.map(u32::from),
+            db.block_fully_scanned().map_err(|_| "scan_height")?.map(|b| u32::from(b.block_height())),
+            db.get_block_hash(BlockHeight::from_u32(self.height)).map_err(|_| "wallet_block_hash")?,
+        )?;
         // Refuse to persist after the wallet's anchored block has changed.
         let known = db.get_tx_height(self.tx.txid()).map_err(|_| "wallet_tx_height")?;
         if known != Some(BlockHeight::from_u32(self.height))
@@ -93,6 +203,22 @@ impl VerifiedTransaction {
             [index] => Ok(*index), [] => Err("exact_output_not_found"), _ => Err("ambiguous_output_match"),
         }
     }
+}
+
+
+fn require_current_context(
+    height: u32, verified_tip: u32, anchor: zcash_primitives::block::BlockHash,
+    current_tip: Option<u32>, scanned_tip: Option<u32>,
+    current_anchor: Option<zcash_primitives::block::BlockHash>,
+) -> Result<(), &'static str> {
+    // A rewind, new tip or incomplete rescan invalidates the captured evidence.
+    // Enhance again rather than committing an older confirmation count.
+    if height == 0 || height > verified_tip
+        || current_tip != Some(verified_tip) || scanned_tip != Some(verified_tip)
+        || current_anchor != Some(anchor) {
+        return Err("wallet_context_changed");
+    }
+    Ok(())
 }
 
 fn decode(bytes: &[u8], expected: TxId, height: u32, tip: u32) -> Result<Transaction, &'static str> {
@@ -139,8 +265,12 @@ pub async fn enhance_pending(client: &mut Client, db: &mut Database) -> Result<u
         };
         // Any unavailable/unmined/conflicting result stays unresolved. No failed status,
         // reservation clearance, retry permission or send is inferred here.
-        enhance(client,db,id).await?.store(db)?;
-        stored += 1;
+        // An unrelated unavailable transaction must not block the remaining
+        // wallet records. It stays unresolved and is retried on the next sync.
+        if let Ok(tx) = enhance(client,db,id).await {
+            tx.store(db)?;
+            stored += 1;
+        }
     }
     Ok(stored)
 }
@@ -164,3 +294,4 @@ pub async fn check_public_fetch(client: &mut Client, db: &Database) -> Result<()
 #[cfg(test)]
 #[path = "transaction_tests.rs"]
 mod tests;
+

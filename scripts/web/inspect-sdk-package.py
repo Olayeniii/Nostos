@@ -40,7 +40,10 @@ def verify(path, revision, artifact_sha256):
     require(manifest["format"] == "nostos-sdk-preview-arm64-v1" and manifest["nostos_revision"] == revision)
     require(manifest["upstream_pin"] == PIN and manifest["architecture"] == "aarch64" and manifest["build_os"] == "ubuntu-24.04")
     require(all(manifest[key] is False for key in ("wallet_files_included", "credentials_included", "services_changed", "production_enabled")))
-    require(manifest["sends_requested"] == 0 and str(manifest["workflow_run_id"]).isdigit())
+    require(manifest["sends_requested"] == 0)
+    origin = manifest.get("build_origin", "github-actions")
+    require(origin in ("local", "github-actions"))
+    require(manifest["workflow_run_id"] is None if origin == "local" else str(manifest["workflow_run_id"]).isdigit())
     require(re.fullmatch(r"[a-f0-9]{64}", manifest["prepared_lock_sha256"]))
     require(set(manifest["files"]) == CONTENTS - {"provenance.json"})
     require(all(re.fullmatch(r"[a-f0-9]{64}", value) for value in manifest["files"].values()))
@@ -67,7 +70,7 @@ def verify(path, revision, artifact_sha256):
             require(digest.hexdigest() == manifest["files"][member.name])
     require(seen == CONTENTS)
     return dict(read_only=True, artifact_verified=True, revision=revision, architecture="aarch64",
-                workflow_run_id=manifest["workflow_run_id"], binary_sha256=manifest["files"]["nostos-sdk-worker"],
+                workflow_run_id=manifest["workflow_run_id"], build_origin=origin, binary_sha256=manifest["files"]["nostos-sdk-worker"],
                 extracted=False, executable_started=False, services_changed=False, sends_requested=0)
 
 
@@ -75,7 +78,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifact", type=Path)
     parser.add_argument("--revision", required=True)
-    parser.add_argument("--artifact-sha256", required=True, help="Trusted GitHub artifact digest, without sha256: prefix")
+    parser.add_argument("--artifact-sha256", required=True, help="Trusted artifact digest, without sha256: prefix")
     args = parser.parse_args()
     try:
         print(json.dumps(verify(args.artifact, args.revision, args.artifact_sha256)))

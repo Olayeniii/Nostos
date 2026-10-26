@@ -1,10 +1,13 @@
 name: Merchant UI review
+# Manual while the hosted Actions allowance is exhausted.
+# See docs/CI_VALIDATION.md before restoring automatic events.
 on:
-  pull_request:
-    paths:
-      - "apps/web/**"
-      - "scripts/ui/**"
-      - ".github/workflows/merchant-ui.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:

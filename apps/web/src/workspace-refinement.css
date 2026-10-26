@@ -454,3 +454,88 @@
     min-height: 44px;
   }
 }
+
+/* Approved pale glass surface and quiet active destination. */
+.merchant-studio.refined-workspace {
+  background: #f4f7f1;
+}
+.refined-workspace .studio-rail a[aria-current="page"] {
+  box-shadow: none;
+}
+.refined-workspace .studio-rail a:not(.studio-mark) {
+  position: relative;
+}
+@media (min-width: 901px) {
+  .refined-workspace .studio-rail a[aria-current="page"] {
+    background: #ffffff0d;
+    color: #f1f7ef;
+  }
+}
+@media (max-width: 900px) {
+  .merchant-studio.refined-workspace {
+    padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px));
+  }
+  .merchant-studio.refined-workspace .studio-rail {
+    inset: auto 10px max(10px, env(safe-area-inset-bottom, 0px));
+    width: auto;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 7px 6px;
+    min-height: 76px;
+    border: 1px solid #cfddcc;
+    border-radius: 18px;
+    background: #eef4eaf5;
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 6px 24px #183a2a15;
+    backdrop-filter: blur(14px) saturate(115%);
+    -webkit-backdrop-filter: blur(14px) saturate(115%);
+  }
+  .refined-workspace .studio-rail a:not(.studio-mark),
+  .refined-workspace .studio-rail a:not(.studio-mark):hover {
+    background: transparent;
+    color: #586b5f;
+    border: 0;
+    box-shadow: none;
+    border-radius: 8px;
+    min-height: 60px;
+    padding: 5px 2px 12px;
+    gap: 5px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .refined-workspace .studio-rail a:not(.studio-mark) svg {
+    width: 23px;
+    height: 23px;
+    filter: none;
+    stroke-width: 1.7;
+  }
+  .refined-workspace .studio-rail a[aria-current="page"] {
+    color: #153e2c;
+    font-weight: 750;
+  }
+  .refined-workspace .studio-rail a[aria-current="page"]::after {
+    content: "";
+    position: absolute;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .refined-workspace .studio-rail a:focus-visible {
+    outline: 2px solid #426b50;
+    outline-offset: 1px;
+  }
+}
+@media (forced-colors: active) {
+  .refined-workspace .studio-rail a[aria-current="page"] {
+    outline: 2px solid Highlight;
+    color: LinkText;
+  }
+}
+
+/* Empty states use their real icon, without the retired decorative corner. */
+.refined-workspace .empty-state::before {
+  content: none;
+  display: none;
+}

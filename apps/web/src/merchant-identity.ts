@@ -1,3 +1,8 @@
+import {
+  runtimeNetwork,
+  runtimeValue,
+} from "../../../packages/network/src/index.js";
+import { trustedOrigin } from "./origin.js";
 import { validAccountPassword } from "./account-validation.js";
 import { randomBytes } from "node:crypto";
 import {
@@ -136,6 +141,17 @@ export function reauthenticated(
       matchesPassword(password, merchant.passwordHash),
   );
 }
+function accountPublicOrigin() {
+  const configured = runtimeValue("NOSTOS_ACCOUNT_PUBLIC_ORIGIN");
+  if (configured !== undefined) {
+    if (!trustedOrigin(configured, process.env.NOSTOS_WEB_TRUSTED_ORIGINS))
+      throw new Error("Account email delivery is unavailable.");
+    return configured;
+  }
+  if (runtimeNetwork() === "mainnet")
+    throw new Error("Account email delivery is unavailable.");
+  return "https://nostos.iyforge.xyz";
+}
 export async function deliverIdentityEmail(
   email: string,
   token: string,
@@ -143,7 +159,7 @@ export async function deliverIdentityEmail(
 ) {
   if (!emailConfigured())
     throw new Error("Account email delivery is unavailable.");
-  const url = "https://nostos.iyforge.xyz/account-link#" + token;
+  const url = accountPublicOrigin() + "/account-link#" + token;
   const subject =
     purpose === "reset"
       ? "Reset your NOSTOS password"

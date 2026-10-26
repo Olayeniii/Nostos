@@ -267,6 +267,23 @@ export class SqlitePaymentStore {
   withdrawalDatabase() {
     return this.#database;
   }
+  boundNetwork(): "mainnet" | "testnet" | undefined {
+    if (
+      !this.#database
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='core_environment'",
+        )
+        .get()
+    )
+      return undefined;
+    const network = this.#database
+      .prepare("SELECT network FROM core_environment WHERE id=1")
+      .get()?.network;
+    if (network === undefined) return undefined;
+    if (network !== "mainnet" && network !== "testnet")
+      throw new Error("Ledger network is invalid.");
+    return network;
+  }
   bindNetwork(network: "testnet" | "mainnet") {
     this.#database.exec(
       "CREATE TABLE IF NOT EXISTS core_environment(id INTEGER PRIMARY KEY CHECK(id=1),network TEXT NOT NULL)",
