@@ -739,7 +739,7 @@
   display: none;
 }
 @media (min-width: 901px) {
-  .merchant-studio .studio-sidebar-toggle {
+  .merchant-studio .studio-rail .studio-sidebar-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -748,13 +748,14 @@
     min-height: 44px;
     flex-shrink: 0;
     padding: 0;
-    border: 1px solid #d5d8cd;
+    margin: 0 0 18px auto;
+    border: 1px solid #7aefbd;
     border-radius: 8px;
-    background: #faf8f2;
-    color: #244b3a;
+    background: #53e3a6;
+    color: #142b22;
   }
-  .merchant-studio .studio-sidebar-toggle:hover {
-    background: #e2f2e7;
+  .merchant-studio .studio-rail .studio-sidebar-toggle:hover {
+    background: #86f0c0;
   }
   .merchant-studio.refined-workspace.sidebar-collapsed {
     --studio-rail-width: 80px;
@@ -839,4 +840,20 @@
 .refined-workspace .workspace-refund-metric .workspace-summary-icon {
   width: 36px;
   height: 36px;
+}
+
+@media (min-width: 901px) {
+  .refined-workspace .overview-mobile-brand {
+    display: none;
+  }
+  .refined-workspace .studio-rail .studio-mark {
+    margin-bottom: 12px;
+  }
+  .merchant-studio.refined-workspace.sidebar-collapsed .studio-sidebar-toggle {
+    margin-inline: auto;
+  }
+  .merchant-studio .studio-rail .studio-sidebar-toggle:focus-visible {
+    outline: 3px solid #f3efe6;
+    outline-offset: 4px;
+  }
 }
