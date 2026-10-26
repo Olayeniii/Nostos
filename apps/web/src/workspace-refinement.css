@@ -749,13 +749,18 @@
     flex-shrink: 0;
     padding: 0;
     margin: 0 0 18px auto;
-    border: 1px solid #7aefbd;
+    border: 0;
     border-radius: 8px;
-    background: #53e3a6;
-    color: #142b22;
+    background: transparent;
+    color: #789384;
+    box-shadow: none;
+    transition:
+      color 140ms ease,
+      background-color 140ms ease;
   }
   .merchant-studio .studio-rail .studio-sidebar-toggle:hover {
-    background: #86f0c0;
+    background: #ffffff08;
+    color: #dce8df;
   }
   .merchant-studio.refined-workspace.sidebar-collapsed {
     --studio-rail-width: 80px;
@@ -780,8 +785,8 @@
 .merchant-studio.refined-workspace
   :is(.overview-metric, .summary-grid > article) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 36px;
-  grid-template-rows: minmax(36px, auto) auto 1fr;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  grid-template-rows: minmax(28px, auto) auto 1fr;
   gap: 10px 12px;
   padding: 18px 20px;
   border-radius: 12px;
@@ -800,9 +805,12 @@
   position: static;
   grid-column: 2;
   grid-row: 1;
-  width: 36px;
-  height: 36px;
+  width: 24px;
+  height: 24px;
   align-self: center;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 .merchant-studio.refined-workspace
   :is(.overview-metric, .summary-grid > article)
@@ -810,7 +818,7 @@
   grid-column: 1 / -1;
   grid-row: 2;
   margin: 0;
-  font-size: clamp(26px, 2.8vw, 38px);
+  font-size: clamp(26px, 2.6vw, 34px);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
@@ -853,7 +861,29 @@
     margin-inline: auto;
   }
   .merchant-studio .studio-rail .studio-sidebar-toggle:focus-visible {
-    outline: 3px solid #f3efe6;
-    outline-offset: 4px;
+    outline: 2px solid #dce8df;
+    outline-offset: 2px;
+  }
+}
+
+.merchant-studio.refined-workspace
+  :is(.overview-metric-icon, .workspace-metric-icon)
+  svg {
+  width: 20px;
+  height: 20px;
+}
+
+.merchant-studio.refined-workspace
+  :is(.overview-metric, .summary-grid > article)
+  > strong
+  small {
+  display: inline-block;
+  letter-spacing: 0;
+  font-weight: 550;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .merchant-studio .studio-rail .studio-sidebar-toggle {
+    transition: none;
   }
 }

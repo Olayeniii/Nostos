@@ -155,18 +155,16 @@ export function MerchantWorkspace({
         >
           <svg
             viewBox="0 0 24 24"
-            width="20"
-            height="20"
+            width="16"
+            height="16"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.8"
+            strokeWidth="1.6"
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <rect x="3" y="4" width="18" height="16" rx="3" />
-            <path d="M9 4v16" />
-            <path d={sidebarCollapsed ? "m13 9 3 3-3 3" : "m16 9-3 3 3 3"} />
+            <path d={sidebarCollapsed ? "m9 6 6 6-6 6" : "m15 6-6 6 6 6"} />
           </svg>
         </button>
         <div className="studio-destinations">
