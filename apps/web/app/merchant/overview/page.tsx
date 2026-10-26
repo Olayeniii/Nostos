@@ -92,7 +92,7 @@ export default function Overview() {
           </span>
           <p>
             {data
-              ? `${summary.confirmedPayments} confirmed payments`
+              ? `${summary.confirmedPayments} confirmed ${summary.confirmedPayments === 1 ? "payment" : "payments"}`
               : "Waiting for payment records"}
           </p>
         </article>
