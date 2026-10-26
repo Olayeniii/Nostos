@@ -85,11 +85,13 @@ export function ReceiptCard({
         <span className={`receipt-pill ${paid ? "success" : ""}`}>
           {paid
             ? "Confirmed"
-            : receipt.paymentStatus === "expired"
-              ? "Payment request expired"
-              : receipt.paymentStatus === "broadcast"
-                ? "Confirming payment"
-                : "Awaiting payment"}
+            : receipt.requestDropped
+              ? "Payment request dropped"
+              : receipt.paymentStatus === "expired"
+                ? "Payment request expired"
+                : receipt.paymentStatus === "broadcast"
+                  ? "Confirming payment"
+                  : "Awaiting payment"}
         </span>
       </div>
       <div className="receipt-divider" />

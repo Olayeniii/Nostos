@@ -52,7 +52,7 @@ const records = [
     ...base,
     id: "order-2",
     description: "Website consultation",
-    paymentStatus: "awaiting_payment",
+    paymentStatus: "unpaid",
     paymentConfirmations: 0,
     paidAt: null,
     payment: undefined,
@@ -148,12 +148,22 @@ for (const width of [320, 375, 390, 430, 768, 980, 1024, 1440]) {
   let customerMode = "normal";
   let releaseCheckout = () => {};
   const posts = [];
+  const droppedIds = new Set();
   let flowRecord;
   await page.route("**/api/product/**", async (route) => {
     const action = new URL(route.request().url()).pathname.split("/").at(-1);
     if (route.request().method() === "POST") posts.push(action);
+    if (action === "drop-request") {
+      droppedIds.add(route.request().postDataJSON().id);
+      return route.fulfill({ json: { ok: true } });
+    }
     if (action === "network")
-      return route.fulfill({ json: { network: fixtureNetwork } });
+      return route.fulfill({
+        json: {
+          network: fixtureNetwork,
+          commerceEnabled: fixtureNetwork === "mainnet",
+        },
+      });
     if (action === "dashboard") {
       if (mode === "error")
         return route.fulfill({ status: 503, json: { error: "Unavailable" } });
@@ -164,9 +174,14 @@ for (const width of [320, 375, 390, 430, 768, 980, 1024, 1440]) {
           records:
             mode === "empty"
               ? []
-              : flowRecord
-                ? [flowRecord, ...records]
-                : records,
+              : mode === "sparse"
+                ? records.slice(0, 2)
+                : (flowRecord ? [flowRecord, ...records] : records).map(
+                    (record) => ({
+                      ...record,
+                      requestDropped: droppedIds.has(record.id),
+                    }),
+                  ),
           syncWarning: false,
         },
       });
@@ -349,7 +364,11 @@ for (const width of [320, 375, 390, 430, 768, 980, 1024, 1440]) {
       true,
       `${width}: desktop sidebar keeps labels`,
     );
-    assert(shell.railWidth >= 200 && shell.railWidth <= 224);
+    assert(
+      width === 980
+        ? shell.railWidth >= 285 && shell.railWidth <= 295
+        : shell.railWidth >= 200 && shell.railWidth <= 224,
+    );
     assert(
       Math.abs(shell.railBottom - shell.height) <= 1,
       `${width}: sidebar stays inside viewport`,
@@ -364,12 +383,64 @@ for (const width of [320, 375, 390, 430, 768, 980, 1024, 1440]) {
   await page.getByRole("button", { name: /Studio commission/ }).waitFor();
   await capture("payments");
   if (process.env.UI_REVIEW_SCREEN === "workspace-layout") {
+    if ([390, 980].includes(width)) {
+      await page.getByRole("button", { name: /Website consultation/ }).click();
+      await page
+        .getByRole("button", { name: "Drop payment request", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Keep request", exact: true })
+        .click();
+      assert.equal(posts.includes("drop-request"), false);
+      await page
+        .getByRole("button", { name: "Drop payment request", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Confirm drop", exact: true })
+        .click();
+      await page.getByRole("button", { name: "Dropped", exact: true }).click();
+      await page
+        .getByRole("button", { name: /Website consultation/ })
+        .waitFor();
+      await capture("dropped-request");
+      await page.getByRole("button", { name: "All", exact: true }).click();
+      assert.equal(
+        await page
+          .getByRole("button", { name: /Website consultation/ })
+          .count(),
+        0,
+      );
+      customerReceipt = { ...records[1], requestDropped: true };
+      await visit("http://127.0.0.1:3000/checkout#" + "a".repeat(43));
+      await page
+        .getByRole("heading", { name: "This payment request is closed." })
+        .waitFor();
+      assert.equal(
+        await page.getByRole("button", { name: "Prepare payment" }).count(),
+        0,
+      );
+      await capture("closed-checkout");
+      await visit("http://127.0.0.1:3000/merchant");
+    }
     if ([980, 1440].includes(width))
       await page.screenshot({ path: `/tmp/nostos-workspace-${width}.png` });
     for (const section of ["overview", "refunds", "funds", "settings"]) {
       await visit(`http://127.0.0.1:3000/merchant/${section}`);
       await page.locator(".studio-header").waitFor();
       await capture(`workspace-${section}`);
+      if (section === "overview" && width === 980) {
+        mode = "sparse";
+        await visit("http://127.0.0.1:3000/merchant/overview");
+        await page.getByText("Website consultation", { exact: true }).waitFor();
+        const footerBottom = await page
+          .locator(".studio-page > footer")
+          .evaluate((node) => node.getBoundingClientRect().bottom);
+        assert(footerBottom >= 1960 - 26, "No empty pane below the footer");
+        await page.screenshot({
+          path: "/tmp/nostos-sparse-overview-fixed.png",
+        });
+        mode = "populated";
+      }
       if (width > 900) {
         assert.equal(
           await page.locator(".studio-brand-name").isVisible(),

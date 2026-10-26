@@ -19,7 +19,9 @@ export default function Overview() {
   const { data, loading, warning, refresh } = useRecord<Dashboard>(
     "/api/product/dashboard",
   );
-  const records = data?.records ?? [];
+  const records = (data?.records ?? []).filter(
+    (record) => !record.requestDropped,
+  );
   const summary = paymentSummary(records);
   const fulfillment = records.filter(
     (record) =>

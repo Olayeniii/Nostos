@@ -99,6 +99,7 @@ describe("merchant email ownership", () => {
       "refund",
       "policy",
       "fulfillment",
+      "drop-request",
       "refund-decision",
       "recover-route",
       "change-email",
@@ -281,5 +282,83 @@ describe("merchant email ownership", () => {
     ).toBe(200);
     expect(store.checkout(c.id)!.fulfillment).toBe("failed");
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it("drops only an owned unpaid request, preserving its route and late-payment record", async () => {
+    const m = store.signup("drop@example.com", password);
+    const other = store.signup("drop-other@example.com", password);
+    for (const merchant of [m, other])
+      consumeIdentityToken(
+        store,
+        issueIdentityToken(store, merchant.id, "verify", merchant.email),
+        password,
+      );
+    const cookie = (id: string) =>
+      accountHeader(store.session(id)).split(";")[0]!;
+    const c = store.createRequest(m.id, "Unpaid order", "n_drop", 100).checkout;
+    store.setRoute(c.id, "fixture-private-route");
+    expect(
+      (await POST(req("drop-request", { id: c.id }, cookie(other.id)))).status,
+    ).toBe(409);
+    expect(
+      (await POST(req("drop-request", { id: c.id }, cookie(m.id)))).status,
+    ).toBe(200);
+    const droppedAt = store.checkout(c.id)!.droppedAt;
+    expect(droppedAt).toBeTruthy();
+    expect(store.checkout(c.id)!.route).toBe("fixture-private-route");
+    expect(store.checkout(c.id)!.status).toBe("unpaid");
+    expect(
+      (await POST(req("drop-request", { id: c.id }, cookie(m.id)))).status,
+    ).toBe(200);
+    expect(store.checkout(c.id)!.droppedAt).toBe(droppedAt);
+    const token = store.receiptToken(c.id, m.id)!;
+    const prepare = new Request("https://nostos.example/api/product/prepare", {
+      method: "POST",
+      headers: {
+        origin: "https://nostos.example",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: "{}",
+    });
+    expect((await POST(prepare)).status).toBe(409);
+    let dashboard = await (
+      await GET(req("dashboard", {}, cookie(m.id), "GET"))
+    ).json();
+    expect(dashboard.records[0].requestDropped).toBe(true);
+    store.recordPayment(c.id, "a".repeat(64));
+    store.paid(c.id);
+    expect(
+      (await POST(req("drop-request", { id: c.id }, cookie(m.id)))).status,
+    ).toBe(409);
+    dashboard = await (
+      await GET(req("dashboard", {}, cookie(m.id), "GET"))
+    ).json();
+    expect(dashboard.records[0].requestDropped).toBe(false);
+    expect(dashboard.records[0].paymentStatus).toBe("confirmed");
+    expect(fetch).not.toHaveBeenCalled();
+    store.close();
+    store = new ProductStore();
+    expect(store.checkout(c.id)!.droppedAt).toBe(droppedAt);
+    expect(store.checkout(c.id)!.paymentTxid).toBe("a".repeat(64));
+  });
+  it("refuses to drop a request with a recorded pending payment", async () => {
+    const m = store.signup("pending-drop@example.com", password);
+    consumeIdentityToken(
+      store,
+      issueIdentityToken(store, m.id, "verify", m.email),
+      password,
+    );
+    const c = store.createRequest(
+      m.id,
+      "Pending order",
+      "n_pending_drop",
+      100,
+    ).checkout;
+    store.recordPayment(c.id, "b".repeat(64));
+    const cookie = accountHeader(store.session(m.id)).split(";")[0]!;
+    expect((await POST(req("drop-request", { id: c.id }, cookie))).status).toBe(
+      409,
+    );
+    expect(store.checkout(c.id)!.droppedAt).toBeNull();
   });
 });

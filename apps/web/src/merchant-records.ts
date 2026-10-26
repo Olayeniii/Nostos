@@ -15,6 +15,7 @@ export type Dashboard = {
   observerRecordChecksEnabled?: boolean;
 };
 export function paymentRecordStatus(r: RecordData) {
+  if (r.requestDropped) return "Request dropped";
   const observation = r.refunds?.at(-1)?.observation;
   if (observation && !["confirmed", "failed"].includes(r.status))
     return refundStageLabel(observation.stage);

@@ -313,6 +313,10 @@ export function checkoutView(
     paymentAmountZat: checkout.amountZat,
     paymentConfirmations: payment?.confirmations ?? 0,
     paymentStatus: checkout.status,
+    requestDropped:
+      !!checkout.droppedAt &&
+      checkout.status === "unpaid" &&
+      !checkout.paymentTxid,
     fulfillment: checkout.fulfillment,
     createdAt: checkout.createdAt,
     paidAt: checkout.paidAt,
@@ -376,7 +380,7 @@ export async function preparePayment(
   assertHostedMerchantOperationsAllowed();
   if (!addressOnNetwork(route, runtimeNetwork()))
     throw new Error("Use a fresh unified address on this network");
-  if (checkout.status !== "unpaid")
+  if (checkout.droppedAt || checkout.status !== "unpaid")
     throw new Error("Payment is already recorded");
   route = await prepareOrchardRefundRoute(route, rpc);
   if (checkout.route && checkout.route !== route)
@@ -384,7 +388,7 @@ export async function preparePayment(
   const memo = encodeMemo(checkout.order, route);
   store.setRoute(checkout.id, route);
   const saved = store.checkout(checkout.id)!;
-  if (saved.route !== route)
+  if (saved.droppedAt || saved.status !== "unpaid" || saved.route !== route)
     throw new Error("The return route is already attached");
   const destination = store.merchant(checkout.merchantId)!.destination;
   if (!addressOnNetwork(destination, runtimeNetwork()))

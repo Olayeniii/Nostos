@@ -179,6 +179,23 @@ export default function Checkout() {
                 Open your receipt
               </a>
             </>
+          ) : r.requestDropped ? (
+            <>
+              <span className="status-chip expired">Request dropped</span>
+              <h2>This payment request is closed.</h2>
+              <p>
+                Ask the merchant for a new link before paying. If you already
+                sent a payment, do not send again. Keep this link to check its
+                status.
+              </p>
+              <button
+                className="secondary"
+                disabled={loading}
+                onClick={() => void refresh()}
+              >
+                Check existing payment
+              </button>
+            </>
           ) : r.paymentStatus === "expired" ? (
             <>
               <span className="status-chip expired">

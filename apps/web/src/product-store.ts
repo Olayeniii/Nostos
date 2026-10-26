@@ -41,6 +41,7 @@ export type Checkout = {
   paymentTxid: string | null;
   createdAt: string;
   paidAt: string | null;
+  droppedAt?: string | null;
   refundPolicy: string;
   refundWindowDays: number | null;
   refundExpiresAt: string | null;
@@ -142,6 +143,7 @@ export class ProductStore {
         this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
     };
     add("merchants", "email_verified_at", "TEXT");
+    add("checkouts", "dropped_at", "TEXT");
     add("checkouts", "fulfillment", "TEXT NOT NULL DEFAULT 'pending'");
     this.db
       .exec(`CREATE TABLE IF NOT EXISTS identity_tokens(token_hash TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES merchants(id),purpose TEXT NOT NULL,email TEXT NOT NULL,expires_at INTEGER NOT NULL);
@@ -318,6 +320,7 @@ export class ProductStore {
       paymentTxid: row.payment_txid ? String(row.payment_txid) : null,
       createdAt: String(row.created_at),
       paidAt: row.paid_at ? String(row.paid_at) : null,
+      droppedAt: row.dropped_at ? String(row.dropped_at) : null,
       refundPolicy: this.decrypt(String(row.refund_policy ?? "")),
       refundWindowDays:
         row.refund_window_days === null ? null : Number(row.refund_window_days),
@@ -384,10 +387,19 @@ export class ProductStore {
       .get(id, merchantId) as { receipt_token: string } | undefined;
     return row ? this.decrypt(row.receipt_token) : undefined;
   }
+  dropRequest(id: string, merchantId: string) {
+    // Keep route and instruction history so a payment already in flight can reconcile.
+    const result = this.db
+      .prepare(
+        "UPDATE checkouts SET dropped_at=COALESCE(dropped_at,?) WHERE id=? AND merchant_id=? AND status='unpaid' AND payment_txid IS NULL AND paid_at IS NULL",
+      )
+      .run(new Date().toISOString(), id, merchantId);
+    return Number(result.changes) === 1;
+  }
   setRoute(id: string, route: string) {
     this.db
       .prepare(
-        "UPDATE checkouts SET route=?,route_hash=? WHERE id=? AND status='unpaid' AND route=''",
+        "UPDATE checkouts SET route=?,route_hash=? WHERE id=? AND status='unpaid' AND dropped_at IS NULL AND route=''",
       )
       .run(this.encrypt(route), this.fingerprint(route), id);
   }

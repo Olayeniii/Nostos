@@ -11,7 +11,8 @@ import tarfile
 
 ROOT=Path('/home/ubuntu/nostos-web-review.CEfoZq')
 REPO=Path('/home/ubuntu/nostos-arm64-build.4eQ9JP/source')
-OLD='nostos-mainnet-public-b201c4c1205f'
+OLD='nostos-mainnet-ui-217010b97b28'
+CURRENT_SOURCE='public-ui-217010b97b28/source'
 IMAGE='sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6'
 
 
@@ -24,7 +25,7 @@ def update(revision):
     with (ROOT/'commerce-install.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         old=json.loads(docker('inspect',OLD))[0]
-        expected={'/app':(str(ROOT/'final-web-b201c4c1205f/source'),False),'/preview':(str(ROOT/'runtime/data'),True),'/preview-rpc':(str(ROOT/'runtime/rpc'),False)}
+        expected={'/app':(str(ROOT/CURRENT_SOURCE),False),'/preview':(str(ROOT/'runtime/data'),True),'/preview-rpc':(str(ROOT/'runtime/rpc'),False)}
         require(old['State']['Running'] and old['Image']==IMAGE and old['Config']['User']=='1001:1001'
             and old['HostConfig']['NetworkMode']=='host' and {m['Destination']:(m['Source'],m['RW']) for m in old['Mounts']}==expected,'Current public release changed.')
         env=dict(v.split('=',1) for v in old['Config']['Env'])
@@ -40,7 +41,7 @@ def update(revision):
         subprocess.run(['git','-C',str(REPO),'archive','--format=tar','--output='+str(archive),revision],check=True)
         with tarfile.open(archive) as tree:tree.extractall(source,filter='data')
         for relative in ('node_modules','apps/web/node_modules'):
-            subprocess.run(['cp','-a',str(ROOT/'final-web-b201c4c1205f/source'/relative),str(source/relative)],check=True)
+            subprocess.run(['cp','-a',str(ROOT/CURRENT_SOURCE/relative),str(source/relative)],check=True)
         builder=runpy.run_path(str(source/'scripts/web/build-commerce-review.py'))
         command=builder['web_build_command'](work,source,revision)
         command[-1]=command[-1].replace('node /build-tools/node_modules/pnpm/bin/pnpm.cjs check && ','')
