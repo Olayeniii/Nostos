@@ -1,89 +1,9 @@
-# Orchard observer candidate
+# Legacy Zallet/Zaino observer
 
-`zallet-ufvk.patch` extends Zallet v0.1.0-beta.3 at commit
-`987382f67e622915228686e9f956c6a9c9a7514c` without replacing the legacy Sapling
-import path. It is a source candidate until the dedicated Rust workflow passes.
-No installed binary, wallet directory or service is changed by this repository.
+This directory retains the earlier Orchard UFVK extension and its build/inspection tooling. The selected mainnet backend is the [SDK observer](../lightclient/README.md), not this Zaino executable. No migration or backend switch is implied by retaining these files.
 
-The extension handles Orchard UFVK inputs to `z_importviewingkey` only with an
-explicit positive birthday and `whenkeyisnew`. It decodes the full key against the
-wallet's network, rejects incoming-only and Sapling-only keys, rejects observers
-containing spending accounts, imports with `AccountPurpose::ViewOnly` and returns
-a deterministic Orchard-only address plus account UUID and the extension marker
-`nostos_view_only_v1: true`. Repeating the same import reuses that view-only account.
-It never accepts or calls a seed, spending-key, signing or broadcast API.
+`zallet-ufvk.patch` extends the pinned Zallet source at `987382f67e622915228686e9f956c6a9c9a7514c`. It imports supported full viewing keys as view-only accounts with an explicit birthday, preserves the legacy Sapling path and rejects spending-account observers. `zaino-transport.patch` records the earlier public-chain transport changes.
 
-Key parsing and errors do not emit key text. The operator still needs a separately
-initialized observer without any merchant spending keys or mnemonic-derived
-accounts. The existing operator/testnet wallets must never be repurposed. A wallet
-that attests view-only status is still inside the operator trust boundary, not an
-independent cryptographic proof of custody or signing-wallet ownership.
+`build.py` checks prerequisites and can explicitly build a separate binary. `package-arm64.py` records fixed-file provenance; `verify-artifact.py` validates archive paths, checksums, revision and ARM64 architecture without executing the binary. Source patches and successful builds do not establish a working deployment.
 
-The workflow checks out the pinned source, applies the patch and compiles/tests
-it. It does not deploy, initialize a wallet, import a real key or request a send.
-A separate isolated Zaino backend build and runtime import/sync proof are required
-before any VPS installation or funded proof. Keep the mainnet release hold.
-
-## Build a separate binary on the wallet host
-
-After the pinned-source Rust workflow passes, the normal `ubuntu` user can run:
-
-```bash
-cd ~/nostos/repo
-git pull --ff-only origin main
-python3 scripts/observer/build.py
-python3 scripts/observer/build.py --build
-```
-
-The first command prints build prerequisites without writes. The explicit build
-uses a new directory under `~/nostos/observer-builds`, verifies the pinned commit
-and exact patched file hash, and builds Zaino with two parallel jobs. It requires
-Cargo/Rust compatible with the pinned source and at least 12 GiB free disk before
-starting; actual compiler memory/disk demand can be higher. A failed or interrupted
-build preserves its source directory. It cannot overwrite the existing wallet
-binary, create a wallet, change services or send a transaction. This host build
-still needs to pass on ARM; the Rust workflow's x86 build is a separate check.
-
-Share only the final build metadata or compiler error. After the isolated build,
-prepare a separate view-only observer directory/service, with no mnemonic,
-merchant spending keys or fallback to the operator wallet. Do not start it by
-reusing either existing wallet service or the initialized operator mainnet wallet.
-
-Validation on 19 October: the pinned Rust workflow passed compilation and its
-Orchard full/incoming/wrong-network/Sapling key checks. Application commit
-`e141bdb339ec7dbbc89a2005a33fc189ac32ef52` passed GitHub production CI with
-311 application tests and 31 web deployment/inspection Python tests. The local
-isolated-builder suite also passed four safety tests. None of these results
-proves an ARM build or live observer import/sync.
-
-## Hosted ARM64 build
-
-When Rust/Cargo is unavailable on the VPS, prefer the private GitHub Actions
-`Build ARM64 observer binary` workflow. It builds the pinned patched Zaino backend
-on an Ubuntu 24.04 ARM runner, runs the key checks natively, checks binary version
-and linkage, and stores a seven-day private artifact. It does not publish a
-release or touch any VPS service. Standard private-repository Actions minutes and
-artifact storage apply; no larger runner is selected.
-
-The artifact contains the compressed binary, source/patch/build provenance and
-SHA-256 checksum. No wallet directory, keys, cookie, provider URL or memo is read
-or included. Download only a successful run for the reviewed source revision and
-compare its checksums before isolated installation. A checksum inside a downloaded
-bundle alone is not independent authentication; confirm the trusted workflow/run
-and repository revision as well. No VPS Rust or dependency download is required
-for this route. Runtime library compatibility and actual observer sync remain
-separate checks. Do not install the toolchain merely because Cargo was absent
-from the interactive shell.
-
-Validate the downloaded inner archive before any installation, using the checksum,
-revision and run ID independently obtained from the reviewed successful build:
-
-```bash
-python3 scripts/observer/verify-artifact.py /path/to/nostos-observer-arm64.tar.gz \
-  --sha256 <reviewed-archive-sha256> --revision <build-source-commit> --run-id <build-run-id>
-```
-
-This reads and hashes the archive without extracting or executing the binary. It
-rejects unexpected paths/links, wrong build provenance, incorrect checksums and
-non-ARM64 executables. It neither installs a toolchain nor touches wallet files
-or services. A failed validation must not be bypassed.
+These tools must not overwrite the selected SDK worker, replace a live wallet or reuse existing signing-wallet directories. Historical build and runtime details remain in Git history. Current setup and trust boundaries are in the [documentation index](../../docs/README.md).

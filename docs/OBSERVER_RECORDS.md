@@ -1,13 +1,27 @@
-# Internal observer record reconciliation
+# Observer records and reconciliation
 
-`apps/web/src/observer-records.ts` connects native read-only output verification to the existing payment ledger and private receipt projection. Explicit opt-in authenticated preview routes can request payment and saved-refund verification. Preparing an instruction, claiming a handoff and binding a refund remain internal operations. See [merchant checks](OBSERVER_MERCHANT_CHECKS.md). Mainnet payment creation and hosted signing remain held. Callers must establish merchant/operator authorization before invoking the internal functions.
+`apps/web/src/observer-records.ts` connects native view-only verification to the payment ledger and receipt projection. Mainnet commerce requires the separately configured SDK observer and explicit feature flags. The observer cannot sign or broadcast.
 
-Incoming reconciliation requires a candidate transaction ID and explicit Orchard-family pool. It derives the account, destination, amount and original memo from saved merchant and checkout records. Automatic transaction discovery is not implemented.
+## Automatic checks
 
-Refunds use the approved saved request. `prepareObservedRefund` reserves principal and returns review-only fields. `claimObservedRefund` durably claims a single external-wallet handoff before opening the wallet. Never grant another handoff after a timeout or restart. The caller supplies wallet approval and signing outside this observer. `bindObservedRefund` saves one candidate transaction ID, without confirming it. `reconcileObservedRefund` confirms only after verified output evidence. Unknown attempts retain reservations and routes until resolved.
+Incoming discovery scans bounded, account-scoped candidate batches, including transactions whose received notes were later spent. Checkout and receipt polling can verify the exact original payment without customer transaction-ID entry.
 
-The authenticated loopback broker permits `nostos_verify_output`, scoped to its merchant account. The native worker decrypts and matches the exact receiver, padded memo, amount, direction and pool, requires at least three confirmations and a stable scanned tip, and checks an owned spend and actual fee cap for outgoing proofs. Transparent/Sprout bundles are rejected; outgoing Sapling and unsupported cross-pool spends are rejected. The separate control-test marker is never accepted as product evidence. The observer cannot sign or broadcast.
+Merchant dashboard refreshes reconcile one saved refund at a time, oldest check first. Customer receipt polling also checks approved refunds. Checks work after a panel closes or a page reloads. Browser reads are discarded when the page becomes hidden; returning, reconnecting, focusing or restoring the page starts a fresh read while keeping existing records visible.
 
-Source fingerprints are rechecked under database locks after asynchronous verification. A core journal atomically records the output claim and ledger update, then projects the existing receipt into the product database. Replaying after interruption repairs that projection without another wallet handoff, debit or RPC. A transaction can be claimed by only one instruction. Full refunds retire original route copies; partial refunds preserve the route. The journal stores no additional raw refund receiver or original paying memo. Selected proof metadata and neutral refund memos are encrypted; underlying observer history still follows its existing retention model.
+A candidate is never settlement evidence. Verification derives the account, receiver, amount, memo, pool and fee limit from saved records. The native worker requires confirmed chain context, an exact unique output and, for a refund, an owned spend. It checks the mined anchor and current scanned tip. A transaction or output cannot satisfy two instructions.
 
-Local evidence uses synthetic encrypted native fixtures and mock application transport, never funded transactions. Native tests and worker compilation exercise the pinned SDK. Application tests exercise rejection, accounting, duplicate prevention, handoff claiming, interruption/reopen and private receipt projection. These checks do not establish live chain trust, a funded round trip, recipient wallet recovery or installation readiness. New native source requires new packaged builds before installation; older artifacts do not validate it.
+## States and recovery
+
+The interface distinguishes waiting for wallet approval, refund detection, confirmations, observer catch-up, verification service availability and a confirmed transaction whose output has not passed the saved checks. These are diagnostic states, not permission to send again.
+
+Manual recovery lets the merchant save the existing transaction reference and check it against the same instruction. Error responses use allowlisted categories and fixed messages; raw provider or wallet diagnostics are not returned. Missing chain lookup alone does not prove a transaction failed or expired.
+
+A core journal commits the output claim and ledger update atomically. Fingerprints are rechecked under locks after asynchronous proof. Interrupted product projection can resume without another debit, wallet handoff or RPC proof. Full repayment retires the original route; partial repayment preserves it.
+
+Unknown outcomes retain reservations. [Expired refund recovery](EXPIRED_REFUND_RECOVERY.md) requires explicit private operator evidence and rotates the attempt memo while preserving the original record and amount. It never signs, broadcasts or confirms a replacement.
+
+## Trust boundary
+
+The SDK checks inclusion against its scanned chain view supplied by hosted services; this is not independent full-node consensus validation. Native fixtures exercise real note encryption and decryption, but use invalid proof/signature placeholders and cannot be broadcast. Application transport mocks do not establish a funded transaction.
+
+See [build status](BUILD_STATUS.md) for the separately reported mainnet result.

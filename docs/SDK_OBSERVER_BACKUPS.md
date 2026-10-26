@@ -1,9 +1,6 @@
 # SDK observer backup and restore
 
-This procedure is for the separate SDK mainnet observer preview. It has not been
-run on the VPS. It does not back up Zallet signing wallets, the product database,
-its encryption key, app credentials, or the merchant's signing-wallet recovery
-material. Those need their own protected backups. Mainnet payments remain held.
+The backup tool covers the separate SDK observer only. It does not include product databases, their encryption key, application credentials or the merchant signing wallet's recovery material. Those need separate protected backups.
 
 ## What is stored
 
@@ -78,47 +75,8 @@ are deliberately unmined. No real merchant key, funded settlement, live VPS
 backup, independent offsite archive or merchant recovery exercise is established
 by these tests. No automated restore or backend switch is included.
 
-## Verified run, 21 October 2026
+## Recorded operator evidence
 
-SDK [run 39659003901](https://github.com/Olayeniii/Nostos/actions/runs/39659003901)
-passed at 19:12 UTC for `fed823db31db83da3e2686ec30b5f1f1e7127c91`.
-The three Python backup tests ran with real age tools, including WAL consistency,
-wrong-merchant and corrupt-archive rejection. Fifteen SDK observer tests passed,
-including the decrypted memo/full-transaction reopen and age restore in both
-pools, plus cross-process native writer-lock exclusion. The viewing-key test and
-two HTTP/broker tests passed. Existing public-chain sync, rewind, abrupt-exit and
-service connection fixtures also passed. Application CI
-[39659003515](https://github.com/Olayeniii/Nostos/actions/runs/39659003515) passed.
+The operator reported creating an encrypted observer archive, copying it off the VPS and restoring it with Python integrity checks. Native fixtures also reopen restored synthetic observer data. A native SDK open of the operator's restored offsite copy has not been established. Neither result proves recovery of the merchant signing wallet.
 
-The first two attempts failed because Cargo runs package tests from the package
-working directory and the backup helper was supplied as a relative path. CI now
-uses an absolute path and checks that it exists. No wallet or refund policy was
-changed to make the test pass.
-
-## Ubuntu ARM64 package, verified 21 October
-
-[Run 39659336232](https://github.com/Olayeniii/Nostos/actions/runs/39659336232)
-passed at 19:17 UTC, source `13c57d4bf95f0b9cc33f03ef38e39e0685a059ea`.
-The native ARM64 worker compiled on Ubuntu 24.04. The 15 SDK observer tests,
-including memo persistence, native lock exclusion and real age restore in both
-pools, passed on ARM64. The package contains only the fixed worker, service files,
-backup tool and provenance, with no wallet or credentials.
-
-Artifact ID: `12374525039`, ZIP size: 6,785,015 bytes.
-GitHub ZIP SHA-256:
-`6e00192a7f478ee860e5164531a59baca5e4e546614033a6a44661cb44effa28`.
-Worker SHA-256:
-`0d2958a6c24adcb71835bf5520f1684c74a60050b7db8845f5741fd8efbfd31e`.
-
-The artifact was downloaded through the connected GitHub account and checked
-against GitHub's ZIP digest. `scripts/web/inspect-sdk-package.py` also checked the
-archive checksum, revision, upstream pin, fixed file list, permissions, per-file
-hashes and AArch64 ELF header. It neither extracts nor runs the package. It needs
-`--revision` and `--artifact-sha256` from trusted GitHub metadata; an archive's own
-checksum file alone is not independent evidence.
-
-The repository is private. Use authenticated GitHub artifact retrieval directly
-on the VPS rather than transferring through a phone. Never share a GitHub token
-in chat or put it in a command argument. Verify the ZIP before extracting it into
-an isolated release. No VPS download, installation, credential configuration,
-service start or merchant sync was performed by this check.
+See [build status](BUILD_STATUS.md) for current source and deployment evidence.

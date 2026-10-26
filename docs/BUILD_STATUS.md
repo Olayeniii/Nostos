@@ -1,64 +1,29 @@
-# Build status
+# Build and deployment status
 
-| Gate              | Status                       | Required proof                                                                                                |
-| ----------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| G0 Foundation     | Passed locally               | Install and all repository checks pass.                                                                       |
-| G1 Shielded spike | Passed                       | Real payment, memo recovery, refund, and receipt references.                                                  |
-| G2 Domain         | Passed                       | Domain and schema tests pass.                                                                                 |
-| G3 Payment intake | Passed                       | One real payment appears once after scanner restart.                                                          |
-| G4 Refund core    | Passed                       | One partial refund broadcasts once and confirms.                                                              |
-| G5 Interface      | Passed controlled phone flow | HTTPS review, 300000 zatoshi refund, confirmed wallet note, and both phone views agree.                       |
-| G6 Hardening      | Passed scoped checks         | 82 tests pass; browser product flow, uncertain-send blocking, private storage and deployment rollback checks. |
-| G7 Submission     | In progress                  | Deploy the product update, verify the real merchant flow, then prepare repository and video.                  |
+Checkpoint: 26 October 2026. Source and deployment are separate facts.
 
-No simulated result may be labeled as real.
+| Area                        | Verified checkpoint                                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Source                      | PR #8 merged into `main` at `8d86d59b3be4dde7c4a742d02205ebceadaa75e2`                                                                                                         |
+| Private mainnet web preview | Operator reported healthy installation of `b201c4c1205f73cd5fd5f43981f95d1489fe3a8d`, whose source tree matches the merge                                                      |
+| Normal observer policy      | Operator reported normal worker restored and temporary exception removed                                                                                                       |
+| Data and health             | Existing records preserved; sign-in HTTP 200; anonymous account endpoint HTTP 401; installation requested zero sends                                                           |
+| Mainnet payment             | Operator confirmed 100,000 zats, or 0.001 ZEC                                                                                                                                  |
+| Mainnet partial refund      | Chain lookup returned five confirmations for the submitted transaction; the operator subsequently confirmed ZODL and NOSTOS showed confirmation for 50,000 zats, or 0.0005 ZEC |
+| Public deployment           | Equality with the reviewed mainnet preview has not been established                                                                                                            |
 
-G5 proof is user-operated Android Chrome plus pasted VPS database and customer wallet outputs. See `scripts/evidence/gate-g5.json`. The earlier `ui-order-001` amount discrepancy remains unresolved and is not used as exact-amount proof. The controlled `ui-order-002` flow confirmed exactly 300000 zatoshi.
+## Validation
 
-G6 includes local mobile and desktop Chromium checks over real account, setup, checkout, receipt and refund interfaces with a mock wallet adapter. No new chain transaction was broadcast for that browser test. It does not replace G5's real wallet evidence. See `scripts/evidence/product-accounts-ui.json`.
+The PR #8 source checkpoint passed 435 application tests, 17 Node tests, three final-preview deployment tests, TypeScript, targeted lint, the current-file secret scan and the Next.js production build. Native verification source was restored to its previously tested version. Native tests and optimized builds were also run by the operator on the isolated ARM64 build host during the mainnet work.
 
-The earlier claim that the first Oracle ARM64 product deployment was unverified
-is superseded by the operator's
-subsequent healthy-release reports and the authenticated merchant/receipt review
-recorded in `docs/DEMO.md`. Latest GitHub main independently checked on October 11:
-`cc43ab69eb1d34bb4f695ee4c7cd8801141d7acc`. Exact current deployment equality remains
-unverified; no deployment or restart was performed during this check.
+These are recorded checkpoints, not a claim that a later checkout has just rerun every test. Fixture checks do not establish a new funded transaction. The deployment report is supplied operator evidence, not direct remote access by the reviewer.
 
-## Current submission evidence
+## Submission work remaining
 
-The original Item21 payment and 0.018 ZEC partial refund are confirmed in supplied
-merchant evidence and the existing receipt. The customer explicitly reported
-receiving the refund in Noir. This was a manually entered payment, not a completed
-automatic handoff. Its remaining 0.002 ZEC and original unset deadline explain why
-both protected return-route copies remain.
+- Verify the public deployment and intended judge access path.
+- Prepare the demo video using the existing confirmed records; no additional funded test is required for that recording.
+- Complete submission fields and save the submission receipt.
+- Review source visibility and licensing before public release. The repository is currently private and `UNLICENSED`.
+- Resolve the retained dependency-security branch separately before treating the deployed dependency stack as security-updated. That work is not part of the merged payment/refund release.
 
-Desktop Noir reached approval after the connection fix, but the separate
-transaction failed consensus validation with an incorrect branch ID. Resync did
-not resolve that rejection on October 11. Automatic payment completion is blocked;
-mobile automatic handoff remains unproved. See `docs/DEMO.md` for scoped evidence
-and remaining checks. Historical gate counts are not the current test count.
-
-On October 11, `pnpm check` passed: format, lint, typecheck, all 232 tests across
-26 files, TypeScript build and current-file secret scan (164 files). Seven Python
-deployment/auto-deployment tests also passed. After the evidence update, format
-and diff checks passed again and the secret scan passed across 165 files. These
-are local repository checks,
-not current live deletion, deployment equality or wallet interoperability proof.
-
-## October 19 merchant interface pass
-
-Source changes contain ledger overflow, stack checkout/account columns below
-900px, and give scrollbars a visible dark treatment. Merchant tabs, payment
-totals, selected ledger rows, Funds balances and withdrawal reviews now share
-clearer styling. Consent checkboxes retain native behavior and compact sizing.
-No payment, refund, custody or mainnet enablement logic changed.
-
-Web type checking, formatting and 38 funds/observer/custody tests passed locally.
-Live homepage inspected before this pass; authenticated screens and narrow
-viewport visual verification remain outstanding. Source changes are not proof of
-deployment or a completed live merchant flow.
-
-The ARM backend compiled in run 39317239917, but its test command targeted the
-wrong workspace and no artifact was uploaded. Revision 5d4b52c corrects the
-command and saves build cache after compilation. Replacement run 39321077735
-is pending verification. No VPS Rust installation or service change was made.
+The earlier testnet evidence remains in `scripts/evidence`. It is historical evidence, with its original network and limits.

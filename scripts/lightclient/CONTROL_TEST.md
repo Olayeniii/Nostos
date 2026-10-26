@@ -23,8 +23,8 @@ it does not authorize a funded transaction, a live key import or a deployment.
   The SDK backup helper does not include this separate ledger. An approved backup
   and restore procedure must cover both before this can count as recovery proof.
 
-Do not run these commands yet without the approvals above. The uppercase path
-labels below are placeholders, never keys, addresses, memos or transaction IDs.
+The uppercase paths below are placeholders. This optional operator harness is not
+part of ordinary checkout, product settlement or the submission recording.
 
 ## Prepare, review and bind
 
