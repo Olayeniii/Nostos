@@ -147,9 +147,17 @@ export function MerchantWorkspace({
             </Link>
           ))}
         </div>
-        <div className="studio-business">
-          <strong>{name}</strong>
-          <small>Merchant account</small>
+        <div className="studio-rail-bottom">
+          <div className="studio-business">
+            <strong>{name}</strong>
+            <small>Merchant account</small>
+            <span className="studio-rail-network">
+              <NetworkLabel />
+            </span>
+          </div>
+          <Link href="/" className="studio-about">
+            About NOSTOS
+          </Link>
         </div>
       </nav>
       <div className="studio-body">
