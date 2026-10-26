@@ -100,12 +100,25 @@ impl VerifiedTransaction {
         owned: &[orchard::note::Nullifier], remote_tip: u32, fee_cap: u64,
         binding: &str, account_uuid: &str, tip_hash: &str)
         -> Result<serde_json::Value, &'static str> {
+        // Operator-only preview exception, scoped to exactly one transaction.
+        // No request parameter can enable this policy.
+        let configured=std::env::var("NOSTOS_SELF_REFUND_TEST_TXID").ok();
+        let allow_self_receipt=configured.as_deref()==Some(self.txid().to_string().as_str());
+        self.verify_product_with_policy(keys,expected,owned,remote_tip,fee_cap,binding,account_uuid,tip_hash,allow_self_receipt)
+    }
+    fn verify_product_with_policy<A: Copy+Eq+std::hash::Hash>(&self,
+        keys: &HashMap<A,UnifiedFullViewingKey>, expected: &Expected<A>,
+        owned: &[orchard::note::Nullifier], remote_tip: u32, fee_cap: u64,
+        binding: &str, account_uuid: &str, tip_hash: &str, allow_self_receipt: bool)
+        -> Result<serde_json::Value, &'static str> {
         if expected.confirmations<3 || remote_tip!=self.tip || self.tx.transparent_bundle().is_some()
             || self.tx.sprout_bundle().is_some() {return Err("product_context");}
         let outgoing=expected.direction==TransferType::Outgoing;
         let fee=if outgoing {
-            // Product refunds may return to another external address of this account.
-            // The owned nullifier below proves funding independently of output direction.
+            if !allow_self_receipt {
+                expected.receiver.require_external_to(keys.get(&expected.account).ok_or("product_keys")?)?;
+            }
+            // The test exception still requires an owned spend and every exact output field.
             if self.tx.sapling_bundle().is_some() {return Err("product_input_pool");}
             let bundle=match expected.pool {
                 ShieldedPool::Orchard=>self.tx.orchard_bundle(),
@@ -120,7 +133,7 @@ impl VerifiedTransaction {
             if fee_cap==0 || fee>fee_cap {return Err("product_fee_cap");}
             Some(fee)
         } else {None};
-        let index=self.matching_output_with_self_receipt(keys,expected,outgoing)?;
+        let index=self.matching_output_with_self_receipt(keys,expected,outgoing && allow_self_receipt)?;
         Ok(serde_json::json!({"nostos_output_proof_v1":true,"network":"mainnet",
             "observation_scope":"orchard-family-only","payments_enabled":false,
             "binding":binding,"account_uuid":account_uuid,"txid":self.txid().to_string(),
@@ -128,7 +141,8 @@ impl VerifiedTransaction {
             "direction":if outgoing {"outgoing"} else {"incoming"},"amount_zat":expected.amount,
             "output_index":index,"height":self.height,"block_hash":self.anchor.to_string(),
             "tip_height":self.tip,"tip_hash":tip_hash,"confirmations":self.tip-self.height+1,
-            "fee_zat":fee,"exact_match":true,"owned_spend":outgoing}))
+            "fee_zat":fee,"exact_match":true,"owned_spend":outgoing,
+            "self_refund_test":outgoing && allow_self_receipt}))
     }
     // Control-only check. The caller must source these nullifiers from the
     // already-bound account, including notes now marked spent after scanning.
