@@ -14,7 +14,7 @@ The service has viewing access to the dedicated merchant account, but no spendin
 
 ## Status
 
-A mainnet payment of 0.001 ZEC and a partial refund of 0.0005 ZEC were confirmed in the private mainnet preview. The reviewed update is merged, normal verification is restored, and the original records are preserved. This does not establish that the public website serves the reviewed mainnet release.
+A mainnet payment of 0.001 ZEC and a partial refund of 0.0005 ZEC were confirmed in the private mainnet preview. The reviewed update is merged, normal verification is restored, and the original records are preserved. The operator subsequently confirmed publication at https://nostos.iyforge.xyz with mainnet commerce enabled, existing records preserved and the observer unchanged.
 
 - [Website](https://nostos.iyforge.xyz)
 - [Demo guide](docs/DEMO.md)
