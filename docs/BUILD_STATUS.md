@@ -2,15 +2,15 @@
 
 Checkpoint: 26 October 2026. Source and deployment are separate facts.
 
-| Area                        | Verified checkpoint                                                                                                                                                            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Source                      | PR #8 merged into `main` at `8d86d59b3be4dde7c4a742d02205ebceadaa75e2`                                                                                                         |
-| Private mainnet web preview | Operator reported healthy installation of `b201c4c1205f73cd5fd5f43981f95d1489fe3a8d`, whose source tree matches the merge                                                      |
-| Normal observer policy      | Operator reported normal worker restored and temporary exception removed                                                                                                       |
-| Data and health             | Existing records preserved; sign-in HTTP 200; anonymous account endpoint HTTP 401; installation requested zero sends                                                           |
-| Mainnet payment             | Operator confirmed 100,000 zats, or 0.001 ZEC                                                                                                                                  |
-| Mainnet partial refund      | Chain lookup returned five confirmations for the submitted transaction; the operator subsequently confirmed ZODL and NOSTOS showed confirmation for 50,000 zats, or 0.0005 ZEC |
-| Public deployment           | Equality with the reviewed mainnet preview has not been established                                                                                                            |
+| Area                        | Verified checkpoint                                                                                                                                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source                      | PR #8 merged into `main` at `8d86d59b3be4dde7c4a742d02205ebceadaa75e2`                                                                                                                                           |
+| Private mainnet web preview | Operator reported healthy installation of `b201c4c1205f73cd5fd5f43981f95d1489fe3a8d`, whose source tree matches the merge                                                                                        |
+| Normal observer policy      | Operator reported normal worker restored and temporary exception removed                                                                                                                                         |
+| Data and health             | Existing records preserved; sign-in HTTP 200; anonymous account endpoint HTTP 401; installation requested zero sends                                                                                             |
+| Mainnet payment             | Operator confirmed 100,000 zats, or 0.001 ZEC                                                                                                                                                                    |
+| Mainnet partial refund      | Chain lookup returned five confirmations for the submitted transaction; the operator subsequently confirmed ZODL and NOSTOS showed confirmation for 50,000 zats, or 0.0005 ZEC                                   |
+| Public deployment           | Operator reported publication of the reviewed mainnet source at `https://nostos.iyforge.xyz`; mainnet network response, sign-in HTTP 200, account HTTP 401, preserved records, unchanged observer and zero sends |
 
 ## Validation
 
@@ -20,7 +20,7 @@ These are recorded checkpoints, not a claim that a later checkout has just rerun
 
 ## Submission work remaining
 
-- Verify the public deployment and intended judge access path.
+- Check the intended judge access path and public browser flow. The operator's rollout report confirms the public mainnet switch; independent retrieval from this review environment was unavailable.
 - Prepare the demo video using the existing confirmed records; no additional funded test is required for that recording.
 - Complete submission fields and save the submission receipt.
 - Review source visibility and licensing before public release. The repository is currently private and `UNLICENSED`.
