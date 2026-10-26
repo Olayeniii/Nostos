@@ -1,14 +1,14 @@
 # Expired external refund recovery
 
-This is a private operator action, not a merchant API or an automatic retry.
+This private maintenance command handles an expired external-wallet attempt. It is separate from the merchant API and automatic reconciliation.
 It does not sign, broadcast, settle a refund, or release its reserved amount.
 
-The operator must inspect the external wallet's local export, matching the
-transaction ID and exact refund memo, and record an unmined expired transaction.
-The export stays on the operator's device. Only selected metadata enters this
-action. This is operator-reviewed evidence, not a native cryptographic proof of
-expiry. An operator who supplies false metadata can make the recovery unsafe.
-Do not expose this entry point through HTTP or accept these claims from customers.
+Recovery depends on manual inspection of the external wallet's local export,
+matching the transaction ID and exact refund memo to an unmined expired
+transaction. The export stays on the wallet owner's device. Only selected
+metadata enters the command. This is reviewed evidence rather than a native
+cryptographic proof of expiry. Incorrect metadata can make recovery unsafe,
+so the entry point is private and does not accept customer claims over HTTP.
 
 Requirements:
 
@@ -22,13 +22,13 @@ Requirements:
   the configured adapter's numeric -5 result, alongside reviewed export evidence;
   missing transaction lookup alone never authorizes recovery.
 
-Run `scripts/web/recover-expired-refund.mjs --dry-run` inside the private preview
-using its existing environment and tsx loader. Supply the metadata JSON on stdin.
-Review `ready: true`, then explicitly run the same action with `--apply`.
+`scripts/web/recover-expired-refund.mjs --dry-run` checks metadata JSON from stdin
+using the installation environment and tsx loader. `ready: true` indicates that
+the checks passed. The separate `--apply` mode commits the recovery.
 
 Metadata fields: `txid`, `memo`, `amountZat`, `feeZat`, `expiryHeight`,
 `walletScannedHeight`, `minedHeight: null`, `walletStatus: "expired"`, and
-`operatorReviewed: true`. Never provide a wallet database, viewing or spending key.
+`operatorReviewed: true`. The input contains metadata only, with no wallet database or keys.
 
 Application atomically appends the old transaction, encrypted memo, fingerprint,
 checked heights and evidence provenance to `observer_refund_attempt_history`.

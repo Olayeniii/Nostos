@@ -1,6 +1,6 @@
 # Scripts
 
-These tools are not a second product entry point. Start with the [project README](../README.md) and [documentation index](../docs/README.md).
+Build, deployment, inspection and maintenance tools. The [project README](../README.md) covers the product; the [documentation index](../docs/README.md) covers the implementation.
 
 | Directory                       | Purpose                                                                                   |
 | ------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -15,6 +15,6 @@ These tools are not a second product entry point. Start with the [project README
 
 The deployed installations and tests reference existing script paths. They are retained rather than moved during submission cleanup. A file's presence does not mean it is the selected mainnet backend.
 
-The `scripts/web/*review.py` recipes contain exact revisions, binary hashes and installation paths. They refuse unexpected state and must not be treated as general setup commands. Do not run historical installers against a newer deployment, delete runtime directories to satisfy a guard or expose their private settings.
+The `scripts/web/*review.py` recipes contain exact revisions, binary hashes and installation paths. They target specific installations and refuse unexpected state. Historical installers are not general setup commands for newer deployments. Their private settings and retained runtime directories are part of the release state.
 
-Read-only inspection, build, installation, recovery application and wallet signing are separate operations. Review a script's arguments and documentation before using it. Local development does not require running any send or deployment command.
+Read-only inspection, build, installation, recovery application and wallet signing are separate operations. Local development does not require running any send or deployment command.

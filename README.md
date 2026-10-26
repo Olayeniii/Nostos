@@ -19,7 +19,6 @@ Your spending keys stay in your wallet. We use viewing access to check the dedic
 
 NOSTOS is live on mainnet. Our completed mainnet test paid 0.001 ZEC and returned 0.0005 ZEC as a confirmed partial refund. Transaction fees are separate from the refunded amount.
 
-- [Demo guide](docs/DEMO.md)
 - [Technical design](docs/ARCHITECTURE.md)
 - [Build and deployment status](docs/BUILD_STATUS.md)
 - [Documentation](docs/README.md)
@@ -54,4 +53,6 @@ Source startup does not configure email delivery or wallet access. Local checks 
 
 Mainnet uses external wallet signing. The older hosted testnet path has separate keys, databases and credentials; it is not a mainnet signing fallback.
 
-Source licensing is currently `UNLICENSED`.
+## License
+
+NOSTOS is released under the [MIT License](LICENSE). Third-party dependencies retain their own licenses.

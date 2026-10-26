@@ -25,23 +25,22 @@ restored directory is created. Backups and database files are mode 0600; private
 working directories are mode 0700, with owner and ancestor checks.
 
 This is an offline manual tool. A merchant observer resumes only after the
-operator separately verifies the restored SDK account, birthday, scan checkpoint
+restored account has passed checks for its SDK identity, birthday, scan checkpoint
 and current chain sync. Restoring history does not confirm a payment or refund.
 The tool has a 256 MiB snapshot limit and a two-minute age process limit. Larger
 wallets need a reviewed streaming procedure, not a higher untested limit.
 
-## Operator inputs and recovery key
+## Recovery key and inputs
 
 Use a dedicated age recipient whose corresponding identity is stored separately
-from the server and archive. Keep a second secure copy under the operator's
-control. Losing that identity makes the archive unrecoverable. This tool accepts
+from the server and archive. A second secure copy belongs in separate private
+storage. Losing that identity makes the archive unrecoverable. This tool accepts
 a private raw age identity file for noninteractive restore; it does not prompt for
 an identity passphrase. Never paste that file or its contents into chat or logs.
 The backup recipient is public and does not authorize wallet spending.
 
 Prerequisites are Python with SQLite backup/serialize/deserialize support and the
-`age` executable. Confirm worker shutdown under a separately approved deployment
-procedure before backup. A running writer is refused rather than stopped.
+`age` executable. Backup requires a stopped worker. A running writer is refused rather than stopped.
 
 For a single merchant, use the script's `backup` subcommand with `--root`,
 `--destination`, `--recipient` and `--merchant`. The root directory name must equal
@@ -75,8 +74,8 @@ are deliberately unmined. No real merchant key, funded settlement, live VPS
 backup, independent offsite archive or merchant recovery exercise is established
 by these tests. No automated restore or backend switch is included.
 
-## Recorded operator evidence
+## Restore results
 
-The operator reported creating an encrypted observer archive, copying it off the VPS and restoring it with Python integrity checks. Native fixtures also reopen restored synthetic observer data. A native SDK open of the operator's restored offsite copy has not been established. Neither result proves recovery of the merchant signing wallet.
+An encrypted observer archive was copied off the VPS and restored with Python integrity checks. Native fixtures also reopen restored synthetic observer data. A native SDK open of that restored offsite copy has not been established. Neither result proves recovery of the merchant signing wallet.
 
 See [build status](BUILD_STATUS.md) for current source and deployment evidence.
