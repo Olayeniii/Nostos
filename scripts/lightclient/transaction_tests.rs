@@ -420,20 +420,23 @@ fn product_refund_to_same_account_requires_owned_spend_and_exact_output() {
         let expected=Expected::new(1,receiver(&customer),1800000,memo(),pool,TransferType::Outgoing,3).unwrap();
         // SDK labels external-address receipts Incoming even when this account funded them.
         assert!(tx.matching_output(&keys,&expected).is_err());
-        let proof=tx.verify_product(&keys,&expected,&owned,tx.tip,10000,"binding","account","tip").unwrap();
+        assert!(tx.verify_product_with_policy(&keys,&expected,&owned,tx.tip,10000,"binding","account","tip",false).is_err());
+        assert!(tx.verify_product(&keys,&expected,&owned,tx.tip,10000,"binding","account","tip").is_err());
+        let proof=tx.verify_product_with_policy(&keys,&expected,&owned,tx.tip,10000,"binding","account","tip",true).unwrap();
+        assert_eq!(proof["self_refund_test"],true);
         assert_eq!(proof["owned_spend"],true);
         assert_eq!(proof["direction"],"outgoing");
-        assert!(tx.verify_product(&keys,&expected,&[],tx.tip,10000,"binding","account","tip").is_err());
-        assert!(tx.verify_product(&keys,&expected,&unknown,tx.tip,10000,"binding","account","tip").is_err());
+        assert!(tx.verify_product_with_policy(&keys,&expected,&[],tx.tip,10000,"binding","account","tip",true).is_err());
+        assert!(tx.verify_product_with_policy(&keys,&expected,&unknown,tx.tip,10000,"binding","account","tip",true).is_err());
         for field in 0..4 {
             let mut changed=Expected::new(1,receiver(&customer),1800000,memo(),pool,TransferType::Outgoing,3).unwrap();
             match field {0=>changed.amount+=1,1=>changed.memo=MemoBytes::from_bytes(b"wrong").unwrap(),
                 2=>changed.receiver=receiver(&key(33)),_=>changed.confirmations=100,}
-            assert!(tx.verify_product(&keys,&changed,&owned,tx.tip,10000,"binding","account","tip").is_err());
+            assert!(tx.verify_product_with_policy(&keys,&changed,&owned,tx.tip,10000,"binding","account","tip",true).is_err());
         }
         let (ambiguous,sender,customer)=fixture_from_sender(pool,true,true,key(32));
         let expected=Expected::new(1,receiver(&customer),1800000,memo(),pool,TransferType::Outgoing,3).unwrap();
-        assert!(ambiguous.verify_product(&HashMap::from([(1,sender)]),&expected,&owned,ambiguous.tip,10000,"binding","account","tip").is_err());
+        assert!(ambiguous.verify_product_with_policy(&HashMap::from([(1,sender)]),&expected,&owned,ambiguous.tip,10000,"binding","account","tip",true).is_err());
     }
     let message=MemoBytes::from_bytes(b"nostos:control:0123456789abcdef0123456789abcdef").unwrap();
     let (tx,sender,customer)=fixture_details(ShieldedPool::Ironwood,true,false,key(32),10_000,message.clone(),10_000);
