@@ -43,5 +43,5 @@ using an old memo/fingerprint cannot settle a replacement attempt. Unknown
 outcomes continue to hold reservations. Normal native proof remains required
 for confirmation of a replacement refund.
 
-No funded retry is authorized by installing this code. Check, apply recovery,
-then review the new instructions before deciding to sign once in the wallet.
+Installation and recovery application request no send. A replacement still needs
+its own wallet review and explicit signature.

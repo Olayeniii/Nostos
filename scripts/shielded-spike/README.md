@@ -1,15 +1,7 @@
-# Shielded spike
+# Historical testnet spike
 
-Gate G1 must prove a real customer payment and merchant refund before product feature work starts.
+The original development proof used Zebra and two isolated Zallet wallets. It is retained for reproducibility and is separate from the current mainnet SDK observer path.
 
-The spike provides five commands:
+The commands are `pnpm spike:setup`, `pnpm spike:send-payment`, `pnpm spike:scan-payment`, `pnpm spike:send-refund` and `pnpm spike:verify`. Send commands use the configured testnet wallets and are not part of local checks or the submission recording.
 
-1. `pnpm spike:setup`
-2. `pnpm spike:send-payment`
-3. `pnpm spike:scan-payment`
-4. `pnpm spike:send-refund`
-5. `pnpm spike:verify`
-
-The selected path is Zebra plus two isolated Zallet wallets. Sends use `z_sendfromaccount` with `FullPrivacy`. Outputs are redacted and proof is classified as real, local test, simulated, planned, or not supported.
-
-See `docs/ZALLET_SPIKE_SETUP.md` before running the commands.
+Read [testnet setup](../../docs/ZALLET_SPIKE_SETUP.md) before use. Local spike state can contain plaintext private data and must remain outside source control. Do not use a personal wallet or substitute mainnet credentials.

@@ -1,4 +1,6 @@
-# Gate G1: Zebra and Zallet setup
+# Historical testnet spike setup
+
+This is the original development path, retained for reproducibility. Current mainnet uses the [SDK observer](../scripts/lightclient/README.md) and an external signing wallet. Do not use these instructions to configure mainnet.
 
 ## Selected path
 

@@ -1,30 +1,28 @@
-# Automatic deployment
+# Deployment
 
-The VPS checks its existing authenticated Git origin/main every five minutes. No wallet credentials, new SSH key, webhook or GitHub runner are needed. Only trusted main commits are deployment inputs. Keep main access restricted: repository write access already permits changing the code that the operator runs.
+## Existing testnet auto-deployer
 
-The timer requires a clean repository on main and a fast-forward update. It invokes the existing isolated deployment helper, which runs all checks and builds before switching web containers, retains the previous release and restores it on a failed health check. Zebra and wallet services are untouched. An unchanged healthy release does nothing. A failed revision is attempted once and held until the next main commit or an explicit retry. The timer uses the VPS's existing Git authentication as the repository owner; authentication failures are not printed.
+The VPS timer checks its configured `origin/main` every five minutes. It requires a clean checkout on `main` and a fast-forward update, then uses the isolated release builder. The live container stays up during the build; the candidate is checked on loopback before switching web traffic. The previous container is retained for failed-switch rollback. Zebra and wallet services are not restarted.
 
-Install after pulling the commit:
+An unchanged healthy release is skipped. A failed revision is held until a later commit or a deliberate manual retry. Repository write access is therefore also authority to change future deployment inputs; restrict it accordingly.
 
-```bash
+```sh
 cd ~/nostos/repo
 git pull --ff-only
 sudo python3 scripts/web/install-auto-deploy.py
 sudo systemctl start nostos-auto-deploy.service
 ```
 
-The service continues if Termius disconnects. Inspect it using `sudo systemctl status nostos-auto-deploy.service` and `sudo journalctl -u nostos-auto-deploy.service -n 30 --no-pager`. Build containers never receive wallet credentials or application databases. The helper does not print private runtime configuration.
+These are operator setup commands, not part of local development. Keep runtime configuration, product keys and wallet credentials outside the repository. A successful GitHub merge is not proof that deployment completed.
 
-Pause before any manual rollback:
+Before a manual rollback, pause `nostos-auto-deploy.timer` and wait for any active deployment to finish. Use a release compatible with the current refund ledger. Never restore an old database snapshot after a broadcast.
 
-```bash
-sudo systemctl stop nostos-auto-deploy.timer
-```
+## Separate mainnet preview
 
-Wait for an active deployment service to finish before manual rollback. Do not restore an old database snapshot after a refund broadcast. Historical releases before the refund ledger understand only the first refund; use a compatible release for continued multi-refund operation.
+The tested mainnet SDK preview uses separate application data, product key, observer credentials, broker and loopback web port. It does not inherit hosted signer configuration or repurpose testnet wallets. Its web source is mounted read-only; runtime product storage is separate.
 
-To retry a held revision, first inspect its build failure, then run the normal manual deployment helper. A successful manual deployment is detected by the timer's next pass. The timer is an operator convenience, not proof of runtime privacy or customer-wallet receipt.
+The `scripts/web/*review.py` installers are revision-bound operator recipes for an existing private installation. They verify source, binary hashes, expected containers and mounts, retain prior state and stop on mismatches. They are not generic public production setup commands. Preserve their dependencies and archived source paths when maintaining a deployed installation.
 
-## Branding metadata
+The final reviewed preview update restores normal observer verification, removes its temporary operator configuration and preserves existing financial records. New deployment success must still be checked from the installer output and the actual runtime. See [build status](BUILD_STATUS.md).
 
-The social image is a fixed 1200 by 630 PNG generated from the existing logo and product copy. The tab icon uses the same mark in SVG and the Apple touch icon is PNG. They contain no payment data, route, merchant data or receipt capability. Public preview metadata is generic on private pages as well, and indexing is disabled for this testnet product. No customer receipt URL is canonicalized into social metadata.
+The public HTTPS origin and judge access path need their own release verification. A private loopback preview is not automatically public when its source is merged. Never expose wallet RPC, copy private preview credentials into a public build or weaken origin/session checks to publish it.

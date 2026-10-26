@@ -1,19 +1,6 @@
-# Validation while hosted Actions allowance is exhausted
+# Validation
 
-Automatic workflow events are temporarily paused in this change. All seven
-workflows accept only `workflow_dispatch`; each also cancels an older run of the
-same workflow and ref. No runner type, validation step, dependency pin, required
-check or repository permission is removed.
-
-This takes repository-wide effect only after the workflow change is reviewed and
-merged. Until then, default-branch workflows remain as configured on main. Do not
-enable paid usage, change repository visibility or install a runner on a live
-wallet host as part of this change.
-
-## Work without hosted minutes
-
-Use an isolated source checkout with Node 24 and pnpm 11. Keep wallet files,
-viewing keys, production credentials and product databases outside the checkout.
+Requires Node.js 24 and pnpm 11. Use a source checkout without wallet exports, product databases or live credentials.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -22,33 +9,18 @@ pnpm --filter @nostos/web build
 python3 -m unittest discover -s scripts/web -p 'test_*.py'
 python3 -m unittest discover -s scripts/observer -p 'test_*.py'
 python3 -m unittest discover -s scripts/lightclient -p 'test_*.py'
-node --test scripts/lightclient/service.test.mjs
 ```
 
-Record the source commit, environment, commands, outcomes and any skipped checks
-in the PR. A blocked Actions job is not a failed application test. Local results
-do not create a successful GitHub check and do not bypass required checks.
+`pnpm test` runs Vitest application tests and the separate Node test suites with their correct runners. Python checks use temporary configuration and databases; environment-specific prerequisites such as `age` are documented by their tests. Browser checks use explicit fixture transport and require Playwright/Chromium separately.
 
-Rust changes still require the pinned compiler, SDK dependencies and native
-tests. An earlier binary validates only its tested source. Reuse a verified
-artifact for unchanged native code; retain its source commit and independent CI
-hashes. Do not describe TypeScript or mocked tests as a fresh native build or a
-funded proof. An isolated build host can run the workflow's pinned commands
-directly without registering a GitHub runner.
+## Hosted workflows
 
-## Restore after the allowance resets
+The workflows are manual (`workflow_dispatch`) while hosted Actions allowance is exhausted. Concurrency cancellation prevents overlapping runs for the same workflow and ref. Local results do not create a successful GitHub check or bypass branch requirements.
 
-The expected reset is November 1, 2026. Restoration is deliberate, not automatic:
+Restore automatic application CI deliberately after confirming available allowance. Keep expensive native builds, provider probes and visual review manual unless their inputs change. Do not enable paid usage or install a runner on a live wallet host merely to obtain checks.
 
-1. Confirm available minutes and storage in GitHub billing.
-2. Restore application CI for pull requests and pushes to main, plus manual
-   dispatch. Do not restore unrestricted feature-branch pushes alongside PR
-   runs, which caused duplicate application builds.
-3. Keep native packages, cross-platform wallet gates, provider probes and visual
-   review manual. Run them on a reviewed checkpoint when their inputs change.
-4. Keep concurrency cancellation. Add a bounded monthly usage policy before
-   enabling further automatic native builds.
+## Native builds
 
-Do not merge a transaction change on the strength of this cost-control patch.
-The merchant-wallet release hold, isolated installation, private import and
-funded approval requirements remain in force.
+Rust changes require the pinned compiler, SDK graph, native fixtures and a new verified artifact. A previous binary validates only its matching source. [ARM64 builds](LOCAL_ARM64_BUILD.md) document the isolated host procedure. Preserve source revision, build log and SHA-256 independently from an artifact's own checksum file.
+
+Tests, mock responses, package checks, public-chain probes, operator-reported runtime output and funded transactions are different evidence. Record the source and scope with each result. See [build status](BUILD_STATUS.md) for the latest recorded application checkpoint.

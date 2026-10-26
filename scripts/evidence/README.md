@@ -1,3 +1,7 @@
-# Evidence output
+# Historical evidence
 
-Public evidence belongs here only after redaction. Private wallet data, memo plaintext, credentials, and complete refund destinations must never enter this directory or source control.
+These redacted records describe earlier testnet checkpoints, UI fixtures and readiness checks. Each file retains its original network, source and evidence limits. A mainnet readiness file is a historical assessment, not current mainnet transaction evidence.
+
+The current mainnet result and installed preview are summarized in [build status](../../docs/BUILD_STATUS.md). Public transaction IDs alone do not prove shielded amounts, recipients or memo contents. Do not relabel historical testnet transactions as mainnet.
+
+Only redacted evidence belongs here. Never commit wallet exports, keys, credentials, receipt capabilities, real payment memo contents or complete refund destinations. Historical files remain unchanged so their provenance is not rewritten for submission.

@@ -1,71 +1,29 @@
-# Customer refund requests and remaining-value refunds
+# Refund requests and accounting
 
-## Product behavior
+A private receipt holder can request a refund amount within the remaining payment value and give a reason. The receipt capability does not authenticate the payer or authorize spending. The request cannot supply a new return address.
 
-The private receipt holder can request an amount within the remaining payment value and give a reason. A receipt capability permits reading and requesting, never spending, identity verification, or proof of payer control. No new return address is accepted by the request endpoint.
+The owning merchant approves or declines with a decision reason. Approval may cover the whole requested amount or less. On mainnet, approval records a decision; reviewing the approved refund reserves principal, and a separate password-authenticated handoff provides the immutable instruction for external wallet signing.
 
-The owning merchant reviews the request and supplies a decision reason. Approval may cover the whole requested amount or a smaller amount. Approval is a deliberate signing action through the same hosted Zallet account and FullPrivacy path. Declining creates no refund instruction. Decisions and refund status appear on the same private receipt.
+Wallet fees are additional merchant spending. They do not reduce the approved refund amount or count as money returned to the customer. Accounting availability is not proof of wallet funding or spendability.
 
-Merchants can also issue a direct refund where there is no open customer request. Every review produces a distinct instruction key. An approval uses a fixed key derived from the request ID. Amount and payment are immutable for that key. Repeat submissions return the recorded transaction; an active or unknown broadcast blocks another send. The accounting reservation is protected by a SQLite write transaction across processes.
+## Ledger
 
-Refund amounts are merchant decisions. Wallet fees are paid by the merchant account in addition to the refund amount. A balance equal to the full payment cannot cover a full refund plus its fee. This change does not silently deduct fees or fund the merchant account.
+`refund_events` records individual instructions. Original IDs, amounts, transaction references and retry counts are retained. The legacy `refunds` row mirrors its original instruction for older releases; it is not a fabricated aggregate. Current code derives totals from the full event ledger.
 
-## Refund ledger and upgrade
+Confirmed refunds plus pending reservations cannot exceed the original payment. Active or unknown instructions block a competing refund. Repeated requests use the same saved instruction. Wallet timeouts and browser cancellation cannot clear a reservation or permit another handoff.
 
-The additive `refund_events` table records every individual instruction and transaction. Existing `refunds` rows are imported by explicit column name, including databases where `retry_count` was appended by an older migration. Original IDs, amounts, transaction IDs and retry counts remain intact. Reopening the store does not duplicate events.
+Refund confirmation requires the exact saved output and native evidence. Settlement updates accounting and the existing receipt. A partial refund leaves the unpaid remainder and original route available under the payment's original terms. Full repayment retires the current route copies.
 
-The original `refunds` table retains the first real instruction for compatibility. Its state, transaction ID and retry count mirror that instruction, never a fabricated aggregate. Keeping its payment-unique guard prevents an older release from treating a payment with a new instruction as never refunded. New code reads the complete event ledger for totals. Confirmed refunds plus reserved sends cannot exceed the original payment. No new instruction can start while another is pending, broadcasting, broadcast, or unknown.
+## Policy and retention
 
-Historical releases only understand the first refund. They do not show cumulative amounts or customer requests, and their old partial-refund cleanup still applies. A health-failure rollback before new traffic preserves the original tables and container. After multiple refunds have occurred, use a release that understands this ledger for continued product operation. Never restore an old database snapshot after a broadcast: that would discard spending history. Rollback does not erase the event ledger. A later compatible release can recover an older partial route as described below.
+New payment requests snapshot the merchant's policy and refund window. The window begins at payment confirmation; later policy edits do not change existing orders. New windows are 1 to 365 days, with a 30-day default when no policy is configured. Historical records with no deadline retain their original terms.
 
-## Privacy and retention
+The retention pass checks expiry in bounded batches. Open requests and unresolved refund instructions delay route removal. Logical deletion does not erase wallet memo history, WAL/SHM, backups or previous snapshots. Request and decision reasons use the product encryption codec and are shown only to the owning merchant and the scoped receipt holder.
 
-Request and decision reasons use the existing AES-GCM product codec. They are returned only to the owning merchant and the relevant receipt capability holder. The API uses explicit projections, no-store responses and fixed error text. The customer cannot supply a wallet/account, destination, signing capability or merchant identity to an approval.
+## Recovery and older records
 
-The receiver invariant remains strict: expected NOSTOS memo, then a wallet-validated Orchard-only return route on the same network. There is no transparent, TEX or Sapling destination fallback. Ironwood funding remains selected through Zallet's `orchard` fund-source interface. A confirmed outgoing refund must match its destination receiver, integer amount and Orchard/Ironwood pool before accounting settlement.
+A supported legacy partial refund whose route was removed can recover only the original route from its payment memo, with ownership, receiver and retained fingerprint checks. Expired or fully repaid records cannot be revived.
 
-A partial refund retains both encrypted route copies while there is remaining refundable value. A complete refund removes them after confirmation. An explicit merchant refund window may close remaining refund capability; open requests and unconfirmed or unknown sends delay removal until resolved. A Node runtime retention pass checks expired routes every five minutes, in bounded batches of 100, rotating past unresolved records so they do not prevent cleanup of later records, without wallet RPC or spending. Expiry is serialized with customer requests and refund reservations. Receipt visits also apply the same expiry checks.
+[Expired external refund recovery](EXPIRED_REFUND_RECOVERY.md) preserves the original attempt and reservation, checks reviewed expiry evidence and requires fresh wallet approval. It creates no new customer request and sends nothing.
 
-The merchant's policy and window are saved with each new payment request. The window starts at payment confirmation. Policy edits do not shorten or otherwise change existing payment requests. Existing records have no newly imposed deadline. New requests default to 30 days if a merchant has no configured window. New policy edits require an integer from 1 to 365 days; an unset deadline is no longer offered. Existing requests with an unset window retain their original terms and capability; they are not silently assigned a deadline. Free-text policy conditions guide review; only the configured deadline and financial limits are enforced automatically.
-
-Route deletion means removal from current product records. Wallet memo history, SQLite WAL pages, backups, previous releases and the retained keyed reuse fingerprint have separate retention properties. No cryptographic erasure or operator blindness is claimed. Hosted spending custody is unchanged.
-
-## Older partial refunds, including Item21
-
-The previous release removes a route even after a partial refund. Such records keep their confirmed payment and refund history. They are not silently revived during migration.
-
-For a remaining balance, the authenticated owning merchant can select **Check original payment route**. This action reads the original transaction, requires one matching incoming shielded note, parses the original order and return route, validates Orchard-only capability, and matches the route against the preserved keyed fingerprint. Only that original route can be restored. An explicitly expired or fully repaid record cannot be revived. Recovery itself does not send funds, create a payment or change a transaction. Interrupted recovery can be completed by repeating the same checks.
-
-The known Item21 payment remains the live fixture. No production database, wallet, node or release was changed during implementation. Its receipt confirmation is user-reported; the customer explicitly confirmed receiving the 0.018 ZEC refund in Noir on October 6, 2026. The screenshot was unavailable to the inspecting workspace; this is customer-reported evidence. Automatic Noir handoff remains unproved and is not fixed by this change.
-
-## Validation and rollout
-
-Tests cover capability scope, merchant ownership, encrypted request/decision text, input rejection, immutable keys, unknown-send blocking, concurrent reservations, cumulative limits, multiple partial settlements, full retirement, deadline snapshots, background expiry, and fingerprint-bound recovery from the original memo. These are local fixtures, not substitutes for the live payment.
-
-The isolated deployment preview disables the background retention pass (`NOSTOS_RETENTION_ENABLED=0`) so preview startup cannot retire live routes.
-
-Use `scripts/web/deploy.py` for an isolated build, candidate health checks, retained previous container and automatic failed-switch recovery. Do not restart Zebra or either wallet. Keep current source changes and runtime files intact. After deployment, verify the actual release mount, the existing Item21 receipt, and customer request/decision controls. Verify runtime logs and Noir independently before describing this as live verified.
-
-## Merchant funding check
-
-Before a new refund instruction is reserved, the application reads the named
-merchant account's spendable balance at one confirmation through the existing
-loopback wallet RPC client. Only Orchard/Ironwood value counts toward Orchard
-funding; transparent and Sapling balances are excluded. An unavailable or invalid
-balance stops before reservation and spending. A balance at or below the refund
-amount produces a fixed funding error: the merchant must fund the wallet rather
-than reduce the customer's refund automatically. Fees remain additional merchant
-spending; remaining payment value is accounting, not a wallet balance.
-
-This is a necessary funding check, not an exact transaction fee quote. A balance
-above the refund amount does not guarantee it covers the selected transaction's
-fee, and another spend can race the check. Any failure after the actual send
-request retains the existing unknown-outcome reservation. Recorded broadcast or
-confirmed instructions return their existing transaction on replay without a
-fresh balance check. Unknown instructions remain blocked without a new send.
-
-The October 11 Item21 attempt for 200000 zat was already recorded as unknown
-before this check existed. Its observed merchant account balance was 190000 zat.
-The new check does not change that record or prove it never broadcast. Its routes
-and reservation remain intact pending independent wallet evidence. No additional
-payment, refund, database mutation or wallet restart is authorized by this fix.
+The earlier hosted testnet path has separate signing and funding checks. Mainnet does not use those hosted send operations. Keep additive ledger history during deployment and rollback; never restore an old database snapshot to clear a broadcast.
