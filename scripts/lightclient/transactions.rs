@@ -104,7 +104,8 @@ impl VerifiedTransaction {
             || self.tx.sprout_bundle().is_some() {return Err("product_context");}
         let outgoing=expected.direction==TransferType::Outgoing;
         let fee=if outgoing {
-            expected.receiver.require_external_to(keys.get(&expected.account).ok_or("product_keys")?)?;
+            // Product refunds may return to another external address of this account.
+            // The owned nullifier below proves funding independently of output direction.
             if self.tx.sapling_bundle().is_some() {return Err("product_input_pool");}
             let bundle=match expected.pool {
                 ShieldedPool::Orchard=>self.tx.orchard_bundle(),
@@ -119,7 +120,7 @@ impl VerifiedTransaction {
             if fee_cap==0 || fee>fee_cap {return Err("product_fee_cap");}
             Some(fee)
         } else {None};
-        let index=self.matching_output(keys,expected)?;
+        let index=self.matching_output_with_self_receipt(keys,expected,outgoing)?;
         Ok(serde_json::json!({"nostos_output_proof_v1":true,"network":"mainnet",
             "observation_scope":"orchard-family-only","payments_enabled":false,
             "binding":binding,"account_uuid":account_uuid,"txid":self.txid().to_string(),
@@ -182,6 +183,10 @@ impl VerifiedTransaction {
     }
     pub fn matching_output<A: Copy+Eq+std::hash::Hash>(&self, keys: &HashMap<A,UnifiedFullViewingKey>, expected: &Expected<A>)
         -> Result<usize, &'static str> {
+        self.matching_output_with_self_receipt(keys,expected,false)
+    }
+    fn matching_output_with_self_receipt<A: Copy+Eq+std::hash::Hash>(&self, keys: &HashMap<A,UnifiedFullViewingKey>, expected: &Expected<A>, allow_self_receipt: bool)
+        -> Result<usize, &'static str> {
         if self.tip.checked_sub(self.height).and_then(|n| n.checked_add(1)).unwrap_or(0) < expected.confirmations {
             return Err("insufficient_confirmations");
         }
@@ -195,7 +200,9 @@ impl VerifiedTransaction {
         };
         let matches: Vec<_> = outputs.iter().filter(|out|
             *out.account()==expected.account && out.value_pool()==expected.pool
-            && out.transfer_type()==expected.direction
+            && (out.transfer_type()==expected.direction
+                || (allow_self_receipt && expected.direction==TransferType::Outgoing
+                    && out.transfer_type()==TransferType::Incoming))
             && out.note().0.recipient().to_raw_address_bytes()==expected.receiver.0
             && out.note().0.value().inner()==expected.amount && out.memo()==&expected.memo
         ).map(|out|out.index()).collect();
