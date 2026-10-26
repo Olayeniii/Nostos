@@ -87,3 +87,46 @@ it("does not clear a send lock for a confirmed payment without a recorded refund
     }),
   ).toBe(true);
 });
+
+it("accepts only known refund check codes and never displays raw server errors", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: "output_unverified",
+            error: "private raw memo",
+          }),
+          { status: 409 },
+        ),
+    ),
+  );
+  await expect(
+    requestJson("/api/product/refund-check", { method: "POST" }, 1000),
+  ).rejects.toMatchObject({
+    status: 409,
+    code: "output_unverified",
+    message: "Request failed",
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: "private raw memo",
+            error: "private raw memo",
+          }),
+          { status: 503 },
+        ),
+    ),
+  );
+  await expect(
+    requestJson("/api/product/refund-check", { method: "POST" }, 1000),
+  ).rejects.toMatchObject({
+    status: 503,
+    code: undefined,
+    message: "Request failed",
+  });
+});

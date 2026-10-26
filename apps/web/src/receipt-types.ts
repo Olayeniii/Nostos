@@ -17,7 +17,16 @@ export type ReceiptData = {
   confirmedRefundAmountZat?: number;
   pendingRefundAmountZat?: number;
   remainingAmountZat?: number;
-  refunds?: { id: string; amountZat: number; status: string; txid?: string }[];
+  refunds?: {
+    id: string;
+    amountZat: number;
+    status: string;
+    txid?: string;
+    observation?: {
+      stage: import("./refund-status.js").RefundCheckCode;
+      checkedAt?: string;
+    };
+  }[];
   refundRequests?: {
     id: string;
     amountZat: number;

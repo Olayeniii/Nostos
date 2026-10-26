@@ -1,3 +1,4 @@
+import { isRefundCheckCode } from "./refund-status.js";
 import { assertHostedMerchantOperationsAllowed } from "./custody-policy.js";
 import {
   assertWalletReady,
@@ -243,6 +244,51 @@ export function checkoutView(
     : undefined;
   const refunds = payment ? core.listRefundsByPayment(payment.id) : [];
   const refund = refunds.at(-1);
+  const db = core.withdrawalDatabase();
+  const observations = new Map<
+    string,
+    { stage: import("./refund-status.js").RefundCheckCode; checkedAt?: string }
+  >();
+  if (
+    db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='observer_record_instructions'",
+      )
+      .get()
+  ) {
+    const hasChecks = Boolean(
+      db
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='observer_refund_checks'",
+        )
+        .get(),
+    );
+    const plans = db
+      .prepare(
+        "SELECT id,refund_id,handoff_started,state FROM observer_record_instructions WHERE checkout_id=? AND kind='refund' AND state='pending'",
+      )
+      .all(checkout.id);
+    for (const plan of plans) {
+      const check = hasChecks
+        ? db
+            .prepare(
+              "SELECT code,checked_at FROM observer_refund_checks WHERE instruction_id=?",
+            )
+            .get(String(plan.id))
+        : undefined;
+      observations.set(String(plan.refund_id), {
+        stage: !plan.handoff_started
+          ? "awaiting_wallet"
+          : isRefundCheckCode(check?.code)
+            ? check.code
+            : "awaiting_detection",
+        ...(typeof check?.checked_at === "string"
+          ? { checkedAt: check.checked_at }
+          : {}),
+      });
+    }
+  }
+
   const totals = payment
     ? core.refundTotals(payment.id)
     : { refundedZat: 0, reservedZat: 0, inProgress: false };
@@ -279,6 +325,9 @@ export function checkoutView(
       amountZat: r.amountZat,
       status: r.status,
       txid: r.txid,
+      ...(observations.has(r.id)
+        ? { observation: observations.get(r.id) }
+        : {}),
     })),
     refundRequests: requests.map((r) => ({
       id: r.id,

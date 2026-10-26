@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { requestJson } from "./requests.js";
+import { requestJson, RequestError } from "./requests.js";
+import { refundCheckMessages, type RefundCheckCode } from "./refund-status.js";
 import QRCode from "qrcode";
 import { zec } from "./receipt-card.js";
 type Review = {
@@ -15,10 +16,12 @@ export function ExternalWalletRefund({
   requestId,
   safe,
   onRefresh,
+  observation,
 }: {
   requestId: string;
   safe: boolean;
   onRefresh: () => void;
+  observation?: { stage: RefundCheckCode; checkedAt?: string };
 }) {
   const [feeCapZat, setFeeCapZat] = useState("10000");
   const [review, setReview] = useState<Review>();
@@ -59,7 +62,7 @@ export function ExternalWalletRefund({
         setMessage("Refund verified.");
         onRefresh();
       }
-    } catch {
+    } catch (error) {
       if (action === "handoff")
         setReview(
           (previous) =>
@@ -68,8 +71,15 @@ export function ExternalWalletRefund({
       setMessage(
         action === "handoff"
           ? "Wallet handoff outcome is unknown. Review saved instructions and wallet history. Do not send again."
-          : "Not verified yet. Keep the saved transaction and check again. Do not send again.",
+          : error instanceof RequestError && error.code
+            ? refundCheckMessages[error.code]
+            : action === "candidate"
+              ? "The reference could not be saved. Refresh the refund and check the transaction ID. No send was requested."
+              : action === "review"
+                ? "The saved refund could not be opened. Refresh its current status before continuing."
+                : "The refund check could not finish. Your reservation is preserved. Check the connection and try verification again. Do not send again.",
       );
+      if (action === "check") onRefresh();
     } finally {
       setPassword("");
       setBusy(false);
@@ -101,18 +111,21 @@ export function ExternalWalletRefund({
       setCopyStatus("Could not copy. Select and copy the saved value shown.");
     }
   }
-  useEffect(() => {
-    if (!safe || !review?.handoffStarted) return;
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void act("check");
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [safe, review?.handoffStarted, requestId]);
+  // Durable dashboard/receipt polling performs checks even after this panel closes.
   return (
     <div className="refund-review">
       <p>
         Your wallet signs this refund. NOSTOS verifies the exact outgoing
         payment after three confirmations.
+      </p>
+      {observation && (
+        <p role="status">{refundCheckMessages[observation.stage]}</p>
+      )}
+      <p>
+        ZODL may reject requests opened from another app. Save the QR and use
+        ZODL's own image scanner. Cake Wallet may omit the memo when opening a
+        request. Before confirming, check that the wallet includes the exact
+        memo shown here. If it has no transaction memo field, cancel.
       </p>
       {!review && (
         <label>
@@ -219,7 +232,8 @@ export function ExternalWalletRefund({
                   <p>
                     Cake Wallet may fill the address and amount without the
                     memo. Paste the exact refund memo into its transaction memo
-                    field before signing.
+                    field before signing. If no transaction memo field is
+                    available, cancel.
                   </p>
                 </>
               )}
@@ -230,7 +244,8 @@ export function ExternalWalletRefund({
               </p>
             </>
           )}
-          {review.handoffStarted && (
+          {(review.handoffStarted ||
+            (observation && observation.stage !== "awaiting_wallet")) && (
             <details>
               <summary>Refund recovery</summary>
               <label>
@@ -261,6 +276,36 @@ export function ExternalWalletRefund({
             </details>
           )}
         </>
+      )}
+      {!review && observation && observation.stage !== "awaiting_wallet" && (
+        <details>
+          <summary>Refund recovery</summary>
+          <label>
+            Refund transaction ID
+            <input
+              value={txid}
+              maxLength={64}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              onChange={(e) => setTxid(e.target.value)}
+            />
+          </label>
+          <button
+            className="secondary"
+            disabled={!safe || busy || !/^[a-f0-9]{64}$/.test(txid.trim())}
+            onClick={() => void act("candidate")}
+          >
+            Save transaction reference
+          </button>
+          <button
+            className="secondary"
+            disabled={!safe || busy}
+            onClick={() => void act("check")}
+          >
+            Check refund confirmation
+          </button>
+        </details>
       )}
       {copyStatus && <p role="status">{copyStatus}</p>}
       {message && <p role="status">{message}</p>}

@@ -1,3 +1,4 @@
+import { refundCheckMessages, type RefundCheckCode } from "./refund-status.js";
 import { chainWallet } from "./wallet-runtime.js";
 import type { ZalletRpcClient } from "../../../packages/zcash-adapter/src/index.js";
 import { randomUUID } from "node:crypto";
@@ -19,9 +20,11 @@ import { ProductStore } from "./product-store.js";
 // Reconciliation has no signing interface and never enables mainnet payments.
 // Preview callers must enforce their feature flag, session, origin and ownership.
 export class ObserverRecordError extends Error {
-  constructor() {
+  constructor(public readonly code?: RefundCheckCode) {
     super(
-      "Observer reconciliation is unresolved. Keep the saved instruction and transaction; do not send again.",
+      code
+        ? refundCheckMessages[code]
+        : "Observer reconciliation is unresolved. Keep the saved instruction and transaction; do not send again.",
     );
   }
 }
@@ -889,7 +892,124 @@ export async function recoverExpiredObservedRefund(
   }
 }
 
+// One durable instruction per dashboard refresh, oldest checked first. No sends.
+export async function reconcileMerchantRefund(
+  store: ProductStore,
+  core: SqlitePaymentStore,
+  merchantId: string,
+) {
+  const db = core.withdrawalDatabase();
+  if (
+    !db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='observer_record_instructions'",
+      )
+      .get()
+  )
+    return;
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS observer_refund_checks (instruction_id TEXT PRIMARY KEY, code TEXT NOT NULL, checked_at TEXT NOT NULL)",
+  );
+  const plan = db
+    .prepare(
+      "SELECT i.request_id FROM observer_record_instructions i LEFT JOIN observer_refund_checks c ON c.instruction_id=i.id WHERE i.merchant_id=? AND i.kind='refund' AND i.handoff_started=1 AND i.state!='applied' ORDER BY COALESCE(c.checked_at,''),i.id LIMIT 1",
+    )
+    .get(merchantId);
+  if (plan) {
+    const instruction = db
+      .prepare("SELECT id FROM observer_record_instructions WHERE source_key=?")
+      .get(`refund:${String(plan.request_id)}`);
+    if (instruction)
+      recordRefundCheck(core, String(instruction.id), "checking");
+    try {
+      await reconcileObservedRefund(
+        store,
+        core,
+        merchantId,
+        String(plan.request_id),
+      );
+    } catch {
+      /* The per-refund check state explains unresolved verification. */
+    }
+  }
+}
+const refundChecks = new Set<string>();
+function recordRefundCheck(
+  core: SqlitePaymentStore,
+  instructionId: string,
+  code: RefundCheckCode,
+) {
+  const db = core.withdrawalDatabase();
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS observer_refund_checks (instruction_id TEXT PRIMARY KEY, code TEXT NOT NULL, checked_at TEXT NOT NULL)",
+  );
+  db.prepare(
+    "INSERT INTO observer_refund_checks VALUES(?,?,?) ON CONFLICT(instruction_id) DO UPDATE SET code=excluded.code,checked_at=excluded.checked_at",
+  ).run(instructionId, code, new Date().toISOString());
+}
+async function explainBoundRefund(
+  merchantId: string,
+  txid: string,
+): Promise<RefundCheckCode> {
+  try {
+    const status = await observerWallet(merchantId).call<
+      Record<string, unknown>
+    >("getwalletstatus", []);
+    const tip = status.node_tip as { height?: number } | undefined;
+    if (
+      status.locked !== false ||
+      status.account_connected !== true ||
+      status.fully_synced_height !== tip?.height
+    )
+      return "observer_syncing";
+    try {
+      const tx = await chainWallet().call<{ confirmations?: number }>(
+        "getrawtransaction",
+        [txid, 1],
+      );
+      if (!Number.isSafeInteger(tx.confirmations))
+        return "observer_unavailable";
+      return tx.confirmations! < 3 ? "confirming" : "output_unverified";
+    } catch (error) {
+      return error instanceof Error && /failed \(-5\)\.$/.test(error.message)
+        ? "transaction_unseen"
+        : "observer_unavailable";
+    }
+  } catch {
+    return "observer_unavailable";
+  }
+}
 export async function reconcileObservedRefund(
+  store: ProductStore,
+  core: SqlitePaymentStore,
+  merchantId: string,
+  requestId: string,
+) {
+  const key = merchantId + ":" + requestId;
+  if (refundChecks.has(key)) throw new ObserverRecordError("checking");
+  refundChecks.add(key);
+  try {
+    return await reconcileRefund(store, core, merchantId, requestId);
+  } catch (error) {
+    const plan = find(core, `refund:${requestId}`);
+    if (
+      plan?.merchant_id === merchantId &&
+      plan.state === "pending" &&
+      plan.handoff_started === 1
+    )
+      recordRefundCheck(
+        core,
+        plan.id,
+        error instanceof ObserverRecordError && error.code
+          ? error.code
+          : "observer_unavailable",
+      );
+    throw error;
+  } finally {
+    refundChecks.delete(key);
+  }
+}
+async function reconcileRefund(
   store: ProductStore,
   core: SqlitePaymentStore,
   merchantId: string,
@@ -903,7 +1023,15 @@ export async function reconcileObservedRefund(
     requireValue(
       plan?.merchant_id === merchantId && plan.handoff_started === 1,
     );
-    if (plan.txid) return await verifyAndApply(store, core, plan, plan.txid);
+    if (plan.txid) {
+      try {
+        return await verifyAndApply(store, core, plan, plan.txid);
+      } catch {
+        const code = await explainBoundRefund(merchantId, plan.txid);
+        recordRefundCheck(core, plan.id, code);
+        throw new ObserverRecordError(code);
+      }
+    }
     const expected = source(store, core, plan);
     requireValue(expected.fingerprint === plan.fingerprint);
     const db = core.withdrawalDatabase();
@@ -942,9 +1070,11 @@ export async function reconcileObservedRefund(
     db.prepare(
       "INSERT INTO observer_refund_cursor VALUES(?,?) ON CONFLICT(instruction_id) DO UPDATE SET cursor=excluded.cursor",
     ).run(plan.id, result.candidates.length < 4 ? 0 : next);
-    throw new ObserverRecordError();
-  } catch {
-    throw new ObserverRecordError();
+    recordRefundCheck(core, plan.id, "awaiting_detection");
+    throw new ObserverRecordError("awaiting_detection");
+  } catch (error) {
+    if (error instanceof ObserverRecordError) throw error;
+    throw new ObserverRecordError("observer_unavailable");
   }
 }
 

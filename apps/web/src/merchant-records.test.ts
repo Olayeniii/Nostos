@@ -84,3 +84,35 @@ describe("merchant refund views", () => {
     expect(paymentHref(record.id)).toBe("/merchant#payment=order%2F1");
   });
 });
+
+it("uses verification stages while keeping confirmed partial refund labels", () => {
+  const refund = {
+    id: "r",
+    amountZat: 50000,
+    status: "broadcasting",
+    observation: { stage: "output_unverified" as const },
+  };
+  const pending = {
+    ...record,
+    status: "broadcasting",
+    refundAmountZat: 50000,
+    refunds: [refund],
+  };
+  expect(refundRecordLabel(pending)).toBe(
+    "Refund verification needs attention",
+  );
+  expect(
+    refundRecordLabel({
+      ...pending,
+      status: "confirmed",
+      remainingAmountZat: 50000,
+      refunds: [{ ...refund, status: "confirmed" }],
+    }),
+  ).toBe("Partially refunded");
+  expect(
+    refundRecordLabel({
+      ...pending,
+      refunds: [{ ...refund, observation: { stage: "awaiting_detection" } }],
+    }),
+  ).toBe("Awaiting refund detection");
+});

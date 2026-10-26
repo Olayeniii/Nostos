@@ -13,6 +13,7 @@ import {
   reconcileObservedPayment,
   detectObservedPayment,
   reconcileObservedRefund,
+  reconcileMerchantRefund,
 } from "../../../../src/observer-records.js";
 import {
   ObserverError,
@@ -832,6 +833,8 @@ async function handle(request: Request) {
           syncWarning = true;
         }
       }
+      if (sdkObserverSelected() && observerCommerceEnabled())
+        await reconcileMerchantRefund(store, core, merchant.id);
       return json({
         merchant: {
           name: merchant.name,
@@ -884,7 +887,15 @@ async function handle(request: Request) {
       error instanceof ObserverError ||
       error instanceof ObserverRecordError
     )
-      return json({ error: error.message }, 409);
+      return json(
+        {
+          error: error.message,
+          ...(error instanceof ObserverRecordError && error.code
+            ? { code: error.code }
+            : {}),
+        },
+        409,
+      );
     // Raw wallet/SQLite errors can contain private memos, destinations or identities.
     return json(
       {

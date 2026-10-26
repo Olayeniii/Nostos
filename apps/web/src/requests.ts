@@ -1,5 +1,9 @@
+import { isRefundCheckCode, type RefundCheckCode } from "./refund-status.js";
 export class RequestError extends Error {
-  constructor(public readonly status: number) {
+  constructor(
+    public readonly status: number,
+    public readonly code?: RefundCheckCode,
+  ) {
     super("Request failed");
   }
 }
@@ -18,7 +22,16 @@ export async function requestJson<T>(
   const timer = setTimeout(abort, timeoutMs);
   try {
     const response = await fetch(url, { ...init, signal: controller.signal });
-    if (!response.ok) throw new RequestError(response.status);
+    if (!response.ok) {
+      let code: RefundCheckCode | undefined;
+      try {
+        const body = await response.json();
+        if (isRefundCheckCode(body?.code)) code = body.code;
+      } catch {
+        /* Never expose raw errors. */
+      }
+      throw new RequestError(response.status, code);
+    }
     return (await response.json()) as T;
   } finally {
     clearTimeout(timer);

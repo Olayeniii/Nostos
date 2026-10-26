@@ -190,6 +190,7 @@ export function MerchantRefundRequest({
       {externalWallet && request.status === "approved" && (
         <ExternalWalletRefund
           requestId={request.id}
+          observation={refund?.observation}
           safe={safe}
           onRefresh={onRefresh}
         />
