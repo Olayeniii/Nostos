@@ -887,3 +887,33 @@
     transition: none;
   }
 }
+
+/* Keep order details readable in narrow desktop and phone layouts. */
+@media (max-width: 1100px) {
+  .refined-workspace .workspace-record-columns {
+    display: none;
+  }
+  .refined-workspace:not(.overview-workspace) .studio-record-list a {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .refined-workspace .studio-record-name {
+    grid-column: 1 / -1;
+  }
+  .refined-workspace .studio-record-name strong,
+  .refined-workspace .studio-record-name small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .refined-workspace .studio-record-value,
+  .refined-workspace .studio-record-state {
+    min-width: 0;
+    grid-column: auto;
+  }
+  .refined-workspace .studio-record-date {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}

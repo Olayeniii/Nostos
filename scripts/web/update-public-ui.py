@@ -11,8 +11,8 @@ import tarfile
 
 ROOT=Path('/home/ubuntu/nostos-web-review.CEfoZq')
 REPO=Path('/home/ubuntu/nostos-arm64-build.4eQ9JP/source')
-OLD='nostos-mainnet-ui-f7030089a1ee'
-CURRENT_SOURCE='public-ui-f7030089a1ee/source'
+OLD='nostos-mainnet-ui-770c1fc247ff'
+CURRENT_SOURCE='public-ui-770c1fc247ff/source'
 IMAGE='sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6'
 
 
