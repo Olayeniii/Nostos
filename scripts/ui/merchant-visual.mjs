@@ -1,4 +1,4 @@
-/* global document, window */
+/* global document, window, getComputedStyle, innerHeight */
 import { createRequire } from "node:module";
 import { mkdir, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -124,9 +124,9 @@ records.push({
   ],
 });
 const report = [];
-for (const width of [320, 375, 390, 430, 768, 1440]) {
+for (const width of [320, 375, 390, 430, 768, 980, 1024, 1440]) {
   const context = await browser.newContext({
-    viewport: { width, height: 960 },
+    viewport: { width, height: width === 980 ? 1960 : 960 },
   });
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const page = await context.newPage();
@@ -134,7 +134,12 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     // Hash-only changes can keep the old fixture mounted. Begin each scenario
     // with a fresh document; real in-app links are still clicked below.
     await page.goto("about:blank");
-    await page.goto(url);
+    await page.goto(
+      url.replace(
+        "http://127.0.0.1:3000",
+        process.env.NOSTOS_UI_BASE_URL || "http://127.0.0.1:3000",
+      ),
+    );
   };
   let mode = "populated";
   let fixtureNetwork = "testnet";
@@ -325,8 +330,71 @@ for (const width of [320, 375, 390, 430, 768, 1440]) {
     .waitFor();
   await capture("home");
   await visit("http://127.0.0.1:3000/merchant");
+  if (width > 900 && phase === "after") {
+    const shell = await page.evaluate(() => {
+      const rail = document.querySelector(".studio-rail");
+      const content = document.querySelector(".studio-page");
+      const brand = document.querySelector(".studio-brand-name");
+      return {
+        railWidth: rail.getBoundingClientRect().width,
+        railBottom: rail.getBoundingClientRect().bottom,
+        brandVisible: getComputedStyle(brand).display !== "none",
+        height: innerHeight,
+        documentHeight: document.documentElement.scrollHeight,
+        contentOverflow: getComputedStyle(content).overflowY,
+      };
+    });
+    assert.equal(
+      shell.brandVisible,
+      true,
+      `${width}: desktop sidebar keeps labels`,
+    );
+    assert(shell.railWidth >= 200 && shell.railWidth <= 224);
+    assert(
+      Math.abs(shell.railBottom - shell.height) <= 1,
+      `${width}: sidebar stays inside viewport`,
+    );
+    assert(
+      shell.documentHeight <= shell.height + 1,
+      `${width}: document must not stretch with content`,
+    );
+    assert.equal(shell.contentOverflow, "auto");
+  }
+
   await page.getByRole("button", { name: /Studio commission/ }).waitFor();
   await capture("payments");
+  if (process.env.UI_REVIEW_SCREEN === "workspace-layout") {
+    if ([980, 1440].includes(width))
+      await page.screenshot({ path: `/tmp/nostos-workspace-${width}.png` });
+    for (const section of ["overview", "refunds", "funds", "settings"]) {
+      await visit(`http://127.0.0.1:3000/merchant/${section}`);
+      await page.locator(".studio-header").waitFor();
+      await capture(`workspace-${section}`);
+      if (width > 900) {
+        assert.equal(
+          await page.locator(".studio-brand-name").isVisible(),
+          true,
+        );
+        const fit = await page.evaluate(() => {
+          const footer = document
+            .querySelector(".studio-rail-bottom")
+            .getBoundingClientRect();
+          return (
+            footer.bottom <= innerHeight &&
+            document.documentElement.scrollHeight <= innerHeight + 1
+          );
+        });
+        assert.equal(
+          fit,
+          true,
+          `${width} ${section}: viewport and sidebar footer`,
+        );
+      }
+    }
+    await context.close();
+    continue;
+  }
+
   assert.equal(
     await page
       .locator(".summary-grid article")

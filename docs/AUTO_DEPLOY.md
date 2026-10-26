@@ -1,10 +1,18 @@
 # Deployment
 
-## Existing testnet auto-deployer
+## Public mainnet
 
-The VPS timer checks its configured `origin/main` every five minutes. It requires a clean checkout on `main` and a fast-forward update, then uses the isolated release builder. The live container stays up during the build; the candidate is checked on loopback before switching web traffic. The previous container is retained for failed-switch rollback. Zebra and wallet services are not restarted.
+The public mainnet application uses external wallet signing and a separate SDK observer. Its product data, encryption key, observer credentials and broker are separate from the older hosted testnet installation. Web source is mounted read-only, with runtime storage outside the checkout.
 
-An unchanged healthy release is skipped. A failed revision is held until a later commit or a deliberate manual retry. Repository write access is therefore also authority to change future deployment inputs; restrict it accordingly.
+`scripts/web/publish-reviewed-mainnet.py` publishes the reviewed application at the configured HTTPS origin. `scripts/web/update-public-ui.py` builds a replacement web release using the existing mainnet environment and storage. It checks health and financial records after switching, with rollback to the previous web container on failure. Neither script signs transactions or changes the observer.
+
+These scripts target a specific installation. Exact source revisions, container names, binary hashes, mounts and archived paths are part of their checks. They refuse unexpected state rather than serving as general setup commands. Runtime credentials and product keys stay outside the repository. A merge and a successful deployment are separate events.
+
+## Legacy testnet auto-deployer
+
+The VPS timer checks its configured `origin/main` every five minutes. It requires a clean checkout on `main` and a fast-forward update, then uses the isolated release builder. The live container stays up during the build; the candidate is checked on loopback before switching web traffic. The previous container remains available for rollback. Zebra and wallet services are not restarted.
+
+An unchanged healthy release is skipped. A failed revision is held until a later commit or a manual retry. Repository write access can therefore change future deployment inputs.
 
 ```sh
 cd ~/nostos/repo
@@ -13,16 +21,10 @@ sudo python3 scripts/web/install-auto-deploy.py
 sudo systemctl start nostos-auto-deploy.service
 ```
 
-These are operator setup commands, not part of local development. Keep runtime configuration, product keys and wallet credentials outside the repository. A successful GitHub merge is not proof that deployment completed.
+Manual rollback requires the timer to be paused and any active deployment to finish. A rollback release must support the current ledger. Restoring an older database after a broadcast can lose transaction state.
 
-Before a manual rollback, pause `nostos-auto-deploy.timer` and wait for any active deployment to finish. Use a release compatible with the current refund ledger. Never restore an old database snapshot after a broadcast.
+## Release isolation
 
-## Separate mainnet preview
+Build containers have no live wallet mounts or spending keys. Wallet RPC remains on loopback. Public builds retain exact origin and session checks. Revision-bound installers preserve the prior container and storage for recovery.
 
-The tested mainnet SDK preview uses separate application data, product key, observer credentials, broker and loopback web port. It does not inherit hosted signer configuration or repurpose testnet wallets. Its web source is mounted read-only; runtime product storage is separate.
-
-The `scripts/web/*review.py` installers are revision-bound operator recipes for an existing private installation. They verify source, binary hashes, expected containers and mounts, retain prior state and stop on mismatches. They are not generic public production setup commands. Preserve their dependencies and archived source paths when maintaining a deployed installation.
-
-The final reviewed preview update restores normal observer verification, removes its temporary operator configuration and preserves existing financial records. New deployment success must still be checked from the installer output and the actual runtime. See [build status](BUILD_STATUS.md).
-
-The public HTTPS origin and judge access path need their own release verification. A private loopback preview is not automatically public when its source is merged. Never expose wallet RPC, copy private preview credentials into a public build or weaken origin/session checks to publish it.
+Current release details are in [project status](BUILD_STATUS.md).

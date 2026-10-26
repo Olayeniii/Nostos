@@ -32,6 +32,6 @@ The HTTP broker allows status, viewing-key import, receiver decoding, candidate 
 
 ## Builds and evidence
 
-See [ARM64 builds](../../docs/LOCAL_ARM64_BUILD.md) for isolated packaging and [build status](../../docs/BUILD_STATUS.md) for the recorded preview result. Packages include only a fixed source/binary/provenance list, never wallet state or credentials.
+See [ARM64 builds](../../docs/LOCAL_ARM64_BUILD.md) for isolated packaging and [build status](../../docs/BUILD_STATUS.md) for the mainnet release status. Packages include only a fixed source/binary/provenance list, never wallet state or credentials.
 
-Offline encrypted transaction fixtures contain invalid proof/signature placeholders and cannot be broadcast. They exercise decoding, matching, persistence and restore; they are not funded evidence. The [private control harness](CONTROL_TEST.md) is separate from product settlement and is not required to replay the existing demo.
+Offline encrypted transaction fixtures contain invalid proof/signature placeholders and cannot be broadcast. They exercise decoding, matching, persistence and restore; they are not funded evidence. The [private control harness](CONTROL_TEST.md) is separate from product settlement and does not participate in checkout or refund accounting.

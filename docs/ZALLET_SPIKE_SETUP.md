@@ -1,6 +1,6 @@
 # Historical testnet spike setup
 
-This is the original development path, retained for reproducibility. Current mainnet uses the [SDK observer](../scripts/lightclient/README.md) and an external signing wallet. Do not use these instructions to configure mainnet.
+This is the original development path, retained for reproducibility. Current mainnet uses the [SDK observer](../scripts/lightclient/README.md) and an external signing wallet. This setup applies only to the historical testnet path.
 
 ## Selected path
 
@@ -54,6 +54,6 @@ After `spike:setup`, fund only the printed customer address using isolated testn
 
 Gate G1 passes only when `spike:verify` writes `scripts/evidence/gate-g1.json` with two real confirmed testnet transaction identifiers.
 
-## Failure rule
+## Failure handling
 
-If `z_sendfromaccount` cannot spend the confirmed externally funded note, stop. Replace only the wallet adapter path and rerun this spike. Do not start the interface or database build, and do not label a local or simulated result as real.
+A failed spend leaves the spike incomplete. Local or simulated results do not satisfy the confirmed testnet pass condition.

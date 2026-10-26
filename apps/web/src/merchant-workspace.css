@@ -1258,7 +1258,7 @@
   color: #c5f7de;
   box-shadow: inset 3px 0 #53e3a6;
 }
-@media (min-width: 1201px) {
+@media (min-width: 901px) {
   .merchant-studio {
     grid-template-columns: 224px minmax(0, 1fr);
   }

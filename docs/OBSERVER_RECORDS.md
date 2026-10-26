@@ -18,10 +18,10 @@ Manual recovery lets the merchant save the existing transaction reference and ch
 
 A core journal commits the output claim and ledger update atomically. Fingerprints are rechecked under locks after asynchronous proof. Interrupted product projection can resume without another debit, wallet handoff or RPC proof. Full repayment retires the original route; partial repayment preserves it.
 
-Unknown outcomes retain reservations. [Expired refund recovery](EXPIRED_REFUND_RECOVERY.md) requires explicit private operator evidence and rotates the attempt memo while preserving the original record and amount. It never signs, broadcasts or confirms a replacement.
+Unknown outcomes retain reservations. [Expired refund recovery](EXPIRED_REFUND_RECOVERY.md) requires privately reviewed wallet evidence and rotates the attempt memo while preserving the original record and amount. It never signs, broadcasts or confirms a replacement.
 
 ## Trust boundary
 
 The SDK checks inclusion against its scanned chain view supplied by hosted services; this is not independent full-node consensus validation. Native fixtures exercise real note encryption and decryption, but use invalid proof/signature placeholders and cannot be broadcast. Application transport mocks do not establish a funded transaction.
 
-See [build status](BUILD_STATUS.md) for the separately reported mainnet result.
+See [build status](BUILD_STATUS.md) for the confirmed mainnet result.

@@ -10,7 +10,7 @@
 | Chain provider            | Client network metadata and queried chain ranges or transaction references                                                |
 | Receipt capability holder | That receipt's order, payment/refund status and allowed refund-request action                                             |
 
-Mainnet NOSTOS does not hold merchant spending keys. A full viewing key cannot spend, but it can expose sensitive activity and memo data for the account it covers. Use a dedicated business account. The service is trusted for record handling and availability; this is not a trustless or operator-blind system.
+Mainnet NOSTOS does not hold merchant spending keys. A full viewing key cannot spend, but it can expose sensitive activity and memo data for the account it covers. A dedicated business account limits that access. NOSTOS relies on the service for record handling and availability; the service can read the data described above.
 
 Shielded note encryption protects transaction fields and memos on chain. It does not hide information entered into checkout from the service, or prevent address reuse, record correlation, network metadata or timing inference. A return address is a receiving destination, not a spend key. It proves neither payer identity nor control of the destination. NOSTOS does not implement draft Authenticated Reply Addresses.
 
@@ -21,7 +21,7 @@ Shielded note encryption protects transaction fields and memos on chain. It does
 - Product identity, route, memo and request fields use authenticated encryption. The server-held key can decrypt them. Selected amounts, statuses and accounting metadata remain readable in the ledger.
 - Canonical Orchard-only refund destinations are required. Transparent, TEX and Sapling-only refund fallbacks are not supported.
 - Exact native output proof is required before mainnet credit or settlement. An ID, wallet error label, submitted request or broadcast response is not confirmation.
-- Pending and unknown outcomes retain reservations. A timeout never authorizes another wallet handoff. Operator-reviewed expiry recovery is separate from ordinary checks.
+- Pending and unknown outcomes retain reservations. A timeout never authorizes another wallet handoff. Manually reviewed expiry recovery is separate from ordinary checks.
 - RPC clients require parsed loopback endpoints, reject embedded credentials and redirects, and contain raw provider errors. Browser clients receive selected fields, not keys or raw wallet responses.
 
 ## Storage and retention
@@ -34,7 +34,7 @@ The service rejects reuse of a saved canonical route within its own retained rec
 
 ## Repository and deployment rules
 
-Never commit wallet exports, seeds, spending or viewing keys, product encryption keys, RPC cookies, provider tokens, real payment memo contents or complete customer return destinations. Keep them out of logs, screenshots and public demo material as well.
+Wallet exports, seeds, spending and viewing keys, product encryption keys, RPC cookies, provider tokens, real payment memos and complete customer return destinations are private runtime data. They are excluded from source, logs and public material.
 
 Network isolation, live log access, backups, historical repository contents, infrastructure permissions and deployed dependency versions need their own review. Passing source tests or a current-file secret scan is not a complete infrastructure audit. The retained security-update branch has not been merged or installed as part of the mainnet payment release.
 

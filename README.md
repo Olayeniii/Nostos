@@ -2,29 +2,32 @@
 
 **A return route travels with the payment.**
 
-NOSTOS adds refunds to shielded Zcash checkout. The customer supplies a shielded return address with the original payment memo. The merchant can later issue a full or partial refund to that saved route, without asking for another address. Customers do not need a NOSTOS account.
+Accept shielded Zcash payments and refund customers without asking for another address. The return route arrives in the original payment's encrypted memo and stays bound to that order. Your customers don't need a NOSTOS account.
 
-## How it works
+## Pay, fulfill, refund if needed
 
-1. The merchant creates a payment link.
-2. The customer adds a return address and pays from a compatible wallet. NOSTOS checks the encrypted memo and exact payment details.
-3. If a refund is needed, the merchant approves it and signs in their own wallet. NOSTOS verifies the outgoing payment and updates the existing receipt.
+1. Create a payment link for your customer.
+2. Your customer adds a shielded return address and pays from a compatible wallet.
+3. Track the confirmed payment and record fulfillment in your workspace.
+4. When a refund is needed, review the amount and sign in your own wallet. The existing receipt updates after verification.
 
-The service has viewing access to the dedicated merchant account, but no spending key. The merchant and service can read the refund destination. Shielded encryption protects payment details on chain; it does not make the service blind or prove who owns a return address. See [security and privacy](docs/SECURITY_BOUNDARY.md).
+Your spending keys stay in your wallet. We use viewing access to check the dedicated merchant account. You and the service can read the return route; on-chain encryption does not make the service blind or prove who owns an address. Read the [privacy and security boundaries](docs/SECURITY_BOUNDARY.md).
 
-## Status
+## Try NOSTOS
 
-A mainnet payment of 0.001 ZEC and a partial refund of 0.0005 ZEC were confirmed in the private mainnet preview. The reviewed update is merged, normal verification is restored, and the original records are preserved. The operator subsequently confirmed publication at https://nostos.iyforge.xyz with mainnet commerce enabled, existing records preserved and the observer unchanged.
+[Open NOSTOS](https://nostos.iyforge.xyz)
 
-- [Website](https://nostos.iyforge.xyz)
-- [Demo guide](docs/DEMO.md)
-- [Build and deployment status](docs/BUILD_STATUS.md)
+NOSTOS is live on mainnet. Our completed mainnet test paid 0.001 ZEC and returned 0.0005 ZEC as a confirmed partial refund. Transaction fees are separate from the refunded amount.
+
 - [Technical design](docs/ARCHITECTURE.md)
-- [All documentation](docs/README.md)
+- [Build and deployment status](docs/BUILD_STATUS.md)
+- [Documentation](docs/README.md)
 
-## Development
+ZODL may require loading the QR image in its own scanner. Some wallets omit the memo when opening a request. Always check the exact amount and transaction memo before signing. See [wallet compatibility](docs/MERCHANT_WALLET_COMPATIBILITY.md).
 
-Requires Node.js 24 and pnpm 11. The web app also needs private configuration from [.env.example](.env.example); local source startup alone does not provide wallet access or email delivery.
+## Run locally
+
+Use Node.js 24 and pnpm 11. Copy the settings you need from [.env.example](.env.example) into private runtime configuration. Keep wallet exports, credentials, keys and live databases outside the checkout.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -33,21 +36,23 @@ pnpm --filter @nostos/web build
 pnpm --filter @nostos/web dev
 ```
 
-Checks use fixtures and mocks unless a command explicitly documents external services. Do not put wallet exports, keys, credentials or live databases inside the checkout. Deployment and funded wallet actions are separate from local checks.
+Source startup does not configure email delivery or wallet access. Local checks use fixtures and mocks unless a command documents external services. Read [script guidance](scripts/README.md) before running deployment, recovery or wallet commands.
 
 ## Repository
 
 | Path                  | Purpose                                                           |
 | --------------------- | ----------------------------------------------------------------- |
-| `apps/web`            | Next.js merchant workspace, checkout, receipts and product API    |
+| `apps/web`            | Merchant workspace, checkout, receipts and product API            |
 | `apps/api`            | Shared payment views and refund request services                  |
-| `apps/worker`         | Hosted testnet intake and refund processing                       |
+| `apps/worker`         | Legacy hosted testnet intake and refund processing                |
 | `packages`            | Memo format, network policy, accounting, database and RPC adapter |
-| `scripts/lightclient` | Native view-only observer, broker, packaging and backups          |
+| `scripts/lightclient` | View-only mainnet observer, broker, packaging and backups         |
 | `scripts/web`         | Deployment, inspection, recovery and UI checks                    |
-| `scripts/evidence`    | Redacted historical testnet evidence                              |
-| `docs`                | Current product, technical and operator documentation             |
+| `scripts/evidence`    | Historical testnet evidence                                       |
+| `docs`                | Product, technical and deployment documentation                   |
 
-The mainnet observer and the earlier hosted testnet wallet path are separate. Mainnet hosted signing is blocked. See [script guidance](scripts/README.md) before running operational tools.
+Mainnet uses external wallet signing. The older hosted testnet path has separate keys, databases and credentials; it is not a mainnet signing fallback.
 
-Source licensing is currently `UNLICENSED`. No open-source license is granted by this repository.
+## License
+
+NOSTOS is released under the [MIT License](LICENSE). Third-party dependencies retain their own licenses.

@@ -1,26 +1,28 @@
 # Documentation
 
-Start with the [project README](../README.md) and [demo guide](DEMO.md). Current behavior is documented here; old checkpoint diaries and superseded setup notes remain in Git history.
+NOSTOS accepts shielded payments and uses the return route supplied with each payment for later refunds. The [project README](../README.md) covers the product and local setup.
 
-## Product and verification
+## Product and design
 
-- [Build status](BUILD_STATUS.md): source, installed preview, checks and remaining submission tasks.
-- [Demo guide](DEMO.md): the existing confirmed result and a short product walkthrough.
+- [Project status](BUILD_STATUS.md): confirmed mainnet result and deployed release.
 - [Technical design](ARCHITECTURE.md): components, memo format and verification flow.
-- [Security and privacy](SECURITY_BOUNDARY.md): who sees what, custody and retention limits.
+- [Security and privacy](SECURITY_BOUNDARY.md): access, custody and retention limits.
 - [Merchant custody](MERCHANT_CUSTODY.md): external signing and viewing access.
-- [Wallet compatibility](MERCHANT_WALLET_COMPATIBILITY.md): ZODL, Cake Wallet, Noir and memo handling.
-- [Refund requests](REFUND_REQUESTS.md): approvals, accounting and route retirement.
-- [Observer records](OBSERVER_RECORDS.md): automatic detection, exact proof and recovery states.
+- [Wallet compatibility](MERCHANT_WALLET_COMPATIBILITY.md): tested wallets and memo handling.
+- [Refund requests](REFUND_REQUESTS.md): decisions, accounting and route retirement.
+- [Observer records](OBSERVER_RECORDS.md): detection, verification and recovery states.
 
-## Operations
+## Development and maintenance
 
-- [Expired refund recovery](EXPIRED_REFUND_RECOVERY.md): private operator procedure that preserves reservations.
-- [Observer backups](SDK_OBSERVER_BACKUPS.md): encrypted archives and restore boundaries.
-- [ARM64 builds](LOCAL_ARM64_BUILD.md): native toolchain and artifact checks.
-- [Deployment](AUTO_DEPLOY.md): existing testnet auto-deployment and separate mainnet preview.
-- [Validation](CI_VALIDATION.md): local checks and manual Actions workflows.
-- [Merchant funds](MERCHANT_FUNDS.md): legacy hosted testnet controls versus mainnet wallet balances.
-- [Testnet spike](ZALLET_SPIKE_SETUP.md): historical development path, not mainnet setup.
+- [Deployment](AUTO_DEPLOY.md)
+- [Validation](CI_VALIDATION.md)
+- [ARM64 builds](LOCAL_ARM64_BUILD.md)
+- [Observer backups](SDK_OBSERVER_BACKUPS.md)
+- [Expired refund recovery](EXPIRED_REFUND_RECOVERY.md)
+- [Merchant funds](MERCHANT_FUNDS.md)
 
-The [receipt image](screenshots/receipt-card-mobile.png) is a local UI fixture, not transaction evidence. [Historical evidence](../scripts/evidence/README.md) keeps its original network and provenance. It is not a current deployment report.
+## Historical testnet tools
+
+The [testnet setup](ZALLET_SPIKE_SETUP.md) and [evidence records](../scripts/evidence/README.md) describe the earlier hosted-wallet implementation. They are separate from the current mainnet setup.
+
+Source and documentation are covered by the [MIT License](../LICENSE).

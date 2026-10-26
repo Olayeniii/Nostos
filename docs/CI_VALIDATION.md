@@ -17,10 +17,10 @@ python3 -m unittest discover -s scripts/lightclient -p 'test_*.py'
 
 The workflows are manual (`workflow_dispatch`) while hosted Actions allowance is exhausted. Concurrency cancellation prevents overlapping runs for the same workflow and ref. Local results do not create a successful GitHub check or bypass branch requirements.
 
-Restore automatic application CI deliberately after confirming available allowance. Keep expensive native builds, provider probes and visual review manual unless their inputs change. Do not enable paid usage or install a runner on a live wallet host merely to obtain checks.
+Automatic application CI is paused while the hosted allowance is exhausted. Native builds, provider probes and visual review run manually.
 
 ## Native builds
 
 Rust changes require the pinned compiler, SDK graph, native fixtures and a new verified artifact. A previous binary validates only its matching source. [ARM64 builds](LOCAL_ARM64_BUILD.md) document the isolated host procedure. Preserve source revision, build log and SHA-256 independently from an artifact's own checksum file.
 
-Tests, mock responses, package checks, public-chain probes, operator-reported runtime output and funded transactions are different evidence. Record the source and scope with each result. See [build status](BUILD_STATUS.md) for the latest recorded application checkpoint.
+Tests, mock responses, package checks, public-chain probes, runtime health reports and funded transactions are different evidence. See [build status](BUILD_STATUS.md) for the latest recorded application checkpoint.

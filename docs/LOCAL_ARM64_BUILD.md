@@ -18,4 +18,4 @@ Use a nonexistent workspace outside both source checkouts and all live wallet/re
 
 Local artifacts record local build origin rather than a fabricated workflow run. Verify the package's source revision, platform, fixed file list, permissions and SHA-256 against independently retained build output before installation. `inspect-sdk-package.py` reads packages without executing them.
 
-The operator has supplied successful native ARM64 builds during the mainnet work. That evidence applies to the reported source and binary hashes, not arbitrary later changes. New native source needs a fresh build. Unchanged source can reuse a previously verified artifact. Deployment remains separate; see [deployment](AUTO_DEPLOY.md).
+The mainnet release has successful ARM64 builds with recorded source revisions and binary hashes. New native source needs a fresh build. Unchanged source can reuse a previously verified artifact. Deployment remains separate; see [deployment](AUTO_DEPLOY.md).

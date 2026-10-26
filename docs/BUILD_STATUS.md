@@ -1,29 +1,19 @@
-# Build and deployment status
+# Project status
 
-Checkpoint: 26 October 2026. Source and deployment are separate facts.
+Updated 26 October 2026.
 
-| Area                        | Verified checkpoint                                                                                                                                                                                              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Source                      | PR #8 merged into `main` at `8d86d59b3be4dde7c4a742d02205ebceadaa75e2`                                                                                                                                           |
-| Private mainnet web preview | Operator reported healthy installation of `b201c4c1205f73cd5fd5f43981f95d1489fe3a8d`, whose source tree matches the merge                                                                                        |
-| Normal observer policy      | Operator reported normal worker restored and temporary exception removed                                                                                                                                         |
-| Data and health             | Existing records preserved; sign-in HTTP 200; anonymous account endpoint HTTP 401; installation requested zero sends                                                                                             |
-| Mainnet payment             | Operator confirmed 100,000 zats, or 0.001 ZEC                                                                                                                                                                    |
-| Mainnet partial refund      | Chain lookup returned five confirmations for the submitted transaction; the operator subsequently confirmed ZODL and NOSTOS showed confirmation for 50,000 zats, or 0.0005 ZEC                                   |
-| Public deployment           | Operator reported publication of the reviewed mainnet source at `https://nostos.iyforge.xyz`; mainnet network response, sign-in HTTP 200, account HTTP 401, preserved records, unchanged observer and zero sends |
+## Mainnet
+
+NOSTOS is live at <https://nostos.iyforge.xyz>. The completed mainnet test paid 100,000 zats (0.001 ZEC) and returned 50,000 zats (0.0005 ZEC) as a confirmed partial refund. Both the wallet and NOSTOS showed the refund confirmation. Network fees are separate.
+
+The deployed payment/refund source is `b201c4c1205f73cd5fd5f43981f95d1489fe3a8d`, with the same source tree as the payment/refund merge in PR #8. Public mainnet routing was added in PR #11. The public installation passed HTTP health checks, preserved existing records and left the observer unchanged. The normal observer policy is installed.
+
+The workspace layout update in PR #12 is installed at revision `217010b97b2898138dbdf563278e39656c8328db`. Installation checks returned public HTTP 200 and anonymous account HTTP 401, with mainnet settings, existing records, observer and routing preserved. No sends were requested. The later documentation and license changes do not require another web installation.
 
 ## Validation
 
-The PR #8 source checkpoint passed 435 application tests, 17 Node tests, three final-preview deployment tests, TypeScript, targeted lint, the current-file secret scan and the Next.js production build. Native verification source was restored to its previously tested version. Native tests and optimized builds were also run by the operator on the isolated ARM64 build host during the mainnet work.
+The payment/refund release passed 435 application tests, 17 Node tests, three deployment tests, TypeScript, targeted lint, the current-file secret scan and the Next.js production build. Native tests and optimized builds ran on the isolated ARM64 build host.
 
-These are recorded checkpoints, not a claim that a later checkout has just rerun every test. Fixture checks do not establish a new funded transaction. The deployment report is supplied operator evidence, not direct remote access by the reviewer.
+The workspace layout update passed the production build, TypeScript, targeted lint and formatting, 48 responsive fixture states and three deployment tests. These fixture results are separate from the completed mainnet transaction test.
 
-## Submission work remaining
-
-- Check the intended judge access path and public browser flow. The operator's rollout report confirms the public mainnet switch; independent retrieval from this review environment was unavailable.
-- Prepare the demo video using the existing confirmed records; no additional funded test is required for that recording.
-- Complete submission fields and save the submission receipt.
-- Review source visibility and licensing before public release. The repository is currently private and `UNLICENSED`.
-- Resolve the retained dependency-security branch separately before treating the deployed dependency stack as security-updated. That work is not part of the merged payment/refund release.
-
-The earlier testnet evidence remains in `scripts/evidence`. It is historical evidence, with its original network and limits.
+The retained dependency-security branch has not been included in the deployed payment/refund release. Historical testnet evidence remains in `scripts/evidence` with its original network and scope.
