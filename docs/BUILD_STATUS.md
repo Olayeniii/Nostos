@@ -8,7 +8,7 @@ NOSTOS is live at <https://nostos.iyforge.xyz>. The completed mainnet test paid 
 
 The deployed payment/refund source is `b201c4c1205f73cd5fd5f43981f95d1489fe3a8d`, with the same source tree as the payment/refund merge in PR #8. Public mainnet routing was added in PR #11. The public installation passed HTTP health checks, preserved existing records and left the observer unchanged. The normal observer policy is installed.
 
-PR #12 contains the subsequent workspace layout and documentation updates. Its web installation is separate from the confirmed payment/refund release.
+The workspace layout update in PR #12 is installed at revision `217010b97b2898138dbdf563278e39656c8328db`. Installation checks returned public HTTP 200 and anonymous account HTTP 401, with mainnet settings, existing records, observer and routing preserved. No sends were requested. The later documentation and license changes do not require another web installation.
 
 ## Validation
 
