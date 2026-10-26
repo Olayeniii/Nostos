@@ -144,6 +144,31 @@ export function MerchantWorkspace({
           <Mark />
           <span className="studio-brand-name">NOSTOS</span>
         </Link>
+        <button
+          type="button"
+          className="studio-sidebar-toggle"
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!sidebarCollapsed}
+          aria-controls="merchant-sidebar"
+          onClick={toggleSidebar}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="4" width="18" height="16" rx="3" />
+            <path d="M9 4v16" />
+            <path d={sidebarCollapsed ? "m13 9 3 3-3 3" : "m16 9-3 3 3 3"} />
+          </svg>
+        </button>
         <div className="studio-destinations">
           {destinations.map((item) => (
             <Link
@@ -206,35 +231,6 @@ export function MerchantWorkspace({
       <div className="studio-body">
         <header className="studio-header">
           <div className="studio-heading-group">
-            <button
-              type="button"
-              className="studio-sidebar-toggle"
-              aria-label={
-                sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
-              }
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-expanded={!sidebarCollapsed}
-              aria-controls="merchant-sidebar"
-              onClick={toggleSidebar}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="20"
-                height="20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="3" y="4" width="18" height="16" rx="3" />
-                <path d="M9 4v16" />
-                <path
-                  d={sidebarCollapsed ? "m13 9 3 3-3 3" : "m16 9-3 3 3 3"}
-                />
-              </svg>
-            </button>
             <div className="studio-identity">
               <Link href="/merchant/overview" className="studio-wordmark">
                 <span className="overview-desktop-brand">Store</span>
