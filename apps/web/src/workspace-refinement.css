@@ -713,3 +713,15 @@
     gap: 12px;
   }
 }
+
+/* Generated paper surface, with opaque cards for clear payment details. */
+.merchant-studio.refined-workspace {
+  background-color: #f4f7f1;
+  background-image: url("/images/store-paper-v1.webp");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.merchant-studio.refined-workspace .studio-header {
+  background: #f4f7f1d9;
+}

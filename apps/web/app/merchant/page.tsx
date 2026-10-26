@@ -149,7 +149,7 @@ export default function Merchant() {
   }
   return (
     <MerchantWorkspace
-      name={data?.merchant.name || "Merchant workspace"}
+      name={data?.merchant.name || "Your store"}
       detailOpen={!!current}
       onPaymentsHome={() => {
         if (busy) return;

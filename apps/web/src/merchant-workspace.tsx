@@ -60,7 +60,7 @@ function WorkspaceIcon({
   );
 }
 export function MerchantWorkspace({
-  name = "Merchant workspace",
+  name = "Your store",
   className = "",
   detailOpen = false,
   onSignOut,
@@ -112,7 +112,7 @@ export function MerchantWorkspace({
     <main
       className={`product-app dashboard-app merchant-studio refined-workspace ${detailOpen ? "detail-open" : ""} ${className}`}
     >
-      <nav className="studio-rail" aria-label="Merchant workspace">
+      <nav className="studio-rail" aria-label="Merchant store">
         <Link
           className="studio-mark"
           href="/merchant/overview"
@@ -164,10 +164,7 @@ export function MerchantWorkspace({
         <header className="studio-header">
           <div className="studio-identity">
             <Link href="/merchant/overview" className="studio-wordmark">
-              {pathname === "/merchant/settings" && <Mark />}
-              <span className="overview-desktop-brand">
-                {pathname === "/merchant/settings" ? "NOSTOS" : "Workspace"}
-              </span>
+              <span className="overview-desktop-brand">Store</span>
               <span className="overview-mobile-brand">NOSTOS</span>
             </Link>
             <span>
