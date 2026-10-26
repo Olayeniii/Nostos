@@ -210,7 +210,7 @@ export default function Merchant() {
           </strong>
           <p>
             {data
-              ? `${summary.confirmedPayments} confirmed payments`
+              ? `${summary.confirmedPayments} confirmed ${summary.confirmedPayments === 1 ? "payment" : "payments"}`
               : "Waiting for payment records"}
           </p>
         </article>
@@ -234,7 +234,7 @@ export default function Merchant() {
           </strong>
           <p>
             {data
-              ? `${summary.confirmedRefunds} confirmed refunds`
+              ? `${summary.confirmedRefunds} confirmed ${summary.confirmedRefunds === 1 ? "refund" : "refunds"}`
               : "Waiting for refund records"}
           </p>
         </article>

@@ -547,10 +547,11 @@
     height: 100dvh;
     min-height: 0;
     overflow: hidden;
-    grid-template-columns: 208px minmax(0, 1fr);
+    --studio-rail-width: 208px;
+    grid-template-columns: var(--studio-rail-width) minmax(0, 1fr);
   }
   .merchant-studio.refined-workspace .studio-rail {
-    width: 208px;
+    width: var(--studio-rail-width);
     height: 100vh;
     height: 100dvh;
     overflow-y: auto;
@@ -645,10 +646,11 @@
     zoom: 1.65;
     width: 100%;
     height: calc(100dvh / 1.65);
-    grid-template-columns: 176px minmax(0, 1fr);
+    --studio-rail-width: 176px;
+    grid-template-columns: var(--studio-rail-width) minmax(0, 1fr);
   }
   .merchant-studio.refined-workspace .studio-rail {
-    width: 176px;
+    width: var(--studio-rail-width);
     height: calc(100dvh / 1.65);
     padding-inline: 8px;
   }
@@ -724,4 +726,117 @@
 }
 .merchant-studio.refined-workspace .studio-header {
   background: #f4f7f1d9;
+}
+
+.studio-heading-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.studio-about-icon,
+.studio-sidebar-toggle {
+  display: none;
+}
+@media (min-width: 901px) {
+  .merchant-studio .studio-sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
+    padding: 0;
+    border: 1px solid #d5d8cd;
+    border-radius: 8px;
+    background: #faf8f2;
+    color: #244b3a;
+  }
+  .merchant-studio .studio-sidebar-toggle:hover {
+    background: #e2f2e7;
+  }
+  .merchant-studio.refined-workspace.sidebar-collapsed {
+    --studio-rail-width: 80px;
+  }
+  .sidebar-collapsed .studio-rail .studio-brand-name,
+  .sidebar-collapsed .studio-destinations a > span,
+  .sidebar-collapsed .studio-business,
+  .sidebar-collapsed .studio-about > span {
+    display: none;
+  }
+  .merchant-studio.refined-workspace.sidebar-collapsed .studio-rail a {
+    justify-content: center;
+    padding-inline: 0;
+    gap: 0;
+  }
+  .sidebar-collapsed .studio-about-icon {
+    display: block;
+  }
+}
+
+/* Keep summary labels, values and helper text on the same baselines. */
+.merchant-studio.refined-workspace
+  :is(.overview-metric, .summary-grid > article) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  grid-template-rows: minmax(36px, auto) auto 1fr;
+  gap: 10px 12px;
+  padding: 18px 20px;
+  border-radius: 12px;
+}
+.merchant-studio.refined-workspace
+  :is(.overview-metric, .summary-grid > article)
+  > :first-child {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.merchant-studio.refined-workspace
+  :is(.overview-metric-icon, .workspace-metric-icon) {
+  position: static;
+  grid-column: 2;
+  grid-row: 1;
+  width: 36px;
+  height: 36px;
+  align-self: center;
+}
+.merchant-studio.refined-workspace
+  :is(.overview-metric, .summary-grid > article)
+  > strong {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  font-size: clamp(26px, 2.8vw, 38px);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.merchant-studio.refined-workspace
+  :is(.overview-metric, .summary-grid > article)
+  > strong
+  small {
+  font-size: 16px;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.merchant-studio.refined-workspace
+  :is(.overview-metric, .summary-grid > article)
+  > p {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  align-self: end;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #59685f;
+}
+.refined-workspace .workspace-refund-metric {
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.refined-workspace .workspace-refund-metric .workspace-summary-icon {
+  width: 36px;
+  height: 36px;
 }

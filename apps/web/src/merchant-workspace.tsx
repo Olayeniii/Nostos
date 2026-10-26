@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { requestJson } from "./requests.js";
 import { Mark } from "./mark.js";
 import { NetworkLabel } from "./network-context.js";
@@ -75,6 +75,25 @@ export function MerchantWorkspace({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setSidebarCollapsed(
+        localStorage.getItem("nostos:sidebar-collapsed") === "true",
+      );
+    } catch {
+      /* Storage can be disabled. */
+    }
+  }, []);
+  function toggleSidebar() {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    try {
+      localStorage.setItem("nostos:sidebar-collapsed", String(next));
+    } catch {
+      /* The toggle still works without persistence. */
+    }
+  }
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   async function signOut() {
@@ -110,9 +129,13 @@ export function MerchantWorkspace({
   ] as const;
   return (
     <main
-      className={`product-app dashboard-app merchant-studio refined-workspace ${detailOpen ? "detail-open" : ""} ${className}`}
+      className={`product-app dashboard-app merchant-studio refined-workspace ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${detailOpen ? "detail-open" : ""} ${className}`}
     >
-      <nav className="studio-rail" aria-label="Merchant store">
+      <nav
+        id="merchant-sidebar"
+        className="studio-rail"
+        aria-label="Merchant store"
+      >
         <Link
           className="studio-mark"
           href="/merchant/overview"
@@ -126,6 +149,8 @@ export function MerchantWorkspace({
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
+              title={sidebarCollapsed ? item.label : undefined}
               onClick={(event) => {
                 if (
                   !event.metaKey &&
@@ -155,22 +180,71 @@ export function MerchantWorkspace({
               <NetworkLabel />
             </span>
           </div>
-          <Link href="/" className="studio-about">
-            About NOSTOS
+          <Link
+            href="/"
+            className="studio-about"
+            aria-label="About NOSTOS"
+            title={sidebarCollapsed ? "About NOSTOS" : undefined}
+          >
+            <svg
+              className="studio-about-icon"
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v6m0-10v1" />
+            </svg>
+            <span>About NOSTOS</span>
           </Link>
         </div>
       </nav>
       <div className="studio-body">
         <header className="studio-header">
-          <div className="studio-identity">
-            <Link href="/merchant/overview" className="studio-wordmark">
-              <span className="overview-desktop-brand">Store</span>
-              <span className="overview-mobile-brand">NOSTOS</span>
-            </Link>
-            <span>
-              {destinations.find((item) => item.href === pathname)?.label ??
-                name}
-            </span>
+          <div className="studio-heading-group">
+            <button
+              type="button"
+              className="studio-sidebar-toggle"
+              aria-label={
+                sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+              }
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="merchant-sidebar"
+              onClick={toggleSidebar}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="3" />
+                <path d="M9 4v16" />
+                <path
+                  d={sidebarCollapsed ? "m13 9 3 3-3 3" : "m16 9-3 3 3 3"}
+                />
+              </svg>
+            </button>
+            <div className="studio-identity">
+              <Link href="/merchant/overview" className="studio-wordmark">
+                <span className="overview-desktop-brand">Store</span>
+                <span className="overview-mobile-brand">NOSTOS</span>
+              </Link>
+              <span>
+                {destinations.find((item) => item.href === pathname)?.label ??
+                  name}
+              </span>
+            </div>
           </div>
           <div className="studio-account">
             <span className="studio-network">
