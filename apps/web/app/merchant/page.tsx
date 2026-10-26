@@ -141,8 +141,8 @@ export default function Merchant() {
     setShare(link);
     setQr(
       await QRCode.toDataURL(link, {
-        width: 220,
-        margin: 2,
+        width: 1024,
+        margin: 4,
         color: { dark: "#0b1514", light: "#f3efe6" },
       }),
     );
@@ -368,12 +368,21 @@ export default function Merchant() {
             </a>
           </div>
           {qr && (
-            <img
-              width={220}
-              height={220}
-              src={qr}
-              alt="QR code for this private payment link"
-            />
+            <div className="qr-export">
+              <img
+                width={220}
+                height={220}
+                src={qr}
+                alt="QR code for this private payment link"
+              />
+              <a
+                className="text-button qr-download"
+                href={qr}
+                download="nostos-payment-link-qr.png"
+              >
+                Download QR
+              </a>
+            </div>
           )}
         </section>
       )}

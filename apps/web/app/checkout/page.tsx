@@ -241,8 +241,8 @@ export default function Checkout() {
                       setPrepared(p);
                       setQr(
                         await QRCode.toDataURL(p.uri, {
-                          width: 248,
-                          margin: 2,
+                          width: 1024,
+                          margin: 4,
                           color: { dark: "#0b1514", light: "#f3efe6" },
                         }),
                       );
@@ -305,13 +305,22 @@ export default function Checkout() {
               ) : (
                 <>
                   <div className="wallet-payment">
-                    {!walletRequested && !walletBusy && (
-                      <img
-                        width={248}
-                        height={248}
-                        src={qr}
-                        alt="Zcash payment request QR code, including amount and memo"
-                      />
+                    {!walletRequested && !walletBusy && qr && (
+                      <div className="qr-export">
+                        <img
+                          width={248}
+                          height={248}
+                          src={qr}
+                          alt="Zcash payment request QR code, including amount and memo"
+                        />
+                        <a
+                          className="text-button qr-download"
+                          href={qr}
+                          download="nostos-payment-qr.png"
+                        >
+                          Download QR
+                        </a>
+                      </div>
                     )}
                     {noirAvailable && (
                       <button

@@ -8,7 +8,7 @@ Accept shielded Zcash payments and refund customers without asking for another a
 
 1. Create a payment link for your customer.
 2. Your customer adds a shielded return address and pays from a compatible wallet.
-3. Track the confirmed payment and record fulfillment in your workspace.
+3. Track the confirmed payment and record fulfillment in your store.
 4. When a refund is needed, review the amount and sign in your own wallet. The existing receipt updates after verification.
 
 Your spending keys stay in your wallet. We use viewing access to check the dedicated merchant account. You and the service can read the return route; on-chain encryption does not make the service blind or prove who owns an address. Read the [privacy and security boundaries](docs/SECURITY_BOUNDARY.md).
@@ -23,7 +23,7 @@ NOSTOS is live on mainnet. Our completed mainnet test paid 0.001 ZEC and returne
 - [Build and deployment status](docs/BUILD_STATUS.md)
 - [Documentation](docs/README.md)
 
-ZODL may require loading the QR image in its own scanner. Some wallets omit the memo when opening a request. Always check the exact amount and transaction memo before signing. See [wallet compatibility](docs/MERCHANT_WALLET_COMPATIBILITY.md).
+Use Download QR to save the payment code. ZODL may require loading that image in its own scanner. Some wallets omit the memo when opening a request. Always check the exact amount and transaction memo before signing. See [wallet compatibility](docs/MERCHANT_WALLET_COMPATIBILITY.md).
 
 ## Run locally
 
