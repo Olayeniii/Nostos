@@ -612,3 +612,104 @@
     display: none;
   }
 }
+
+@media (min-width: 901px) {
+  .merchant-studio.refined-workspace .studio-page {
+    display: flex;
+    flex-direction: column;
+  }
+  .merchant-studio.refined-workspace .studio-page > * {
+    flex-shrink: 0;
+  }
+  .merchant-studio.refined-workspace .studio-page > footer {
+    margin-top: auto;
+    padding-top: 20px;
+    padding-bottom: 0;
+  }
+  .merchant-studio.refined-workspace .studio-page > footer::before {
+    content: none;
+  }
+}
+.drop-request-panel {
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  padding-top: 16px;
+}
+.drop-request-panel p {
+  line-height: 1.6;
+}
+
+/* A phone's desktop viewport is tall, not a wide laptop screen. */
+@media (min-width: 901px) and (max-aspect-ratio: 3/4) {
+  .merchant-studio.refined-workspace {
+    zoom: 1.65;
+    width: 100%;
+    height: calc(100dvh / 1.65);
+    grid-template-columns: 176px minmax(0, 1fr);
+  }
+  .merchant-studio.refined-workspace .studio-rail {
+    width: 176px;
+    height: calc(100dvh / 1.65);
+    padding-inline: 8px;
+  }
+  .merchant-studio.refined-workspace .studio-page {
+    padding: 20px 16px;
+  }
+  .refined-workspace .studio-header {
+    padding-inline: 16px;
+  }
+  .refined-workspace .studio-identity {
+    gap: 8px;
+  }
+  .refined-workspace .overview-title,
+  .refined-workspace .dashboard-title {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .refined-workspace .overview-metrics,
+  .refined-workspace .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .refined-workspace .overview-total,
+  .refined-workspace .summary-grid article:first-child {
+    grid-column: 1 / -1;
+  }
+  .refined-workspace .overview-attention-grid,
+  .refined-workspace .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .refined-workspace .overview-columns,
+  .merchant-studio .ledger-columns,
+  .merchant-studio .ledger-row .ledger-date {
+    display: none;
+  }
+  .merchant-studio.refined-workspace .overview-records a,
+  .merchant-studio .ledger-row,
+  .merchant-studio .has-selection .ledger-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+  .overview-records .overview-payment,
+  .overview-records .overview-next,
+  .merchant-studio .ledger-row .payment-state {
+    grid-column: 1 / -1;
+  }
+  .merchant-studio .ledger-layout,
+  .merchant-studio .ledger-layout.has-selection {
+    display: block;
+  }
+  .merchant-studio .ledger-layout.has-selection .ledger {
+    display: none;
+  }
+  .refined-workspace .studio-tools {
+    flex-wrap: wrap;
+  }
+  .refined-workspace .studio-search {
+    width: 100%;
+    max-width: none;
+  }
+  .merchant-studio .studio-page > footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+}

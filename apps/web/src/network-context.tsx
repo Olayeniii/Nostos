@@ -52,7 +52,7 @@ export function NetworkNotice() {
     <>
       {n === "mainnet"
         ? commerce
-          ? "Mainnet payment preview. Payments and refunds are signed in your wallet."
+          ? "Mainnet. Payments and refunds are signed in your wallet."
           : "Mainnet connection preview. Merchant payments are disabled."
         : n === "testnet"
           ? "Testnet only. No real funds."

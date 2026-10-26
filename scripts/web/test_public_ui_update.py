@@ -9,7 +9,7 @@ class Update(unittest.TestCase):
   with tempfile.TemporaryDirectory() as directory:
    root=Path(directory);calls=[]
    old={'State':{'Running':True},'Image':m.IMAGE,'Config':{'User':'1001:1001','Env':['NOSTOS_NETWORK=mainnet','NOSTOS_WEB_TRUSTED_ORIGINS=https://nostos.iyforge.xyz','NOSTOS_MAINNET_ACCOUNT_PUBLIC_ORIGIN=https://nostos.iyforge.xyz','NOSTOS_MAINNET_PRODUCT_DATA_KEY=fixture-key']},'HostConfig':{'NetworkMode':'host'},'Mounts':[
-    {'Destination':'/app','Source':str(root/'final-web-b201c4c1205f/source'),'RW':False},{'Destination':'/preview','Source':str(root/'runtime/data'),'RW':True},{'Destination':'/preview-rpc','Source':str(root/'runtime/rpc'),'RW':False}]}
+    {'Destination':'/app','Source':str(root/m.CURRENT_SOURCE),'RW':False},{'Destination':'/preview','Source':str(root/'runtime/data'),'RW':True},{'Destination':'/preview-rpc','Source':str(root/'runtime/rpc'),'RW':False}]}
    def docker(*args):
     calls.append(args)
     return json.dumps([old]) if args[0]=='inspect' else ''

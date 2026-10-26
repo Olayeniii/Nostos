@@ -93,6 +93,7 @@ export async function prepareObservedPayment(
     !saved ||
     saved.merchantId !== checkout.merchantId ||
     saved.status !== "unpaid" ||
+    !!saved.droppedAt ||
     (saved.route && saved.route !== route) ||
     connected(store, checkout.merchantId) !== destination
   )

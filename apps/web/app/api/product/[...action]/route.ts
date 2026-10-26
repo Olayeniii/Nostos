@@ -330,6 +330,14 @@ async function handle(request: Request) {
         });
       }
       if (route === "prepare" && isPost) {
+        if (checkout.droppedAt)
+          return json(
+            {
+              error:
+                "This payment request has been dropped. Ask the merchant for a new link.",
+            },
+            409,
+          );
         const route =
           body.route === undefined ? checkout.route : text(body.route, 20, 506);
         if (!route)
@@ -489,6 +497,20 @@ async function handle(request: Request) {
         message:
           "If the new email is available, a verification link has been sent. Your current email remains active until verification.",
       });
+    }
+    if (route === "drop-request" && isPost) {
+      const id = text(body.id, 36, 36);
+      if (!id || Object.keys(body).some((key) => key !== "id"))
+        return json({ error: "Select an unpaid payment request." }, 400);
+      if (!store.dropRequest(id, merchant.id))
+        return json(
+          {
+            error:
+              "Only your unpaid requests can be dropped. Refresh the payment.",
+          },
+          409,
+        );
+      return json({ ok: true });
     }
     if (route === "fulfillment" && isPost) {
       const checkout = store.checkout(String(body.id ?? ""));

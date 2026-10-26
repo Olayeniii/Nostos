@@ -36,9 +36,8 @@ export function AppFooter() {
         <NetworkNotice />
       </span>
       <p>
-        Shielded transactions protect on-chain details. The merchant and service
-        operator can see the information needed to process your payment and
-        refund.
+        Shielded transactions protect on-chain details. The merchant and NOSTOS
+        can see the information needed to process your payment and refund.
       </p>
     </footer>
   );

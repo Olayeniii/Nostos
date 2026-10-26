@@ -25,6 +25,7 @@ export default function Merchant() {
   const [selected, setSelected] = useState("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [dropping, setDropping] = useState(false);
   const [error, setError] = useState("");
   const [copyNotice, setCopyNotice] = useState("");
   const shareRef = useRef<HTMLElement>(null);
@@ -47,7 +48,11 @@ export default function Merchant() {
       .includes(query.trim().toLowerCase());
     return (
       match &&
+      (filter === "dropped"
+        ? !!record.requestDropped
+        : !record.requestDropped) &&
       (filter === "all" ||
+        filter === "dropped" ||
         (filter === "confirmed"
           ? record.paymentStatus === "confirmed"
           : record.paymentStatus !== "confirmed" &&
@@ -55,7 +60,9 @@ export default function Merchant() {
     );
   });
   const current = records.find((r) => r.id === selected);
-  const summary = paymentSummary(records);
+  const summary = paymentSummary(
+    records.filter((record) => !record.requestDropped),
+  );
   const entryHandled = useRef(false);
   useEffect(() => {
     if (!data || entryHandled.current) return;
@@ -91,6 +98,7 @@ export default function Merchant() {
       );
   }
   function closeDetail() {
+    setDropping(false);
     setSelected("");
     clearPaymentHash();
   }
@@ -394,6 +402,7 @@ export default function Merchant() {
                 ["all", "All"],
                 ["awaiting", "Awaiting"],
                 ["confirmed", "Confirmed"],
+                ["dropped", "Dropped"],
               ].map(([value, label]) => (
                 <button
                   key={value}
@@ -618,6 +627,67 @@ export default function Merchant() {
                 <dd>{date(current.createdAt)}</dd>
               </div>
             </dl>
+            {current.paymentStatus === "unpaid" &&
+              !current.paymentTxid &&
+              !current.requestDropped && (
+                <section className="drop-request-panel">
+                  {dropping ? (
+                    <>
+                      <h3>Drop this payment request?</h3>
+                      <p>
+                        It will leave your active list and this link will stop
+                        preparing payments. A payment already sent from a wallet
+                        can still arrive and will remain eligible for
+                        verification.
+                      </p>
+                      <div className="home-actions">
+                        <button
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => setDropping(false)}
+                        >
+                          Keep request
+                        </button>
+                        <button
+                          className="secondary"
+                          disabled={busy || loading}
+                          onClick={async () => {
+                            setBusy(true);
+                            setError("");
+                            try {
+                              await post("drop-request", { id: current.id });
+                              closeDetail();
+                              await refresh();
+                            } catch {
+                              setError(
+                                "Could not confirm the request was dropped. Refresh before trying again.",
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Confirm drop
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      className="text-button"
+                      disabled={busy || loading}
+                      onClick={() => setDropping(true)}
+                    >
+                      Drop payment request
+                    </button>
+                  )}
+                </section>
+              )}
+            {current.requestDropped && (
+              <p className="info-panel">
+                This request was dropped. Its records are retained in case a
+                payment was already sent.
+              </p>
+            )}
             {current.paymentStatus === "confirmed" && (
               <section className="fulfillment-panel">
                 <h3>02 / Fulfillment</h3>

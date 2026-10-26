@@ -9,6 +9,7 @@ export type ReceiptData = {
   refundAmountZat: number;
   status: string;
   paymentStatus?: string;
+  requestDropped?: boolean;
   fulfillment?: "pending" | "fulfilled" | "failed";
   paymentTxid?: string | null;
   refundTxid?: string;
